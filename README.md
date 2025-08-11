@@ -1,3 +1,7 @@
+# readmynumber
+
+## マイナンバーカード及び在留カード読み取りアプリ
+
 Inspired by [readmynumber](https://github.com/Ukenn2112/readmynumber) (author [Ukenn2112](https://github.com/Ukenn2112)).
 
 ### 【主な機能】
