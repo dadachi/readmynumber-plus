@@ -9,9 +9,10 @@ This is an iOS SwiftUI application for reading Japanese My Number (マイナン�
 ## Development Commands
 
 This is an Xcode project with no package.json - use Xcode or command line tools:
-- **Build**: `xcodebuild -scheme readmynumber -destination 'platform=iOS Simulator,name=iPhone 15' build`
-- **Test**: `xcodebuild -scheme readmynumber -destination 'platform=iOS Simulator,name=iPhone 15' test`
+- **Build**: `xcodebuild -scheme "マイ証明書" -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build`
+- **Test**: `xcodebuild -scheme "マイ証明書" -destination 'platform=iOS Simulator,name=iPhone 16 Pro' test`
 - **Run**: Open `readmynumber.xcodeproj` in Xcode and run the project
+- **List available simulators**: `xcodebuild -list` to see available schemes and devices
 
 ## Architecture Overview
 
