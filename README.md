@@ -1,6 +1,6 @@
 # readmynumber
 
-## マイナンバーカード及び在留カード読み取りアプリ
+## 日本のIDカード（マイナンバーカード・在留カード）をiOSで読み取るアプリ
 
 Inspired by [readmynumber](https://github.com/Ukenn2112/readmynumber) (author [Ukenn2112](https://github.com/Ukenn2112)).
 
