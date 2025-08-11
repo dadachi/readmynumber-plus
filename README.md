@@ -1,15 +1,5 @@
 Inspired by [readmynumber](https://github.com/Ukenn2112/readmynumber) (author [Ukenn2112](https://github.com/Ukenn2112)).
 
-<img src="https://github.com/user-attachments/assets/98d3feb0-728a-4e21-bfea-b2384c801e2d" align="left" width="65"> <h1>TUTnext for swiftUI App</h1>
-## マイ証明書<br>マイナンバー証明書リーダー
-
-「マイナンバー証明書リーダー」は、ユーザーがマイナンバーカードに搭載された電子証明書を簡単に読み取ることができるアプリケーションです。このアプリは、利用者証明用と署名用の2種類の証明書をサポートしており、ユーザーが安全にオンラインサービスにアクセスできるように設計されています。
-
-<img src="https://github.com/user-attachments/assets/9a0e0813-bbe8-47d4-b6bf-c9af327134fa" align="left" width="165">
-<img src="https://github.com/user-attachments/assets/a9713395-6cfb-41eb-a3e5-9a2c1d9ce005" align="left" width="165">
-<img src="https://github.com/user-attachments/assets/18b718d4-ceb2-4b23-b4ee-03b4e940a0eb" align="left" width="165">
-<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
-
 ### 【主な機能】
 
 1、利用者証明用電子証明書の読み取り
