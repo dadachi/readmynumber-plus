@@ -1,4 +1,4 @@
-Inspired by [readmynumber](https://github.com/Ukenn2112/readmynumber).
+Inspired by [readmynumber](https://github.com/Ukenn2112/readmynumber) (author [Ukenn2112](https://github.com/Ukenn2112)).
 
 <img src="https://github.com/user-attachments/assets/98d3feb0-728a-4e21-bfea-b2384c801e2d" align="left" width="65"> <h1>TUTnext for swiftUI App</h1>
 ## マイ証明書<br>マイナンバー証明書リーダー
