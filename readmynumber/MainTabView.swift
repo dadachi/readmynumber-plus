@@ -16,31 +16,31 @@ struct MainTabView: View {
                     Text("証明書読み取り")
                 }
             
-            SecondTabView()
+            ResidentTabView()
                 .tabItem {
-                    Image(systemName: "gear")
-                    Text("設定")
+                    Image(systemName: "person.circle")
+                    Text("Resident")
                 }
         }
     }
 }
 
-struct SecondTabView: View {
+struct ResidentTabView: View {
     var body: some View {
         NavigationStack {
             VStack {
                 Spacer()
                 
                 VStack(spacing: 20) {
-                    Image(systemName: "gear")
+                    Image(systemName: "person.circle")
                         .font(.system(size: 60))
                         .foregroundColor(.secondary)
                     
-                    Text("設定")
+                    Text("Resident")
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    Text("この画面は将来の設定機能用に予約されています。")
+                    Text("この画面は住民情報機能用に予約されています。")
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -49,7 +49,7 @@ struct SecondTabView: View {
                 
                 Spacer()
             }
-            .navigationTitle("設定")
+            .navigationTitle("Resident")
         }
     }
 }
@@ -59,5 +59,5 @@ struct SecondTabView: View {
 }
 
 #Preview {
-    SecondTabView()
+    ResidentTabView()
 }
