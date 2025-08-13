@@ -13,13 +13,19 @@ struct MainTabView: View {
             ContentView()
                 .tabItem {
                     Image(systemName: "creditcard.fill")
-                    Text("証明書読み取り")
+                    Text("マイナンバー")
                 }
             
             ResidentTabView()
                 .tabItem {
-                    Image(systemName: "person.circle")
-                    Text("Resident")
+                    Image(systemName: "person.text.rectangle.fill")
+                    Text("在留カード")
+                }
+            
+            MDocView()
+                .tabItem {
+                    Image(systemName: "doc.text.viewfinder")
+                    Text("M-Doc")
                 }
         }
     }
