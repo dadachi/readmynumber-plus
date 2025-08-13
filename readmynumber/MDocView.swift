@@ -5,13 +5,24 @@
 
 import SwiftUI
 import CoreNFC
+import AVFoundation
+import CoreBluetooth
 
 struct MDocView: View {
+    @StateObject private var mdocReader = MDocReader()
     @State private var showAlert: Bool = false
     @State private var alertTitle: String = ""
     @State private var alertMessage: String = ""
-    @State private var isScanning: Bool = false
+    @State private var showDocumentDetail = false
+    @State private var parsedDocument: MDocParser.ParsedDocument?
+    @State private var selectedReadingMethod: ReadingMethod = .qrCode
     @Environment(\.colorScheme) var colorScheme
+    
+    enum ReadingMethod {
+        case qrCode
+        case nfc
+        case bluetooth
+    }
     
     var body: some View {
         NavigationStack {
@@ -74,6 +85,21 @@ struct MDocView: View {
                             .background(Color.purple.opacity(0.1))
                             .cornerRadius(8)
 
+                            // Reading Method Selection
+                            HStack {
+                                Text("読み取り方法:")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Picker("", selection: $selectedReadingMethod) {
+                                    Label("QRコード", systemImage: "qrcode").tag(ReadingMethod.qrCode)
+                                    Label("NFC", systemImage: "wave.3.right").tag(ReadingMethod.nfc)
+                                    Label("Bluetooth", systemImage: "antenna.radiowaves.left.and.right").tag(ReadingMethod.bluetooth)
+                                }
+                                .pickerStyle(SegmentedPickerStyle())
+                            }
+                            .padding(.vertical, 8)
+                            
                             Button(action: {
                                 startMDocReading()
                             }) {
@@ -143,7 +169,7 @@ struct MDocView: View {
                     }
                     .frame(width: geometry.size.width, height: geometry.size.height)
 
-                    if isScanning {
+                    if mdocReader.isReading {
                         Color.black.opacity(0.4)
                             .edgesIgnoringSafeArea(.all)
                         ProgressView("M-Doc読み取り中...")
@@ -156,13 +182,108 @@ struct MDocView: View {
             .alert(isPresented: $showAlert) {
                 Alert(title: Text(alertTitle), message: Text(alertMessage), dismissButton: .default(Text("OK")))
             }
+            .sheet(isPresented: $showDocumentDetail) {
+                if let document = parsedDocument {
+                    MDocDetailView(document: document)
+                }
+            }
         }
     }
     
     private func startMDocReading() {
-        // M-Doc読み取り機能の実装
-        // 現時点では開発中のメッセージを表示
-        showError(title: "機能開発中", message: "M-Doc読み取り機能は現在開発中です。今後のアップデートでご利用いただけるようになります。")
+        switch selectedReadingMethod {
+        case .qrCode:
+            startQRCodeReading()
+        case .nfc:
+            startNFCReading()
+        case .bluetooth:
+            startBluetoothReading()
+        }
+    }
+    
+    private func startQRCodeReading() {
+        mdocReader.startQRCodeReading { result in
+            switch result {
+            case .success(let deviceEngagement):
+                // QRコード読み取り成功後、BLE接続を開始
+                mdocReader.connectBLE(with: deviceEngagement)
+                requestMDocData()
+            case .failure(let error):
+                showError(title: "QRコード読み取りエラー", message: error.localizedDescription)
+            }
+        }
+    }
+    
+    private func startNFCReading() {
+        guard NFCTagReaderSession.readingAvailable else {
+            showError(title: "NFC利用不可", message: "このデバイスはNFC読み取りに対応していません")
+            return
+        }
+        
+        mdocReader.startNFCReading()
+        observeReaderStatus()
+    }
+    
+    private func startBluetoothReading() {
+        // Simulate device engagement for BLE direct connection
+        mdocReader.startQRCodeReading { result in
+            switch result {
+            case .success(let deviceEngagement):
+                mdocReader.connectBLE(with: deviceEngagement)
+                requestMDocData()
+            case .failure(let error):
+                showError(title: "Bluetooth接続エラー", message: error.localizedDescription)
+            }
+        }
+    }
+    
+    private func requestMDocData() {
+        // Request mobile driver's license data
+        let request = mdocReader.requestDataElements(
+            docType: MobileDrivingLicense.docType,
+            elements: [
+                MobileDrivingLicense.isoMdlNamespace: [
+                    "family_name", "given_name", "birth_date",
+                    "document_number", "issue_date", "expiry_date",
+                    "issuing_country", "issuing_authority",
+                    "portrait", "driving_privileges"
+                ]
+            ]
+        )
+        
+        mdocReader.sendRequest(request) { result in
+            switch result {
+            case .success(let response):
+                if let document = response.documents?.first {
+                    processReceivedDocument(document)
+                }
+            case .failure(let error):
+                showError(title: "データ取得エラー", message: error.localizedDescription)
+            }
+        }
+    }
+    
+    private func processReceivedDocument(_ document: Document) {
+        if let parsed = MDocParser.parse(document) {
+            self.parsedDocument = parsed
+            self.showDocumentDetail = true
+        } else {
+            showError(title: "解析エラー", message: "M-Docデータの解析に失敗しました")
+        }
+    }
+    
+    private func observeReaderStatus() {
+        // Observe reader status changes
+        switch mdocReader.connectionStatus {
+        case .completed:
+            if let document = mdocReader.receivedDocument {
+                processReceivedDocument(document)
+            }
+        case .failed(let error):
+            showError(title: "読み取りエラー", message: error.localizedDescription)
+        default:
+            break
+        }
     }
     
     private func showError(title: String, message: String) {
