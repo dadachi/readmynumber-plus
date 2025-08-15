@@ -5,6 +5,7 @@
       "Bash(mkdir:*)",
       "Bash(mv:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }
