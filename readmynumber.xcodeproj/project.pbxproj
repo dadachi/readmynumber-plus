@@ -7,16 +7,16 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		13C62D192DAA4FAA00C4B773 /* マイ証明書.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "マイ証明書.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		13C62D192DAA4FAA00C4B773 /* readmynumber.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = readmynumber.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		130C47082DAA511B00ABA648 /* Exceptions for "readmynumber" folder in "マイ証明書" target */ = {
+		130C47082DAA511B00ABA648 /* Exceptions for "readmynumber" folder in "readmynumber" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 13C62D182DAA4FAA00C4B773 /* マイ証明書 */;
+			target = 13C62D182DAA4FAA00C4B773 /* readmynumber */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -24,7 +24,7 @@
 		13C62D1B2DAA4FAA00C4B773 /* readmynumber */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				130C47082DAA511B00ABA648 /* Exceptions for "readmynumber" folder in "マイ証明書" target */,
+				130C47082DAA511B00ABA648 /* Exceptions for "readmynumber" folder in "readmynumber" target */,
 			);
 			path = readmynumber;
 			sourceTree = "<group>";
@@ -53,7 +53,7 @@
 		13C62D1A2DAA4FAA00C4B773 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				13C62D192DAA4FAA00C4B773 /* マイ証明書.app */,
+				13C62D192DAA4FAA00C4B773 /* readmynumber.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -61,9 +61,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		13C62D182DAA4FAA00C4B773 /* マイ証明書 */ = {
+		13C62D182DAA4FAA00C4B773 /* readmynumber */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 13C62D272DAA4FAB00C4B773 /* Build configuration list for PBXNativeTarget "マイ証明書" */;
+			buildConfigurationList = 13C62D272DAA4FAB00C4B773 /* Build configuration list for PBXNativeTarget "readmynumber" */;
 			buildPhases = (
 				13C62D152DAA4FAA00C4B773 /* Sources */,
 				13C62D162DAA4FAA00C4B773 /* Frameworks */,
@@ -76,11 +76,11 @@
 			fileSystemSynchronizedGroups = (
 				13C62D1B2DAA4FAA00C4B773 /* readmynumber */,
 			);
-			name = "マイ証明書";
+			name = readmynumber;
 			packageProductDependencies = (
 			);
 			productName = readmynumber;
-			productReference = 13C62D192DAA4FAA00C4B773 /* マイ証明書.app */;
+			productReference = 13C62D192DAA4FAA00C4B773 /* readmynumber.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -90,7 +90,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1610;
+				LastSwiftUpdateCheck = 1640;
 				LastUpgradeCheck = 1610;
 				TargetAttributes = {
 					13C62D182DAA4FAA00C4B773 = {
@@ -112,7 +112,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				13C62D182DAA4FAA00C4B773 /* マイ証明書 */,
+				13C62D182DAA4FAA00C4B773 /* readmynumber */,
 			);
 		};
 /* End PBXProject section */
@@ -347,7 +347,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		13C62D272DAA4FAB00C4B773 /* Build configuration list for PBXNativeTarget "マイ証明書" */ = {
+		13C62D272DAA4FAB00C4B773 /* Build configuration list for PBXNativeTarget "readmynumber" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				13C62D282DAA4FAB00C4B773 /* Debug */,

@@ -11,6 +11,8 @@ struct ResidenceCardDetailView: View {
     @State private var alertTitle: String = ""
     @State private var alertMessage: String = ""
     @StateObject private var dataManager = ResidenceCardDataManager.shared
+    @State private var frontImageJPEG: UIImage?
+    @State private var faceImageJPEG: UIImage?
 
     var body: some View {
         ZStack {
@@ -112,13 +114,45 @@ struct ResidenceCardDetailView: View {
                             }
                         }
 
-                        // 券面画像情報
+                        // 券面画像表示
+                        if let frontImage = frontImageJPEG {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("券面画像")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Image(uiImage: frontImage)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxHeight: 200)
+                                    .cornerRadius(8)
+                                    .shadow(radius: 2)
+                            }
+                        }
+                        
+                        // 顔写真表示
+                        if let faceImage = faceImageJPEG {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("顔写真")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Image(uiImage: faceImage)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxHeight: 150)
+                                    .cornerRadius(8)
+                                    .shadow(radius: 2)
+                            }
+                        }
+
+                        // 画像情報
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("券面画像: \(cardData.frontImage.count) bytes (MMR/TIFF)")
+                            Text("券面画像: \(cardData.frontImage.count) bytes (元: TIFF)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
-                            Text("顔写真: \(cardData.faceImage.count) bytes (JPEG2000)")
+                            Text("顔写真: \(cardData.faceImage.count) bytes (元: JPEG2000)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -203,15 +237,43 @@ struct ResidenceCardDetailView: View {
             }
         }
         .navigationBarHidden(true)
+        .onAppear {
+            convertImages()
+        }
         .sheet(isPresented: $showingExportSheet) {
             if let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-                let frontImageURL = documentsDirectory.appendingPathComponent("residence_card_front.tiff")
-                let faceImageURL = documentsDirectory.appendingPathComponent("residence_card_face.jp2")
+                let frontImageURL = documentsDirectory.appendingPathComponent("residence_card_front.jpg")
+                let faceImageURL = documentsDirectory.appendingPathComponent("residence_card_face.jpg")
                 ShareSheet(activityItems: [frontImageURL, faceImageURL])
             }
         }
         .alert(isPresented: $showAlert) {
             Alert(title: Text(alertTitle), message: Text(alertMessage), dismissButton: .default(Text("OK")))
+        }
+    }
+    
+    // 画像変換処理
+    private func convertImages() {
+        // TIFFからJPEGへ変換
+        if let tiffImage = UIImage(data: cardData.frontImage) {
+            frontImageJPEG = tiffImage
+        } else {
+            // CGImageSourceを使用してTIFFを読み込む
+            if let imageSource = CGImageSourceCreateWithData(cardData.frontImage as CFData, nil),
+               let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
+                frontImageJPEG = UIImage(cgImage: cgImage)
+            }
+        }
+        
+        // JPEG2000からJPEGへ変換
+        if let jp2Image = UIImage(data: cardData.faceImage) {
+            faceImageJPEG = jp2Image
+        } else {
+            // CGImageSourceを使用してJPEG2000を読み込む
+            if let imageSource = CGImageSourceCreateWithData(cardData.faceImage as CFData, nil),
+               let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
+                faceImageJPEG = UIImage(cgImage: cgImage)
+            }
         }
     }
     
@@ -223,13 +285,27 @@ struct ResidenceCardDetailView: View {
         }
         
         do {
-            // 券面画像を保存（TIFF形式）
-            let frontImageURL = documentsDirectory.appendingPathComponent("residence_card_front.tiff")
-            try cardData.frontImage.write(to: frontImageURL)
+            // 券面画像をJPEGとして保存
+            if let frontImage = frontImageJPEG,
+               let jpegData = frontImage.jpegData(compressionQuality: 0.9) {
+                let frontImageURL = documentsDirectory.appendingPathComponent("residence_card_front.jpg")
+                try jpegData.write(to: frontImageURL)
+            } else {
+                // 変換に失敗した場合は元のTIFFを保存
+                let frontImageURL = documentsDirectory.appendingPathComponent("residence_card_front.tiff")
+                try cardData.frontImage.write(to: frontImageURL)
+            }
             
-            // 顔写真を保存（JPEG2000形式）
-            let faceImageURL = documentsDirectory.appendingPathComponent("residence_card_face.jp2")
-            try cardData.faceImage.write(to: faceImageURL)
+            // 顔写真をJPEGとして保存
+            if let faceImage = faceImageJPEG,
+               let jpegData = faceImage.jpegData(compressionQuality: 0.9) {
+                let faceImageURL = documentsDirectory.appendingPathComponent("residence_card_face.jpg")
+                try jpegData.write(to: faceImageURL)
+            } else {
+                // 変換に失敗した場合は元のJPEG2000を保存
+                let faceImageURL = documentsDirectory.appendingPathComponent("residence_card_face.jp2")
+                try cardData.faceImage.write(to: faceImageURL)
+            }
             
             showingExportSheet = true
         } catch {
