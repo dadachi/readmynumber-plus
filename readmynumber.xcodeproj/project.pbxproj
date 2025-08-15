@@ -6,28 +6,17 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXContainerItemProxy section */
-		01747E502E4E154A009D3742 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 13C62D112DAA4FAA00C4B773 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 13C62D182DAA4FAA00C4B773;
-			remoteInfo = "マイ証明書";
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXFileReference section */
-		01747E4C2E4E154A009D3742 /* マイ証明書Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "マイ証明書Tests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		13C62D192DAA4FAA00C4B773 /* マイ証明書.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "マイ証明書.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		13C62D192DAA4FAA00C4B773 /* readmynumber.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = readmynumber.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		130C47082DAA511B00ABA648 /* Exceptions for "readmynumber" folder in "マイ証明書" target */ = {
+		130C47082DAA511B00ABA648 /* Exceptions for "readmynumber" folder in "readmynumber" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 13C62D182DAA4FAA00C4B773 /* マイ証明書 */;
+			target = 13C62D182DAA4FAA00C4B773 /* readmynumber */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -35,7 +24,7 @@
 		13C62D1B2DAA4FAA00C4B773 /* readmynumber */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				130C47082DAA511B00ABA648 /* Exceptions for "readmynumber" folder in "マイ証明書" target */,
+				130C47082DAA511B00ABA648 /* Exceptions for "readmynumber" folder in "readmynumber" target */,
 			);
 			path = readmynumber;
 			sourceTree = "<group>";
@@ -43,13 +32,6 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		01747E492E4E154A009D3742 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		13C62D162DAA4FAA00C4B773 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -71,8 +53,7 @@
 		13C62D1A2DAA4FAA00C4B773 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				13C62D192DAA4FAA00C4B773 /* マイ証明書.app */,
-				01747E4C2E4E154A009D3742 /* マイ証明書Tests.xctest */,
+				13C62D192DAA4FAA00C4B773 /* readmynumber.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -80,29 +61,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		01747E4B2E4E154A009D3742 /* マイ証明書Tests */ = {
+		13C62D182DAA4FAA00C4B773 /* readmynumber */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 01747E522E4E154A009D3742 /* Build configuration list for PBXNativeTarget "マイ証明書Tests" */;
-			buildPhases = (
-				01747E482E4E154A009D3742 /* Sources */,
-				01747E492E4E154A009D3742 /* Frameworks */,
-				01747E4A2E4E154A009D3742 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				01747E512E4E154A009D3742 /* PBXTargetDependency */,
-			);
-			name = "マイ証明書Tests";
-			packageProductDependencies = (
-			);
-			productName = "マイ証明書Tests";
-			productReference = 01747E4C2E4E154A009D3742 /* マイ証明書Tests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		13C62D182DAA4FAA00C4B773 /* マイ証明書 */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 13C62D272DAA4FAB00C4B773 /* Build configuration list for PBXNativeTarget "マイ証明書" */;
+			buildConfigurationList = 13C62D272DAA4FAB00C4B773 /* Build configuration list for PBXNativeTarget "readmynumber" */;
 			buildPhases = (
 				13C62D152DAA4FAA00C4B773 /* Sources */,
 				13C62D162DAA4FAA00C4B773 /* Frameworks */,
@@ -115,11 +76,11 @@
 			fileSystemSynchronizedGroups = (
 				13C62D1B2DAA4FAA00C4B773 /* readmynumber */,
 			);
-			name = "マイ証明書";
+			name = readmynumber;
 			packageProductDependencies = (
 			);
 			productName = readmynumber;
-			productReference = 13C62D192DAA4FAA00C4B773 /* マイ証明書.app */;
+			productReference = 13C62D192DAA4FAA00C4B773 /* readmynumber.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -132,10 +93,6 @@
 				LastSwiftUpdateCheck = 1640;
 				LastUpgradeCheck = 1610;
 				TargetAttributes = {
-					01747E4B2E4E154A009D3742 = {
-						CreatedOnToolsVersion = 16.4;
-						TestTargetID = 13C62D182DAA4FAA00C4B773;
-					};
 					13C62D182DAA4FAA00C4B773 = {
 						CreatedOnToolsVersion = 16.1;
 					};
@@ -155,20 +112,12 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				13C62D182DAA4FAA00C4B773 /* マイ証明書 */,
-				01747E4B2E4E154A009D3742 /* マイ証明書Tests */,
+				13C62D182DAA4FAA00C4B773 /* readmynumber */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		01747E4A2E4E154A009D3742 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		13C62D172DAA4FAA00C4B773 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -179,13 +128,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		01747E482E4E154A009D3742 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		13C62D152DAA4FAA00C4B773 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -195,53 +137,7 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXTargetDependency section */
-		01747E512E4E154A009D3742 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 13C62D182DAA4FAA00C4B773 /* マイ証明書 */;
-			targetProxy = 01747E502E4E154A009D3742 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
 /* Begin XCBuildConfiguration section */
-		01747E532E4E154A009D3742 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = NNYDL5U3V3;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.nativeapptemplate.-----Tests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/マイ証明書.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/マイ証明書";
-			};
-			name = Debug;
-		};
-		01747E542E4E154A009D3742 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = NNYDL5U3V3;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.nativeapptemplate.-----Tests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/マイ証明書.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/マイ証明書";
-			};
-			name = Release;
-		};
 		13C62D252DAA4FAB00C4B773 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -442,15 +338,6 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		01747E522E4E154A009D3742 /* Build configuration list for PBXNativeTarget "マイ証明書Tests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				01747E532E4E154A009D3742 /* Debug */,
-				01747E542E4E154A009D3742 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		13C62D142DAA4FAA00C4B773 /* Build configuration list for PBXProject "readmynumber" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -460,7 +347,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		13C62D272DAA4FAB00C4B773 /* Build configuration list for PBXNativeTarget "マイ証明書" */ = {
+		13C62D272DAA4FAB00C4B773 /* Build configuration list for PBXNativeTarget "readmynumber" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				13C62D282DAA4FAB00C4B773 /* Debug */,
