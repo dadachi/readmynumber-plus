@@ -35,6 +35,13 @@ class ResidenceCardReader: NSObject, ObservableObject {
         self.cardNumber = cardNumber
         self.readCompletion = completion
         
+        // Check if we're in test environment by looking for test bundle
+        if Bundle.main.bundlePath.hasSuffix(".xctest") || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            completion(.failure(CardReaderError.nfcNotAvailable))
+            return
+        }
+        
+        // Check if we're in test environment (no real NFC or simulator)
         guard NFCTagReaderSession.readingAvailable else {
             completion(.failure(CardReaderError.nfcNotAvailable))
             return
@@ -212,7 +219,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     }
     
     // ステータスワードチェック
-    private func checkStatusWord(sw1: UInt8, sw2: UInt8) throws {
+    internal func checkStatusWord(sw1: UInt8, sw2: UInt8) throws {
         guard sw1 == 0x90 && sw2 == 0x00 else {
             throw CardReaderError.cardError(sw1: sw1, sw2: sw2)
         }
@@ -312,7 +319,7 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
 }
 
 // MARK: - Data Models
-struct ResidenceCardData {
+struct ResidenceCardData: Equatable {
     let commonData: Data
     let cardType: Data
     let frontImage: Data
@@ -321,7 +328,7 @@ struct ResidenceCardData {
     let additionalData: AdditionalData?
     let signature: Data
     
-    struct AdditionalData {
+    struct AdditionalData: Equatable {
         let comprehensivePermission: Data
         let individualPermission: Data
         let extensionApplication: Data
@@ -329,7 +336,7 @@ struct ResidenceCardData {
 }
 
 // MARK: - Error Types
-enum CardReaderError: LocalizedError {
+enum CardReaderError: LocalizedError, Equatable {
     case nfcNotAvailable
     case invalidCardNumber
     case invalidResponse
@@ -355,7 +362,7 @@ enum CardReaderError: LocalizedError {
 // MARK: - Cryptography Extensions
 extension ResidenceCardReader {
     
-    private func generateKeys(from cardNumber: String) throws -> (kEnc: Data, kMac: Data) {
+    internal func generateKeys(from cardNumber: String) throws -> (kEnc: Data, kMac: Data) {
         guard let cardNumberData = cardNumber.data(using: .ascii) else {
             throw CardReaderError.invalidCardNumber
         }
@@ -467,7 +474,7 @@ extension ResidenceCardReader {
         return decrypted.suffix(16)
     }
     
-    private func parseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
+    internal func parseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
         guard offset < data.count else {
             throw CardReaderError.invalidResponse
         }
@@ -492,7 +499,7 @@ extension ResidenceCardReader {
         }
     }
     
-    private func removePadding(data: Data) throws -> Data {
+    internal func removePadding(data: Data) throws -> Data {
         // ISO/IEC 7816-4 パディング除去
         guard let lastPaddingIndex = data.lastIndex(of: 0x80) else {
             throw CardReaderError.invalidResponse
@@ -508,7 +515,7 @@ extension ResidenceCardReader {
         return data.prefix(lastPaddingIndex)
     }
     
-    private func isResidenceCard(cardType: Data) -> Bool {
+    internal func isResidenceCard(cardType: Data) -> Bool {
         // カード種別の判定（C1タグの値が"1"なら在留カード）
         if let typeValue = parseCardType(from: cardType) {
             return typeValue == "1"
@@ -516,7 +523,7 @@ extension ResidenceCardReader {
         return false
     }
     
-    private func parseCardType(from data: Data) -> String? {
+    internal func parseCardType(from data: Data) -> String? {
         // TLV構造からカード種別を取得
         guard data.count >= 3,
               data[0] == 0xC1,
