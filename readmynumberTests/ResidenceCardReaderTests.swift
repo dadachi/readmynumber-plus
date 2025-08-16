@@ -390,8 +390,8 @@ struct ResidenceCardDataManagerTests {
         }
         
         // Give a tiny delay to ensure state is fully updated
-        try? await Task.sleep(nanoseconds: 1_000_000) // 1ms
-        
+        try? await Task.sleep(nanoseconds: 2_000_000) // 2ms
+
         await MainActor.run {
             #expect(manager.cardData == nil)
             #expect(manager.shouldNavigateToDetail == false)
