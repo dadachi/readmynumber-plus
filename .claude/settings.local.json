@@ -10,7 +10,8 @@
       "WebFetch(domain:www.moj.go.jp)",
       "Bash(identify:*)",
       "Bash(echo:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(magick:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
