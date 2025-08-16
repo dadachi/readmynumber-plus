@@ -412,6 +412,9 @@ struct ResidenceCardDataManagerTests {
     func testResetNavigation() {
         let manager = ResidenceCardDataManager.shared
         
+        // Clear any existing data first to ensure clean state
+        manager.clearData()
+        
         let testData = ResidenceCardData(
             commonData: Data(),
             cardType: Data(),
@@ -428,6 +431,9 @@ struct ResidenceCardDataManagerTests {
         manager.resetNavigation()
         #expect(manager.shouldNavigateToDetail == false)
         #expect(manager.cardData != nil) // Data should still be present
+        
+        // Clean up after test
+        manager.clearData()
     }
 }
 
