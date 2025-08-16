@@ -7,7 +7,10 @@
       "Bash(swift:*)",
       "Bash(rm:*)",
       "WebSearch",
-      "WebFetch(domain:www.moj.go.jp)"
+      "WebFetch(domain:www.moj.go.jp)",
+      "Bash(identify:*)",
+      "Bash(echo:*)",
+      "Bash(cp:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
