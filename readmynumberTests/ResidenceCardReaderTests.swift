@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import CryptoKit
 @testable import readmynumber
 
 // MARK: - Test Data Factory
@@ -790,6 +791,95 @@ struct SignatureVerificationTests {
         
         #expect(extractedHash?.count == 32)
         #expect(extractedHash?.first == 0xAB)
+    }
+    
+    @Test("Hash calculation for image data")
+    func testHashCalculationForImageData() {
+        // Test the hash calculation part of signature verification
+        let frontImageData = Data("Front Image Test Data".utf8)
+        let faceImageData = Data("Face Image Test Data".utf8)
+        
+        // Calculate hash of concatenated data (this is what the signature verification does)
+        let concatenatedData = frontImageData + faceImageData
+        let calculatedHash = SHA256.hash(data: concatenatedData)
+        let calculatedHashData = Data(calculatedHash)
+        
+        // Verify hash properties
+        #expect(calculatedHashData.count == 32) // SHA-256 produces 32-byte hash
+        #expect(calculatedHashData.hexString.count == 64) // 32 bytes = 64 hex characters
+        
+        // Verify hash is deterministic
+        let secondHash = SHA256.hash(data: concatenatedData)
+        let secondHashData = Data(secondHash)
+        #expect(calculatedHashData == secondHashData)
+        
+        // Verify different data produces different hash
+        let differentData = frontImageData + Data("Different Face Data".utf8)
+        let differentHash = SHA256.hash(data: differentData)
+        let differentHashData = Data(differentHash)
+        #expect(calculatedHashData != differentHashData)
+    }
+    
+    @Test("Signature verification structure validation")
+    func testSignatureVerificationStructureValidation() {
+        let verifier = ResidenceCardSignatureVerifier()
+        
+        // Test with properly structured signature data (but without valid crypto)
+        var signatureData = Data()
+        
+        // Add check code (tag 0xDA, 256 bytes)
+        signatureData.append(0xDA)
+        signatureData.append(0x82) // Extended length encoding
+        signatureData.append(0x01) // Length high byte  
+        signatureData.append(0x00) // Length low byte (256)
+        signatureData.append(Data(repeating: 0xAA, count: 256)) // Mock check code
+        
+        // Add certificate (tag 0xDB, 50 bytes for test)
+        signatureData.append(0xDB)
+        signatureData.append(0x32) // 50 bytes
+        signatureData.append(Data(repeating: 0xBB, count: 50)) // Mock certificate
+        
+        let frontImageData = Data("Test Front".utf8)
+        let faceImageData = Data("Test Face".utf8)
+        
+        let result = verifier.verifySignature(
+            signatureData: signatureData,
+            frontImageData: frontImageData,
+            faceImageData: faceImageData
+        )
+        
+        // Should successfully parse structure but fail at cryptographic validation
+        #expect(result.error != .missingCheckCode)
+        #expect(result.error != .missingCertificate)
+        #expect(result.error != .invalidCheckCodeLength)
+        #expect(result.error != .missingImageData)
+        
+        // Should fail at cryptographic steps (expected for mock data)
+        #expect(result.isValid == false)
+        #expect(result.error != nil)
+    }
+    
+    @Test("VerificationResult can be valid")
+    func testVerificationResultCanBeValid() {
+        // Test that VerificationResult.isValid can be true
+        let validResult = ResidenceCardSignatureVerifier.VerificationResult(
+            isValid: true,
+            error: nil,
+            details: ResidenceCardSignatureVerifier.VerificationDetails(
+                checkCodeHash: "ABCDEF1234567890",
+                calculatedHash: "ABCDEF1234567890",
+                certificateSubject: "Test Certificate",
+                certificateIssuer: "Test CA",
+                certificateNotBefore: Date(),
+                certificateNotAfter: Date().addingTimeInterval(86400)
+            )
+        )
+        
+        #expect(validResult.isValid == true)
+        #expect(validResult.error == nil)
+        #expect(validResult.details != nil)
+        #expect(validResult.details?.checkCodeHash == "ABCDEF1234567890")
+        #expect(validResult.details?.calculatedHash == "ABCDEF1234567890")
     }
     
     // Helper functions to access private methods for testing

@@ -290,7 +290,7 @@ class ResidenceCardSignatureVerifier {
 }
 
 // MARK: - Data Extension for Hex String
-private extension Data {
+extension Data {
     var hexString: String {
         return map { String(format: "%02X", $0) }.joined()
     }
