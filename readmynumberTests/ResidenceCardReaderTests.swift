@@ -223,12 +223,144 @@ struct ResidenceCardReaderTests {
         
         // Valid 12-digit card number
         #expect(throws: Never.self) {
-            _ = try reader.generateKeys(from: "AA1234567890")
+            _ = try reader.generateKeys(from: "AB12345678CD")
         }
         
         // Invalid card number (non-ASCII)
         #expect(throws: CardReaderError.self) {
             _ = try reader.generateKeys(from: "あいうえお")
+        }
+    }
+    
+    @Test("Enhanced card number format validation")
+    func testEnhancedCardNumberValidation() {
+        let reader = ResidenceCardReader()
+        
+        // Valid formats
+        let validNumbers = [
+            "AB12345678CD",
+            "ZZ98765432XY", 
+            "MN01234567QW",
+            "  AB12345678CD  ", // with whitespace
+            "ab12345678cd"      // lowercase (should be converted)
+        ]
+        
+        for cardNumber in validNumbers {
+            #expect(throws: Never.self) {
+                _ = try reader.validateCardNumber(cardNumber)
+            }
+        }
+        
+        // Test uppercase conversion and whitespace trimming
+        do {
+            let result = try reader.validateCardNumber("  ab12345678cd  ")
+            #expect(result == "AB12345678CD")
+        } catch {
+            #expect(Bool(false), "Should convert lowercase and trim whitespace")
+        }
+    }
+    
+    @Test("Invalid card number lengths")
+    func testInvalidCardNumberLengths() {
+        let reader = ResidenceCardReader()
+        
+        let invalidLengths = [
+            "",                     // Empty
+            "A",                    // Too short
+            "AB1234567",           // 9 characters
+            "AB12345678C",         // 11 characters
+            "AB12345678CDE",       // 13 characters
+            "AB12345678CDEFG"      // 15 characters
+        ]
+        
+        for cardNumber in invalidLengths {
+            #expect(throws: CardReaderError.invalidCardNumberLength) {
+                _ = try reader.validateCardNumber(cardNumber)
+            }
+        }
+    }
+    
+    @Test("Invalid card number formats")
+    func testInvalidCardNumberFormats() {
+        let reader = ResidenceCardReader()
+        
+        let invalidFormats = [
+            "1234567890AB",        // Numbers first
+            "A123456789BC",        // Only 1 letter at start
+            "ABC12345678D",        // 3 letters at start
+            "AB1234567CDE",        // 7 numbers
+            "AB123456789C",        // 9 numbers
+            "AB12345678C1",        // Number at end
+            "AB123456781C",        // Number in middle of end letters
+            "1B12345678CD",        // Number in first position
+            "A112345678CD"         // Number in second position
+        ]
+        
+        for cardNumber in invalidFormats {
+            #expect(throws: CardReaderError.invalidCardNumberFormat) {
+                _ = try reader.validateCardNumber(cardNumber)
+            }
+        }
+    }
+    
+    @Test("Invalid card number characters")
+    func testInvalidCardNumberCharacters() {
+        let reader = ResidenceCardReader()
+        
+        let invalidCharacters = [
+            "AB12345678C@",        // Special character
+            "AB123456-78CD",       // Hyphen in numbers
+            "AB 12345678CD",       // Space in middle
+            "AB12345678C.",        // Period
+            "αB12345678CD",        // Greek letter
+            "AB12345678Cß"         // German eszett
+        ]
+        
+        for cardNumber in invalidCharacters {
+            #expect(throws: CardReaderError.self) {
+                _ = try reader.validateCardNumber(cardNumber)
+            }
+        }
+    }
+    
+    @Test("Card number pattern validation")
+    func testCardNumberPatternValidation() {
+        let reader = ResidenceCardReader()
+        
+        // Test regex pattern matching
+        #expect(reader.isValidResidenceCardFormat("AB12345678CD") == true)
+        #expect(reader.isValidResidenceCardFormat("ZZ98765432XY") == true)
+        #expect(reader.isValidResidenceCardFormat("AB1234567CD") == false)  // 7 digits
+        #expect(reader.isValidResidenceCardFormat("A12345678CD") == false)   // 1 letter at start
+        #expect(reader.isValidResidenceCardFormat("AB12345678C") == false)   // 1 letter at end
+        #expect(reader.isValidResidenceCardFormat("1B12345678CD") == false)  // Digit at start
+        #expect(reader.isValidResidenceCardFormat("AB12345678C1") == false)  // Digit at end
+    }
+    
+    @Test("Edge cases and special scenarios")
+    func testEdgeCasesAndSpecialScenarios() {
+        let reader = ResidenceCardReader()
+        
+        // Test with real-world like card numbers
+        let realisticNumbers = [
+            "AA00000001BC",
+            "ZZ99999999XY",
+            "MK20241201PQ"
+        ]
+        
+        for cardNumber in realisticNumbers {
+            #expect(throws: Never.self) {
+                _ = try reader.validateCardNumber(cardNumber)
+            }
+        }
+        
+        // Test boundary values
+        #expect(throws: Never.self) {
+            _ = try reader.validateCardNumber("AA00000000AA")  // All zeros in middle
+        }
+        
+        #expect(throws: Never.self) {
+            _ = try reader.validateCardNumber("ZZ99999999ZZ")  // All nines in middle
         }
     }
     
@@ -353,7 +485,7 @@ struct ResidenceCardReaderTests {
         
         // Since we're in a test environment without real NFC, this should fail
         let result = await withCheckedContinuation { continuation in
-            reader.startReading(cardNumber: "AA1234567890") { result in
+            reader.startReading(cardNumber: "AB12345678CD") { result in
                 continuation.resume(returning: result)
             }
         }
@@ -395,7 +527,7 @@ struct ResidenceCardDataManagerTests {
         }
         
         // Give a tiny delay to ensure state is fully updated
-        try? await Task.sleep(nanoseconds: 2_000_000) // 2ms
+        try? await Task.sleep(nanoseconds: 5_000_000) // 5ms
 
         await MainActor.run {
             #expect(manager.cardData == nil)
@@ -594,7 +726,7 @@ struct ResidenceCardReaderIntegrationTests {
             "123456789012345",       // Too long (15 characters)
             "AAAA BBBB CC",          // With spaces (12 chars but invalid format)
             "😀😀😀😀😀😀😀😀😀😀😀😀",  // Emoji (12 chars but non-ASCII)
-            "ABCDEFGHIJKL",          // 12 ASCII chars (should fail at key generation due to non-numeric)
+            "ABCDEFGHIJKL",          // 12 ASCII chars (should fail at format validation)
             "12345678901",           // 11 characters (too short)
             "1234567890123"          // 13 characters (too long)
         ]
@@ -613,8 +745,8 @@ struct ResidenceCardReaderIntegrationTests {
                             case .nfcNotAvailable:
                                 // This is expected in simulator environment
                                 #expect(true)
-                            case .invalidCardNumber:
-                                // This is expected for malformed card numbers
+                            case .invalidCardNumber, .invalidCardNumberFormat, .invalidCardNumberLength, .invalidCardNumberCharacters:
+                                // These are expected for malformed card numbers
                                 #expect(true)
                             case .cryptographyError:
                                 // This might occur for card numbers that pass initial validation but fail crypto
@@ -633,7 +765,7 @@ struct ResidenceCardReaderIntegrationTests {
         }
         
         // Test with a valid format card number (should fail only due to NFC unavailability in test environment)
-        let validFormatCardNumber = "AA1234567890"  // 12 ASCII characters
+        let validFormatCardNumber = "AB12345678CD"  // 12 characters in correct format
         await withCheckedContinuation { continuation in
             reader.startReading(cardNumber: validFormatCardNumber) { result in
                 switch result {

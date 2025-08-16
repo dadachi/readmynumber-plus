@@ -32,8 +32,16 @@ class ResidenceCardReader: NSObject, ObservableObject {
     
     // MARK: - Public Methods
     func startReading(cardNumber: String, completion: @escaping (Result<ResidenceCardData, Error>) -> Void) {
-        self.cardNumber = cardNumber
         self.readCompletion = completion
+        
+        // Enhanced card number validation
+        do {
+            let validatedCardNumber = try validateCardNumber(cardNumber)
+            self.cardNumber = validatedCardNumber
+        } catch {
+            completion(.failure(error))
+            return
+        }
         
         // Check if we're in test environment by looking for test bundle
         if Bundle.main.bundlePath.hasSuffix(".xctest") || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
@@ -365,6 +373,9 @@ struct ResidenceCardData: Equatable {
 enum CardReaderError: LocalizedError, Equatable {
     case nfcNotAvailable
     case invalidCardNumber
+    case invalidCardNumberFormat
+    case invalidCardNumberLength
+    case invalidCardNumberCharacters
     case invalidResponse
     case cardError(sw1: UInt8, sw2: UInt8)
     case cryptographyError(String)
@@ -375,6 +386,12 @@ enum CardReaderError: LocalizedError, Equatable {
             return "NFCが利用できません"
         case .invalidCardNumber:
             return "無効な在留カード番号です"
+        case .invalidCardNumberFormat:
+            return "在留カード番号の形式が正しくありません（英字2桁+数字8桁+英字2桁）"
+        case .invalidCardNumberLength:
+            return "在留カード番号は12桁で入力してください"
+        case .invalidCardNumberCharacters:
+            return "在留カード番号に無効な文字が含まれています"
         case .invalidResponse:
             return "カードからの応答が不正です"
         case .cardError(let sw1, let sw2):
@@ -382,6 +399,122 @@ enum CardReaderError: LocalizedError, Equatable {
         case .cryptographyError(let message):
             return "暗号処理エラー: \(message)"
         }
+    }
+}
+
+// MARK: - Card Number Validation
+extension ResidenceCardReader {
+    
+    /// Enhanced validation for residence card number format
+    /// Format: 英字2桁 + 数字8桁 + 英字2桁 (Total: 12 characters)
+    /// Example: AB12345678CD
+    internal func validateCardNumber(_ cardNumber: String) throws -> String {
+        // Remove any whitespace and convert to uppercase
+        let trimmedCardNumber = cardNumber.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        
+        // Check length (must be exactly 12 characters)
+        guard trimmedCardNumber.count == 12 else {
+            throw CardReaderError.invalidCardNumberLength
+        }
+        
+        // Check format: 英字2桁 + 数字8桁 + 英字2桁
+        guard isValidResidenceCardFormat(trimmedCardNumber) else {
+            throw CardReaderError.invalidCardNumberFormat
+        }
+        
+        // Check character validity
+        guard isValidCharacters(trimmedCardNumber) else {
+            throw CardReaderError.invalidCardNumberCharacters
+        }
+        
+        return trimmedCardNumber
+    }
+    
+    /// Check if the card number follows the correct format pattern
+    internal func isValidResidenceCardFormat(_ cardNumber: String) -> Bool {
+        // Pattern: ^[A-Z]{2}[0-9]{8}[A-Z]{2}$
+        let pattern = "^[A-Z]{2}[0-9]{8}[A-Z]{2}$"
+        
+        do {
+            let regex = try NSRegularExpression(pattern: pattern, options: [])
+            let range = NSRange(location: 0, length: cardNumber.utf16.count)
+            return regex.firstMatch(in: cardNumber, options: [], range: range) != nil
+        } catch {
+            return false
+        }
+    }
+    
+    /// Validate individual characters in the card number
+    private func isValidCharacters(_ cardNumber: String) -> Bool {
+        let characters = Array(cardNumber)
+        
+        // First 2 characters: uppercase letters A-Z
+        for i in 0..<2 {
+            guard characters[i].isLetter && characters[i].isUppercase else {
+                return false
+            }
+        }
+        
+        // Middle 8 characters: digits 0-9
+        for i in 2..<10 {
+            guard characters[i].isNumber else {
+                return false
+            }
+        }
+        
+        // Last 2 characters: uppercase letters A-Z
+        for i in 10..<12 {
+            guard characters[i].isLetter && characters[i].isUppercase else {
+                return false
+            }
+        }
+        
+        return true
+    }
+    
+    /// Additional validation for known invalid patterns
+    private func hasInvalidPatterns(_ cardNumber: String) -> Bool {
+        // Check for obviously invalid patterns like all same characters
+        let uniqueChars = Set(cardNumber)
+        if uniqueChars.count == 1 {
+            return true // All same character is invalid
+        }
+        
+        // Check for sequential patterns in the numeric part
+        let numericPart = String(cardNumber.dropFirst(2).dropLast(2))
+        if isSequentialPattern(numericPart) {
+            return true
+        }
+        
+        return false
+    }
+    
+    /// Check if numeric part contains obvious sequential patterns
+    private func isSequentialPattern(_ numericString: String) -> Bool {
+        guard numericString.count >= 3 else { return false }
+        
+        let digits = numericString.compactMap { $0.wholeNumberValue }
+        guard digits.count == numericString.count else { return false }
+        
+        // Check for ascending sequence (e.g., 12345678)
+        var isAscending = true
+        for i in 1..<digits.count {
+            if digits[i] != digits[i-1] + 1 {
+                isAscending = false
+                break
+            }
+        }
+        
+        // Check for descending sequence (e.g., 87654321)
+        var isDescending = true
+        for i in 1..<digits.count {
+            if digits[i] != digits[i-1] - 1 {
+                isDescending = false
+                break
+            }
+        }
+        
+        return isAscending || isDescending
     }
 }
 
