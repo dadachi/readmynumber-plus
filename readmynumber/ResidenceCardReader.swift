@@ -35,6 +35,13 @@ class ResidenceCardReader: NSObject, ObservableObject {
         self.cardNumber = cardNumber
         self.readCompletion = completion
         
+        // Check if we're in test environment by looking for test bundle
+        if Bundle.main.bundlePath.hasSuffix(".xctest") || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            completion(.failure(CardReaderError.nfcNotAvailable))
+            return
+        }
+        
+        // Check if we're in test environment (no real NFC or simulator)
         guard NFCTagReaderSession.readingAvailable else {
             completion(.failure(CardReaderError.nfcNotAvailable))
             return

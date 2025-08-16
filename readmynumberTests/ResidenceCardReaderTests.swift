@@ -342,32 +342,31 @@ struct ResidenceCardReaderTests {
         }
     }
 
-// The scan screen continues to appear, so comment it out.
-//    @Test("NFC availability check")
-//    func testNFCAvailability() async {
-//        let reader = ResidenceCardReader()
-//        
-//        // Since we're in a test environment without real NFC, this should fail
-//        let result = await withCheckedContinuation { continuation in
-//            reader.startReading(cardNumber: "AA1234567890") { result in
-//                continuation.resume(returning: result)
-//            }
-//        }
-//        
-//        // Verify that the operation failed as expected
-//        switch result {
-//        case .success:
-//            #expect(Bool(false), "Expected failure in test environment without real NFC card")
-//        case .failure(let error):
-//            // Verify we get the expected NFC unavailable error
-//            if let cardReaderError = error as? CardReaderError {
-//                #expect(cardReaderError == .nfcNotAvailable, "Expected NFC unavailable error, got: \(cardReaderError)")
-//            } else {
-//                // Other NFC-related errors might also occur in test environment
-//                #expect(true, "Received non-CardReaderError: \(error)")
-//            }
-//        }
-//    }
+    @Test("NFC availability check")
+    func testNFCAvailability() async {
+        let reader = ResidenceCardReader()
+        
+        // Since we're in a test environment without real NFC, this should fail
+        let result = await withCheckedContinuation { continuation in
+            reader.startReading(cardNumber: "AA1234567890") { result in
+                continuation.resume(returning: result)
+            }
+        }
+        
+        // Verify that the operation failed as expected
+        switch result {
+        case .success:
+            #expect(Bool(false), "Expected failure in test environment without real NFC card")
+        case .failure(let error):
+            // Verify we get the expected NFC unavailable error
+            if let cardReaderError = error as? CardReaderError {
+                #expect(cardReaderError == .nfcNotAvailable, "Expected NFC unavailable error, got: \(cardReaderError)")
+            } else {
+                // Other NFC-related errors might also occur in test environment
+                #expect(true, "Received non-CardReaderError: \(error)")
+            }
+        }
+    }
 }
 
 // MARK: - ResidenceCardDataManager Tests
@@ -389,6 +388,9 @@ struct ResidenceCardDataManagerTests {
         await MainActor.run {
             manager.clearData()
         }
+        
+        // Give a tiny delay to ensure state is fully updated
+        try? await Task.sleep(nanoseconds: 1_000_000) // 1ms
         
         await MainActor.run {
             #expect(manager.cardData == nil)
@@ -438,11 +440,13 @@ struct ResidenceCardDataManagerTests {
     }
     
     @Test("Set card data with additional data")
-    func testSetCardDataWithAdditionalData() {
+    func testSetCardDataWithAdditionalData() async {
         let manager = ResidenceCardDataManager.shared
         
         // Clear any existing data to ensure clean state
-        manager.clearData()
+        await MainActor.run {
+            manager.clearData()
+        }
         
         let additionalData = ResidenceCardData.AdditionalData(
             comprehensivePermission: Data("Permission1".utf8),
@@ -460,24 +464,35 @@ struct ResidenceCardDataManagerTests {
             signature: Data([0x60])
         )
         
-        manager.setCardData(testData)
+        await MainActor.run {
+            manager.setCardData(testData)
+        }
         
-        #expect(manager.cardData == testData)
-        #expect(manager.cardData?.additionalData == additionalData)
-        #expect(manager.cardData?.additionalData?.comprehensivePermission == Data("Permission1".utf8))
-        #expect(manager.cardData?.additionalData?.individualPermission == Data("Permission2".utf8))
-        #expect(manager.cardData?.additionalData?.extensionApplication == Data("Extension".utf8))
+        await MainActor.run {
+            #expect(manager.cardData == testData)
+            #expect(manager.cardData?.additionalData == additionalData)
+            #expect(manager.cardData?.additionalData?.comprehensivePermission == Data("Permission1".utf8))
+            #expect(manager.cardData?.additionalData?.individualPermission == Data("Permission2".utf8))
+            #expect(manager.cardData?.additionalData?.extensionApplication == Data("Extension".utf8))
+        }
         
         // Clean up
-        manager.clearData()
+        await MainActor.run {
+            manager.clearData()
+        }
     }
     
     @Test("Reset navigation")
-    func testResetNavigation() {
+    func testResetNavigation() async {
         let manager = ResidenceCardDataManager.shared
         
         // Clear any existing data first to ensure clean state
-        manager.clearData()
+        await MainActor.run {
+            manager.clearData()
+        }
+        
+        // Give a tiny delay to ensure state is fully updated
+        try? await Task.sleep(nanoseconds: 1_000_000) // 1ms
         
         let testData = ResidenceCardData(
             commonData: Data(),
@@ -489,15 +504,21 @@ struct ResidenceCardDataManagerTests {
             signature: Data()
         )
         
-        manager.setCardData(testData)
-        #expect(manager.shouldNavigateToDetail == true)
+        await MainActor.run {
+            manager.setCardData(testData)
+            #expect(manager.shouldNavigateToDetail == true)
+        }
         
-        manager.resetNavigation()
-        #expect(manager.shouldNavigateToDetail == false)
-        #expect(manager.cardData == testData) // Data should still be present and equal
+        await MainActor.run {
+            manager.resetNavigation()
+            #expect(manager.shouldNavigateToDetail == false)
+            #expect(manager.cardData == testData) // Data should still be present and equal
+        }
         
         // Clean up after test
-        manager.clearData()
+        await MainActor.run {
+            manager.clearData()
+        }
     }
 }
 
