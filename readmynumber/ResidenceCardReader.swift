@@ -306,15 +306,26 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
         try await selectDF(tag: tag, aid: AID.df3)
         let signature = try await readBinaryPlain(tag: tag, p1: 0x82)
         
-        return ResidenceCardData(
+        // 7. 署名検証 (3.4.3.1 署名検証方法)
+        let verifier = ResidenceCardSignatureVerifier()
+        let verificationResult = verifier.verifySignature(
+            signatureData: signature,
+            frontImageData: frontImage,
+            faceImageData: faceImage
+        )
+        
+        var cardData = ResidenceCardData(
             commonData: commonData,
             cardType: cardType,
             frontImage: frontImage,
             faceImage: faceImage,
             address: address,
             additionalData: additionalData,
-            signature: signature
+            signature: signature,
+            signatureVerificationResult: verificationResult
         )
+        
+        return cardData
     }
 }
 
@@ -328,10 +339,25 @@ struct ResidenceCardData: Equatable {
     let additionalData: AdditionalData?
     let signature: Data
     
+    // Signature verification status
+    var signatureVerificationResult: ResidenceCardSignatureVerifier.VerificationResult?
+    
     struct AdditionalData: Equatable {
         let comprehensivePermission: Data
         let individualPermission: Data
         let extensionApplication: Data
+    }
+    
+    // Custom Equatable implementation to handle optional verification result
+    static func == (lhs: ResidenceCardData, rhs: ResidenceCardData) -> Bool {
+        return lhs.commonData == rhs.commonData &&
+               lhs.cardType == rhs.cardType &&
+               lhs.frontImage == rhs.frontImage &&
+               lhs.faceImage == rhs.faceImage &&
+               lhs.address == rhs.address &&
+               lhs.additionalData == rhs.additionalData &&
+               lhs.signature == rhs.signature
+        // Note: signatureVerificationResult is not included in equality check
     }
 }
 

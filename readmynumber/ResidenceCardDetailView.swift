@@ -215,6 +215,72 @@ struct ResidenceCardDetailView: View {
                                 .cornerRadius(8)
                             }
                         }
+                        
+                        // 署名検証ステータス
+                        if let verificationResult = cardData.signatureVerificationResult {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Image(systemName: verificationResult.isValid ? "checkmark.seal.fill" : "xmark.seal.fill")
+                                        .foregroundColor(verificationResult.isValid ? .green : .red)
+                                        .font(.system(size: 16))
+                                    
+                                    Text("署名検証: \(verificationResult.isValid ? "有効" : "無効")")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(verificationResult.isValid ? .green : .red)
+                                }
+                                
+                                if let error = verificationResult.error {
+                                    Text("エラー: \(error.localizedDescription)")
+                                        .font(.caption2)
+                                        .foregroundColor(.red)
+                                }
+                                
+                                if let details = verificationResult.details {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        if let checkCodeHash = details.checkCodeHash {
+                                            Text("復号ハッシュ: \(String(checkCodeHash.prefix(16)))...")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        if let calculatedHash = details.calculatedHash {
+                                            Text("計算ハッシュ: \(String(calculatedHash.prefix(16)))...")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        if let subject = details.certificateSubject {
+                                            Text("証明書主体: \(subject)")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(12)
+                            .background(verificationResult.isValid ? Color.green.opacity(0.1) : Color.red.opacity(0.1))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(verificationResult.isValid ? Color.green : Color.red, lineWidth: 1)
+                            )
+                        } else {
+                            HStack {
+                                Image(systemName: "questionmark.circle")
+                                    .foregroundColor(.orange)
+                                Text("署名検証: 未実行")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                            }
+                            .padding(12)
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.orange, lineWidth: 1)
+                            )
+                        }
 
                         // チェックコード表示
                         if let checkCode = parseCheckCode(from: cardData.signature) {
@@ -522,7 +588,8 @@ struct ResidenceCardDetailView: View {
             individualPermission: Data([0x12, 0x04, 0x69, 0x6E, 0x64, 0x76]), // "indv"
             extensionApplication: Data([0x12, 0x04, 0x65, 0x78, 0x74, 0x6E])  // "extn"
         ),
-        signature: Data(repeating: 0xFF, count: 256) // サンプル署名
+        signature: Data(repeating: 0xFF, count: 256), // サンプル署名
+        signatureVerificationResult: nil
     )
     
     ResidenceCardDetailView(cardData: sampleData)

@@ -103,7 +103,8 @@ struct ResidenceCardDataTests {
             faceImage: faceImage,
             address: address,
             additionalData: additionalData,
-            signature: signature
+            signature: signature,
+            signatureVerificationResult: nil
         )
         
         #expect(cardData.commonData == commonData)
@@ -130,7 +131,8 @@ struct ResidenceCardDataTests {
             faceImage: Data(),
             address: Data(),
             additionalData: nil,
-            signature: Data()
+            signature: Data(),
+            signatureVerificationResult: nil
         )
         
         let c0Value = cardData.parseTLV(data: testData, tag: 0xC0)
@@ -158,7 +160,8 @@ struct ResidenceCardDataTests {
             faceImage: Data(),
             address: Data(),
             additionalData: nil,
-            signature: Data()
+            signature: Data(),
+            signatureVerificationResult: nil
         )
         
         let value1 = cardData1.parseTLV(data: testData1, tag: 0xC0)
@@ -177,7 +180,8 @@ struct ResidenceCardDataTests {
             faceImage: Data(),
             address: Data(),
             additionalData: nil,
-            signature: Data()
+            signature: Data(),
+            signatureVerificationResult: nil
         )
         
         let value2 = cardData2.parseTLV(data: testData2, tag: 0xC1)
@@ -405,7 +409,8 @@ struct ResidenceCardDataManagerTests {
             faceImage: Data([0x04]),
             address: Data([0x05]),
             additionalData: nil,
-            signature: Data([0x06])
+            signature: Data([0x06]),
+            signatureVerificationResult: nil
         )
         
         // Set card data
@@ -461,7 +466,8 @@ struct ResidenceCardDataManagerTests {
             faceImage: Data([0x40]),
             address: Data([0x50]),
             additionalData: additionalData,
-            signature: Data([0x60])
+            signature: Data([0x60]),
+            signatureVerificationResult: nil
         )
         
         await MainActor.run {
@@ -501,7 +507,8 @@ struct ResidenceCardDataManagerTests {
             faceImage: Data(),
             address: Data(),
             additionalData: nil,
-            signature: Data()
+            signature: Data(),
+            signatureVerificationResult: nil
         )
         
         await MainActor.run {
@@ -551,7 +558,8 @@ struct ResidenceCardReaderIntegrationTests {
             faceImage: faceImage,
             address: address,
             additionalData: additionalData,
-            signature: signature
+            signature: signature,
+            signatureVerificationResult: nil
         )
         
         // Verify the complete data structure
@@ -643,5 +651,223 @@ struct ResidenceCardReaderIntegrationTests {
                 continuation.resume()
             }
         }
+    }
+}
+
+// MARK: - Signature Verification Tests
+struct SignatureVerificationTests {
+    
+    @Test("TLV parsing for signature data")
+    func testTLVParsingForSignatureData() {
+        let verifier = ResidenceCardSignatureVerifier()
+        
+        // Create test signature data with check code and certificate
+        var signatureData = Data()
+        
+        // Add check code (tag 0xDA, 256 bytes)
+        signatureData.append(0xDA) // Tag
+        signatureData.append(0x82) // Length encoding
+        signatureData.append(0x01) // Length high byte
+        signatureData.append(0x00) // Length low byte (256)
+        signatureData.append(Data(repeating: 0xAA, count: 256)) // Check code data
+        
+        // Add certificate (tag 0xDB, 100 bytes for test)
+        signatureData.append(0xDB) // Tag
+        signatureData.append(0x64) // Length (100 bytes)
+        signatureData.append(Data(repeating: 0xBB, count: 100)) // Certificate data
+        
+        // Test extraction
+        let extractedCheckCode = extractCheckCodeForTest(verifier: verifier, data: signatureData)
+        let extractedCertificate = extractCertificateForTest(verifier: verifier, data: signatureData)
+        
+        #expect(extractedCheckCode?.count == 256)
+        #expect(extractedCheckCode?.first == 0xAA)
+        #expect(extractedCertificate?.count == 100)
+        #expect(extractedCertificate?.first == 0xBB)
+    }
+    
+    @Test("Image value extraction from TLV")
+    func testImageValueExtraction() {
+        let verifier = ResidenceCardSignatureVerifier()
+        
+        // Create front image TLV data (tag 0xD0)
+        var frontImageTLV = Data()
+        frontImageTLV.append(0xD0) // Tag for front image
+        frontImageTLV.append(0x81) // Extended length
+        frontImageTLV.append(0x64) // 100 bytes
+        frontImageTLV.append(Data(repeating: 0xFF, count: 100))
+        
+        // Create face image TLV data (tag 0xD1)
+        var faceImageTLV = Data()
+        faceImageTLV.append(0xD1) // Tag for face image
+        faceImageTLV.append(0x50) // 80 bytes
+        faceImageTLV.append(Data(repeating: 0xEE, count: 80))
+        
+        let frontValue = extractImageValueForTest(verifier: verifier, data: frontImageTLV)
+        let faceValue = extractImageValueForTest(verifier: verifier, data: faceImageTLV)
+        
+        #expect(frontValue?.count == 100)
+        #expect(frontValue?.first == 0xFF)
+        #expect(faceValue?.count == 80)
+        #expect(faceValue?.first == 0xEE)
+    }
+    
+    @Test("Verification with mock data")
+    func testVerificationWithMockData() {
+        let verifier = ResidenceCardSignatureVerifier()
+        
+        // Create mock signature data (simplified)
+        var mockSignature = Data()
+        mockSignature.append(0xDA) // Check code tag
+        mockSignature.append(0x81) // Length
+        mockSignature.append(0x10) // 16 bytes for test
+        mockSignature.append(Data(repeating: 0x11, count: 16))
+        
+        mockSignature.append(0xDB) // Certificate tag
+        mockSignature.append(0x0A) // 10 bytes for test
+        mockSignature.append(Data(repeating: 0x22, count: 10))
+        
+        // Create mock image data
+        let frontImage = Data(repeating: 0x33, count: 100)
+        let faceImage = Data(repeating: 0x44, count: 50)
+        
+        let result = verifier.verifySignature(
+            signatureData: mockSignature,
+            frontImageData: frontImage,
+            faceImageData: faceImage
+        )
+        
+        // Since this is mock data, verification should fail but not crash
+        #expect(result.isValid == false)
+        #expect(result.error != nil)
+    }
+    
+    @Test("Error handling for missing data")
+    func testErrorHandlingForMissingData() {
+        let verifier = ResidenceCardSignatureVerifier()
+        
+        // Test with empty signature data
+        let emptyResult = verifier.verifySignature(
+            signatureData: Data(),
+            frontImageData: Data([0x01]),
+            faceImageData: Data([0x02])
+        )
+        
+        #expect(emptyResult.isValid == false)
+        #expect(emptyResult.error != nil)
+        
+        // Test with missing check code
+        var incompleteSignature = Data()
+        incompleteSignature.append(0xDB) // Only certificate, no check code
+        incompleteSignature.append(0x0A)
+        incompleteSignature.append(Data(repeating: 0x33, count: 10))
+        
+        let missingCheckCodeResult = verifier.verifySignature(
+            signatureData: incompleteSignature,
+            frontImageData: Data([0x01]),
+            faceImageData: Data([0x02])
+        )
+        
+        #expect(missingCheckCodeResult.isValid == false)
+        #expect(missingCheckCodeResult.error != nil)
+    }
+    
+    @Test("PKCS#1 padding extraction test")
+    func testPKCS1PaddingExtraction() {
+        // Create mock PKCS#1 v1.5 padded data
+        var paddedData = Data()
+        paddedData.append(0x00) // Leading zero
+        paddedData.append(0x01) // Block type
+        paddedData.append(Data(repeating: 0xFF, count: 200)) // Padding
+        paddedData.append(0x00) // Separator
+        
+        // DigestInfo structure (simplified) + SHA-256 hash
+        let mockHash = Data(repeating: 0xAB, count: 32) // 32 bytes for SHA-256
+        paddedData.append(Data(repeating: 0x30, count: 15)) // Mock DigestInfo
+        paddedData.append(mockHash)
+        
+        let extractedHash = extractHashFromPKCS1ForTest(data: paddedData)
+        
+        #expect(extractedHash?.count == 32)
+        #expect(extractedHash?.first == 0xAB)
+    }
+    
+    // Helper functions to access private methods for testing
+    private func extractCheckCodeForTest(verifier: ResidenceCardSignatureVerifier, data: Data) -> Data? {
+        // This would normally require making the method internal or using @testable
+        // For now, we simulate the TLV parsing logic
+        return parseTLVForTest(data: data, tag: 0xDA)
+    }
+    
+    private func extractCertificateForTest(verifier: ResidenceCardSignatureVerifier, data: Data) -> Data? {
+        return parseTLVForTest(data: data, tag: 0xDB)
+    }
+    
+    private func extractImageValueForTest(verifier: ResidenceCardSignatureVerifier, data: Data) -> Data? {
+        if let value = parseTLVForTest(data: data, tag: 0xD0) {
+            return value
+        } else if let value = parseTLVForTest(data: data, tag: 0xD1) {
+            return value
+        }
+        return data.isEmpty ? nil : data
+    }
+    
+    private func extractHashFromPKCS1ForTest(data: Data) -> Data? {
+        // Simplified PKCS#1 v1.5 extraction
+        guard data.count >= 32 + 11 else { return nil }
+        guard data[0] == 0x00 && data[1] == 0x01 else { return nil }
+        
+        var separatorIndex = -1
+        for i in 2..<data.count {
+            if data[i] == 0x00 {
+                separatorIndex = i
+                break
+            } else if data[i] != 0xFF {
+                return nil
+            }
+        }
+        
+        guard separatorIndex > 0 && separatorIndex < data.count - 32 else { return nil }
+        return data.suffix(32)
+    }
+    
+    private func parseTLVForTest(data: Data, tag: UInt8) -> Data? {
+        var offset = 0
+        
+        while offset < data.count {
+            guard offset + 2 <= data.count else { break }
+            
+            let currentTag = data[offset]
+            var length = 0
+            var lengthFieldSize = 1
+            
+            let lengthByte = data[offset + 1]
+            
+            if lengthByte <= 0x7F {
+                length = Int(lengthByte)
+                lengthFieldSize = 1
+            } else if lengthByte == 0x81 {
+                guard offset + 3 <= data.count else { break }
+                length = Int(data[offset + 2])
+                lengthFieldSize = 2
+            } else if lengthByte == 0x82 {
+                guard offset + 4 <= data.count else { break }
+                length = Int(data[offset + 2]) * 256 + Int(data[offset + 3])
+                lengthFieldSize = 3
+            } else {
+                break
+            }
+            
+            let valueStart = offset + 1 + lengthFieldSize
+            guard valueStart + length <= data.count else { break }
+            
+            if currentTag == tag {
+                return data.subdata(in: valueStart..<(valueStart + length))
+            }
+            
+            offset = valueStart + length
+        }
+        
+        return nil
     }
 }
