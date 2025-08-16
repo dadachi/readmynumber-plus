@@ -3,7 +3,9 @@
     "allow": [
       "Bash(xcodebuild:*)",
       "Bash(mkdir:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(swift:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
