@@ -185,11 +185,27 @@ struct ResidenceCardDetailView: View {
 
                             Spacer()
 
-                            Button(action: {
-                                copySignatureData()
-                            }) {
+                            Menu {
+                                Button(action: {
+                                    copyCheckCode()
+                                }) {
+                                    Label("チェックコードをコピー", systemImage: "checkmark.circle")
+                                }
+                                
+                                Button(action: {
+                                    copyCertificatePEM()
+                                }) {
+                                    Label("証明書(PEM)をコピー", systemImage: "doc.text")
+                                }
+                                
+                                Button(action: {
+                                    copySignatureData()
+                                }) {
+                                    Label("全データ(HEX)をコピー", systemImage: "doc.on.doc")
+                                }
+                            } label: {
                                 HStack {
-                                    Image(systemName: "doc.on.doc")
+                                    Image(systemName: "square.and.arrow.up")
                                     Text("コピー")
                                 }
                                 .padding(.horizontal, 12)
@@ -200,17 +216,44 @@ struct ResidenceCardDetailView: View {
                             }
                         }
 
-                        // 署名データのサマリー表示
-                        ScrollView {
-                            Text("署名データ: \(cardData.signature.count) bytes")
-                                .font(.system(.footnote, design: .monospaced))
-                                .padding()
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(colorScheme == .dark ? Color(UIColor.systemGray5) : Color.white)
-                                .foregroundColor(colorScheme == .dark ? .white : .black)
-                                .cornerRadius(8)
+                        // チェックコード表示
+                        if let checkCode = parseCheckCode(from: cardData.signature) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("チェックコード (256 bytes)", systemImage: "checkmark.seal")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Text(String(checkCode.prefix(64)) + "...")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .padding(8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(colorScheme == .dark ? Color(UIColor.systemGray5) : Color(UIColor.systemGray6))
+                                    .cornerRadius(6)
+                            }
                         }
-                        .frame(height: 100)
+                        
+                        // 公開鍵証明書表示
+                        if let certificate = parsePublicKeyCertificate(from: cardData.signature) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Label("公開鍵証明書 (X.509, 1200 bytes)", systemImage: "key.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    Text(certificate.prefix(200) + "...")
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .padding(8)
+                                        .background(colorScheme == .dark ? Color(UIColor.systemGray5) : Color(UIColor.systemGray6))
+                                        .cornerRadius(6)
+                                }
+                            }
+                        }
+
+                        // 署名データのサマリー表示
+                        Text("署名データ合計: \(cardData.signature.count) bytes")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 4)
                     }
                     .padding()
                     .background(colorScheme == .dark ? Color(UIColor.systemGray4) : Color.white)
@@ -331,6 +374,26 @@ struct ResidenceCardDetailView: View {
         showError(title: "コピー完了", message: "電子署名データをクリップボードにコピーしました")
     }
     
+    // チェックコードをコピー
+    private func copyCheckCode() {
+        if let checkCode = parseCheckCode(from: cardData.signature) {
+            UIPasteboard.general.string = checkCode
+            showError(title: "コピー完了", message: "チェックコードをクリップボードにコピーしました")
+        } else {
+            showError(title: "エラー", message: "チェックコードが見つかりません")
+        }
+    }
+    
+    // 公開鍵証明書をPEM形式でコピー
+    private func copyCertificatePEM() {
+        if let certificate = parsePublicKeyCertificate(from: cardData.signature) {
+            UIPasteboard.general.string = certificate
+            showError(title: "コピー完了", message: "公開鍵証明書(PEM形式)をクリップボードにコピーしました")
+        } else {
+            showError(title: "エラー", message: "公開鍵証明書が見つかりません")
+        }
+    }
+    
     // カード種別文字列を解析
     private func parseCardTypeString(from data: Data) -> String {
         if let typeValue = cardData.parseTLV(data: data, tag: 0xC1),
@@ -392,6 +455,48 @@ struct ResidenceCardDetailView: View {
         if let permissionData = cardData.parseTLV(data: data, tag: 0x12),
            let permissionString = String(data: permissionData, encoding: .utf8) {
             return permissionString
+        }
+        return nil
+    }
+    
+    // チェックコードを解析
+    private func parseCheckCode(from data: Data) -> String? {
+        // TLVからチェックコードを取得 (Tag 0xDA)
+        if let checkCodeData = cardData.parseTLV(data: data, tag: 0xDA) {
+            // バイナリデータを16進数文字列に変換
+            return checkCodeData.map { String(format: "%02X", $0) }.joined()
+        }
+        return nil
+    }
+    
+    // 公開鍵証明書を解析
+    private func parsePublicKeyCertificate(from data: Data) -> String? {
+        // TLVから公開鍵証明書を取得 (Tag 0xDB)
+        if let certData = cardData.parseTLV(data: data, tag: 0xDB) {
+            // X.509証明書をBase64エンコード（PEM形式）
+            let base64String = certData.base64EncodedString()
+            // 64文字ごとに改行を入れる（PEM形式の標準）
+            var formattedString = ""
+            var index = base64String.startIndex
+            while index < base64String.endIndex {
+                let endIndex = base64String.index(index, offsetBy: 64, limitedBy: base64String.endIndex) ?? base64String.endIndex
+                formattedString += base64String[index..<endIndex]
+                if endIndex < base64String.endIndex {
+                    formattedString += "\n"
+                }
+                index = endIndex
+            }
+            return "-----BEGIN CERTIFICATE-----\n\(formattedString)\n-----END CERTIFICATE-----"
+        }
+        return nil
+    }
+    
+    // 公開鍵証明書を解析（16進数文字列として）
+    private func parsePublicKeyCertificateAsHex(from data: Data) -> String? {
+        // TLVから公開鍵証明書を取得 (Tag 0xDB)
+        if let certData = cardData.parseTLV(data: data, tag: 0xDB) {
+            // バイナリデータを16進数文字列に変換
+            return certData.map { String(format: "%02X", $0) }.joined()
         }
         return nil
     }

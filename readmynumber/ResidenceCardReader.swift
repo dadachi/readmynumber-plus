@@ -560,15 +560,39 @@ extension ResidenceCardData {
             guard offset + 2 <= data.count else { break }
             
             let currentTag = data[offset]
-            let length = Int(data[offset + 1])
+            var length = 0
+            var lengthFieldSize = 1
             
-            guard offset + 2 + length <= data.count else { break }
+            // Parse length according to BER-TLV encoding rules
+            let lengthByte = data[offset + 1]
             
-            if currentTag == tag {
-                return data.subdata(in: (offset + 2)..<(offset + 2 + length))
+            if lengthByte <= 0x7F {
+                // Short form: length is directly encoded in one byte (0x00 to 0x7F)
+                length = Int(lengthByte)
+                lengthFieldSize = 1
+            } else if lengthByte == 0x81 {
+                // Extended form: next byte contains length (0x00 to 0xFF)
+                guard offset + 3 <= data.count else { break }
+                length = Int(data[offset + 2])
+                lengthFieldSize = 2
+            } else if lengthByte == 0x82 {
+                // Extended form: next 2 bytes contain length (big-endian)
+                guard offset + 4 <= data.count else { break }
+                length = Int(data[offset + 2]) * 256 + Int(data[offset + 3])
+                lengthFieldSize = 3
+            } else {
+                // Unsupported length encoding
+                break
             }
             
-            offset += 2 + length
+            let valueStart = offset + 1 + lengthFieldSize
+            guard valueStart + length <= data.count else { break }
+            
+            if currentTag == tag {
+                return data.subdata(in: valueStart..<(valueStart + length))
+            }
+            
+            offset = valueStart + length
         }
         
         return nil
