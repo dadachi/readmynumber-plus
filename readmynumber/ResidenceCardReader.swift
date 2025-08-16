@@ -312,7 +312,7 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
 }
 
 // MARK: - Data Models
-struct ResidenceCardData {
+struct ResidenceCardData: Equatable {
     let commonData: Data
     let cardType: Data
     let frontImage: Data
@@ -321,7 +321,7 @@ struct ResidenceCardData {
     let additionalData: AdditionalData?
     let signature: Data
     
-    struct AdditionalData {
+    struct AdditionalData: Equatable {
         let comprehensivePermission: Data
         let individualPermission: Data
         let extensionApplication: Data
