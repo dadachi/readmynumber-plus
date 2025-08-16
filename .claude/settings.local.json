@@ -5,7 +5,9 @@
       "Bash(mkdir:*)",
       "Bash(mv:*)",
       "Bash(swift:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "WebSearch",
+      "WebFetch(domain:www.moj.go.jp)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
