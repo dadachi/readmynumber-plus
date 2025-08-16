@@ -71,7 +71,18 @@ struct ResidenceCardDetailView: View {
                         let cardType = parseCardTypeString(from: cardData.cardType)
                         InfoCardView(title: "カード種別", value: cardType, systemImage: "creditcard")
 
-                        // 住所情報
+                        // 住所関連情報
+                        // 追記書き込み年月日
+                        if let updateDate = parseAddressUpdateDate(from: cardData.address) {
+                            InfoCardView(title: "住所更新日", value: updateDate, systemImage: "calendar")
+                        }
+                        
+                        // 市町村コード
+                        if let municipalityCode = parseMunicipalityCode(from: cardData.address) {
+                            InfoCardView(title: "市町村コード", value: municipalityCode, systemImage: "building.2")
+                        }
+                        
+                        // 住居地
                         if let addressString = parseAddressData(from: cardData.address) {
                             InfoCardView(title: "住所", value: addressString, systemImage: "location.fill", isFullWidth: true)
                         }
@@ -338,10 +349,39 @@ struct ResidenceCardDetailView: View {
     
     // 住所データを解析
     private func parseAddressData(from data: Data) -> String? {
-        // TLVから住所データを取得
-        if let addressData = cardData.parseTLV(data: data, tag: 0x11),
+        // TLVから住居地データを取得 (Tag 0xD4)
+        if let addressData = cardData.parseTLV(data: data, tag: 0xD4),
            let addressString = String(data: addressData, encoding: .utf8) {
-            return addressString
+            // Null値を除去してトリミング
+            let trimmedAddress = addressString.trimmingCharacters(in: .controlCharacters).trimmingCharacters(in: .whitespaces)
+            return trimmedAddress.isEmpty ? nil : trimmedAddress
+        }
+        return nil
+    }
+    
+    // 追記書き込み年月日を解析
+    private func parseAddressUpdateDate(from data: Data) -> String? {
+        // TLVから追記書き込み年月日を取得 (Tag 0xD2)
+        if let dateData = cardData.parseTLV(data: data, tag: 0xD2),
+           let dateString = String(data: dateData, encoding: .ascii) {
+            // YYYYMMDDフォーマットを年/月/日に変換
+            if dateString.count == 8 {
+                let year = String(dateString.prefix(4))
+                let month = String(dateString.dropFirst(4).prefix(2))
+                let day = String(dateString.suffix(2))
+                return "\(year)年\(month)月\(day)日"
+            }
+            return dateString
+        }
+        return nil
+    }
+    
+    // 市町村コードを解析
+    private func parseMunicipalityCode(from data: Data) -> String? {
+        // TLVから市町村コードを取得 (Tag 0xD3)
+        if let codeData = cardData.parseTLV(data: data, tag: 0xD3),
+           let codeString = String(data: codeData, encoding: .ascii) {
+            return codeString
         }
         return nil
     }
