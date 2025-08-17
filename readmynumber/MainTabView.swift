@@ -36,6 +36,7 @@ struct ResidentTabView: View {
     @State private var showAlert: Bool = false
     @State private var alertTitle: String = ""
     @State private var alertMessage: String = ""
+    @State private var showingSample = false
     @StateObject private var residenceCardReader = ResidenceCardReader()
     @StateObject private var dataManager = ResidenceCardDataManager.shared
     @Environment(\.colorScheme) var colorScheme
@@ -72,6 +73,17 @@ struct ResidentTabView: View {
                                     .fontWeight(.bold)
 
                                 Spacer()
+                                
+                                Button(action: {
+                                    showingSample = true
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "questionmark.circle")
+                                        Text("サンプル")
+                                    }
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                                }
 
                                 Image(systemName: "creditcard")
                                     .font(.title2)
@@ -148,6 +160,9 @@ struct ResidentTabView: View {
                 if let cardData = dataManager.cardData {
                     ResidenceCardDetailView(cardData: cardData)
                 }
+            }
+            .sheet(isPresented: $showingSample) {
+                ResidenceCardSampleView()
             }
         }
         .onAppear {
