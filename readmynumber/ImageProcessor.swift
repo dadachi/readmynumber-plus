@@ -415,4 +415,170 @@ class ImageProcessor {
             }
         }
     }
+    
+    // MARK: - ResidenceCardData Processing
+    
+    /// Process ResidenceCardData.frontImage to make white background transparent and composite faceImage
+    /// - Parameters:
+    ///   - cardData: The ResidenceCardData containing frontImage (TIFF) and faceImage data
+    ///   - tolerance: Tolerance for white background removal (default 0.08)
+    /// - Returns: UIImage with transparent background and face composited, or nil if processing fails
+    static func createCompositeResidenceCard(from cardData: ResidenceCardData, tolerance: CGFloat = 0.08) -> UIImage? {
+        // Step 1: Convert TIFF frontImage to UIImage
+        guard let frontImage = convertTIFFDataToUIImage(data: cardData.frontImage) else {
+            print("Failed to convert frontImage TIFF data to UIImage")
+            return nil
+        }
+        
+        print("Converted frontImage from TIFF - Size: \(frontImage.size)")
+        
+        // Step 2: Remove white background from front image
+        guard let transparentFrontImage = makeBackgroundTransparent(
+            from: frontImage, 
+            tolerance: tolerance, 
+            backgroundColor: UIColor.white
+        ) else {
+            print("Failed to make frontImage background transparent")
+            return nil
+        }
+        
+        print("Made frontImage background transparent")
+        
+        // Step 3: Convert faceImage data to UIImage (could be JPEG2000 or other format)
+        guard let faceImage = convertImageDataToUIImage(data: cardData.faceImage) else {
+            print("Failed to convert faceImage data to UIImage")
+            return nil
+        }
+        
+        print("Converted faceImage - Size: \(faceImage.size)")
+        
+        // Step 4: Composite face image onto transparent front image
+        guard let compositeImage = compositeFaceOntoCard(
+            cardImage: transparentFrontImage,
+            faceImage: faceImage
+        ) else {
+            print("Failed to composite faceImage onto transparent frontImage")
+            return nil
+        }
+        
+        print("Successfully created composite residence card with transparent background")
+        return compositeImage
+    }
+    
+    /// Convert TIFF data to UIImage
+    /// - Parameter data: TIFF image data
+    /// - Returns: UIImage or nil if conversion fails
+    private static func convertTIFFDataToUIImage(data: Data) -> UIImage? {
+        // Try direct UIImage creation
+        if let image = UIImage(data: data) {
+            return image
+        }
+        
+        // Try CGImageSource for TIFF
+        if let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
+           let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
+            return UIImage(cgImage: cgImage)
+        }
+        
+        return nil
+    }
+    
+    /// Convert image data to UIImage (supports various formats)
+    /// - Parameter data: Image data
+    /// - Returns: UIImage or nil if conversion fails
+    private static func convertImageDataToUIImage(data: Data) -> UIImage? {
+        // Try direct UIImage creation
+        if let image = UIImage(data: data) {
+            return image
+        }
+        
+        // Try CGImageSource for various formats including JPEG2000
+        if let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
+           let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
+            return UIImage(cgImage: cgImage)
+        }
+        
+        return nil
+    }
+    
+    /// Composite face image onto the residence card image
+    /// - Parameters:
+    ///   - cardImage: The residence card image with transparent background
+    ///   - faceImage: The face photo to composite
+    /// - Returns: Composite image or nil if compositing fails
+    private static func compositeFaceOntoCard(cardImage: UIImage, faceImage: UIImage) -> UIImage? {
+        let cardSize = cardImage.size
+        let scale = cardImage.scale
+        
+        UIGraphicsBeginImageContextWithOptions(cardSize, false, scale)
+        defer { UIGraphicsEndImageContext() }
+        
+        // Draw the transparent card image first
+        cardImage.draw(in: CGRect(origin: .zero, size: cardSize))
+        
+        // Calculate face position based on residence card specifications
+        // Face photo is typically positioned at approximately (72%, 35%) from top-left
+        // with size about (22% width, 30% height) of the card
+        let facePositionX = cardSize.width * 0.72
+        let facePositionY = cardSize.height * 0.35
+        let faceWidth = cardSize.width * 0.22
+        let faceHeight = cardSize.height * 0.30
+        
+        let faceRect = CGRect(
+            x: facePositionX,
+            y: facePositionY,
+            width: faceWidth,
+            height: faceHeight
+        )
+        
+        print("Compositing face at position: \(faceRect)")
+        
+        // Draw the face image
+        faceImage.draw(in: faceRect)
+        
+        return UIGraphicsGetImageFromCurrentImageContext()
+    }
+    
+    /// Save composite residence card as PNG data
+    /// - Parameter compositeImage: The composite image with transparent background
+    /// - Returns: PNG data or nil if conversion fails
+    static func saveCompositeAsTransparentPNG(_ compositeImage: UIImage) -> Data? {
+        return compositeImage.pngData()
+    }
+    
+    /// Create and save composite residence card from ResidenceCardData
+    /// - Parameters:
+    ///   - cardData: The ResidenceCardData
+    ///   - fileName: Output file name (without extension)
+    ///   - tolerance: Background removal tolerance
+    /// - Returns: Success status and file URL if saved
+    static func processAndSaveResidenceCard(
+        from cardData: ResidenceCardData,
+        fileName: String = "residence_card_composite",
+        tolerance: CGFloat = 0.08
+    ) -> (success: Bool, fileURL: URL?) {
+        
+        // Create composite image
+        guard let compositeImage = createCompositeResidenceCard(from: cardData, tolerance: tolerance) else {
+            return (false, nil)
+        }
+        
+        // Convert to PNG data
+        guard let pngData = saveCompositeAsTransparentPNG(compositeImage) else {
+            return (false, nil)
+        }
+        
+        // Save to documents directory
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let fileURL = documentsPath.appendingPathComponent("\(fileName).png")
+        
+        do {
+            try pngData.write(to: fileURL)
+            print("Saved composite residence card to: \(fileURL.path)")
+            return (true, fileURL)
+        } catch {
+            print("Error saving composite image: \(error)")
+            return (false, nil)
+        }
+    }
 }

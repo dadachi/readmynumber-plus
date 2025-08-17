@@ -14,6 +14,7 @@ struct ResidenceCardDetailView: View {
     @StateObject private var dataManager = ResidenceCardDataManager.shared
     @State private var frontImageJPEG: UIImage?
     @State private var faceImageJPEG: UIImage?
+    @State private var compositeImageWithTransparency: UIImage?
 
     var body: some View {
         ZStack {
@@ -124,6 +125,18 @@ struct ResidenceCardDetailView: View {
                                 .foregroundColor(.white)
                                 .cornerRadius(8)
                             }
+                            
+                            Button(action: createCompositeImage) {
+                                HStack {
+                                    Image(systemName: "rectangle.stack")
+                                    Text("合成・透明化")
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                            }
                         }
 
                         // 券面画像表示
@@ -158,6 +171,28 @@ struct ResidenceCardDetailView: View {
                             }
                         }
 
+                        // 合成画像（透明背景）表示
+                        if let compositeImage = compositeImageWithTransparency {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("合成画像（透明背景）")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                ZStack {
+                                    // チェッカーボード背景で透明度を可視化
+                                    CheckerboardPattern()
+                                        .frame(height: 200)
+                                        .cornerRadius(8)
+                                    
+                                    Image(uiImage: compositeImage)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxHeight: 200)
+                                        .cornerRadius(8)
+                                }
+                            }
+                        }
+                        
                         // 画像情報
                         VStack(alignment: .leading, spacing: 8) {
                             Text("券面画像: \(cardData.frontImage.count) bytes (元: TIFF)")
@@ -167,6 +202,13 @@ struct ResidenceCardDetailView: View {
                             Text("顔写真: \(cardData.faceImage.count) bytes (元: JPEG2000)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                            
+                            if compositeImageWithTransparency != nil {
+                                Text("合成画像: 透明背景付きPNG")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                                    .fontWeight(.semibold)
+                            }
                         }
                         .padding()
                         .background(colorScheme == .dark ? Color(UIColor.systemGray5) : Color.white)
@@ -419,16 +461,20 @@ struct ResidenceCardDetailView: View {
             return
         }
         
+        var exportedFiles: [URL] = []
+        
         do {
             // 券面画像をJPEGとして保存
             if let frontImage = frontImageJPEG,
                let jpegData = frontImage.jpegData(compressionQuality: 0.9) {
                 let frontImageURL = documentsDirectory.appendingPathComponent("residence_card_front.jpg")
                 try jpegData.write(to: frontImageURL)
+                exportedFiles.append(frontImageURL)
             } else {
                 // 変換に失敗した場合は元のTIFFを保存
                 let frontImageURL = documentsDirectory.appendingPathComponent("residence_card_front.tiff")
                 try cardData.frontImage.write(to: frontImageURL)
+                exportedFiles.append(frontImageURL)
             }
             
             // 顔写真をJPEGとして保存
@@ -436,10 +482,20 @@ struct ResidenceCardDetailView: View {
                let jpegData = faceImage.jpegData(compressionQuality: 0.9) {
                 let faceImageURL = documentsDirectory.appendingPathComponent("residence_card_face.jpg")
                 try jpegData.write(to: faceImageURL)
+                exportedFiles.append(faceImageURL)
             } else {
                 // 変換に失敗した場合は元のJPEG2000を保存
                 let faceImageURL = documentsDirectory.appendingPathComponent("residence_card_face.jp2")
                 try cardData.faceImage.write(to: faceImageURL)
+                exportedFiles.append(faceImageURL)
+            }
+            
+            // 合成画像（透明背景）をPNGとして保存
+            if let compositeImage = compositeImageWithTransparency,
+               let pngData = ImageProcessor.saveCompositeAsTransparentPNG(compositeImage) {
+                let compositeImageURL = documentsDirectory.appendingPathComponent("residence_card_composite_transparent.png")
+                try pngData.write(to: compositeImageURL)
+                exportedFiles.append(compositeImageURL)
             }
             
             showingExportSheet = true
@@ -582,6 +638,17 @@ struct ResidenceCardDetailView: View {
         return nil
     }
     
+    // 合成画像作成処理
+    private func createCompositeImage() {
+        // Create composite image with transparent background
+        if let compositeImage = ImageProcessor.createCompositeResidenceCard(from: cardData, tolerance: 0.08) {
+            compositeImageWithTransparency = compositeImage
+            showError(title: "成功", message: "合成画像を作成しました。白い背景が透明になり、顔写真が正しい位置に配置されています。")
+        } else {
+            showError(title: "エラー", message: "合成画像の作成に失敗しました。")
+        }
+    }
+    
     private func showError(title: String, message: String) {
         self.alertTitle = title
         self.alertMessage = message
@@ -672,4 +739,35 @@ private func loadFaceImageData() -> Data {
     )
     
     ResidenceCardDetailView(cardData: sampleData)
+}
+
+// MARK: - CheckerboardPattern for transparency visualization
+struct CheckerboardPattern: View {
+    let checkSize: CGFloat = 10
+    
+    var body: some View {
+        GeometryReader { geometry in
+            let numX = Int(ceil(geometry.size.width / checkSize))
+            let numY = Int(ceil(geometry.size.height / checkSize))
+            
+            VStack(spacing: 0) {
+                ForEach(0..<numY, id: \.self) { y in
+                    HStack(spacing: 0) {
+                        ForEach(0..<numX, id: \.self) { x in
+                            Rectangle()
+                                .fill(checkColor(x: x, y: y))
+                                .frame(width: checkSize, height: checkSize)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func checkColor(x: Int, y: Int) -> Color {
+        let isEvenX = x % 2 == 0
+        let isEvenY = y % 2 == 0
+        let useLight = (isEvenX && isEvenY) || (!isEvenX && !isEvenY)
+        return useLight ? Color.gray.opacity(0.2) : Color.gray.opacity(0.4)
+    }
 }

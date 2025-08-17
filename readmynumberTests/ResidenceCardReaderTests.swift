@@ -1147,6 +1147,115 @@ struct FrontImageLoadingTests {
         
         return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
     }
+    
+    @Test("Test ResidenceCardData composite image creation")
+    func testResidenceCardDataCompositeImage() {
+        // Create test ResidenceCardData with image data
+        let frontImageData = createTestTIFFData()
+        let faceImageData = createTestJPEGData()
+        
+        let testCardData = ResidenceCardData(
+            commonData: Data([0xC0, 0x04, 0x01, 0x02, 0x03, 0x04]),
+            cardType: Data([0xC1, 0x01, 0x31]),
+            frontImage: frontImageData,
+            faceImage: faceImageData,
+            address: Data([0x11, 0x10, 0x6A, 0x65, 0x6E, 0x6B, 0x69, 0x6E, 0x73]),
+            additionalData: nil,
+            signature: Data(repeating: 0xFF, count: 256),
+            signatureVerificationResult: nil
+        )
+        
+        // Test composite image creation
+        let compositeImage = ImageProcessor.createCompositeResidenceCard(from: testCardData, tolerance: 0.1)
+        #expect(compositeImage != nil, "Should successfully create composite image")
+        
+        if let composite = compositeImage {
+            #expect(composite.size.width > 0, "Composite image should have width > 0")
+            #expect(composite.size.height > 0, "Composite image should have height > 0")
+            
+            // Test PNG conversion for transparency
+            let pngData = ImageProcessor.saveCompositeAsTransparentPNG(composite)
+            #expect(pngData != nil, "Should be able to convert composite to PNG")
+            #expect(pngData!.count > 0, "PNG data should not be empty")
+        }
+    }
+    
+    @Test("Test processing and saving ResidenceCardData")
+    func testProcessAndSaveResidenceCard() {
+        // Create test ResidenceCardData
+        let frontImageData = createTestTIFFData()
+        let faceImageData = createTestJPEGData()
+        
+        let testCardData = ResidenceCardData(
+            commonData: Data([0xC0, 0x04, 0x01, 0x02, 0x03, 0x04]),
+            cardType: Data([0xC1, 0x01, 0x31]),
+            frontImage: frontImageData,
+            faceImage: faceImageData,
+            address: Data([0x11, 0x10, 0x6A, 0x65, 0x6E, 0x6B, 0x69, 0x6E, 0x73]),
+            additionalData: nil,
+            signature: Data(repeating: 0xFF, count: 256),
+            signatureVerificationResult: nil
+        )
+        
+        // Test processing and saving
+        let result = ImageProcessor.processAndSaveResidenceCard(
+            from: testCardData,
+            fileName: "test_residence_card",
+            tolerance: 0.08
+        )
+        
+        #expect(result.success, "Should successfully process and save residence card")
+        
+        if let fileURL = result.fileURL {
+            #expect(FileManager.default.fileExists(atPath: fileURL.path), "Saved file should exist")
+            #expect(fileURL.pathExtension == "png", "Saved file should be PNG")
+            
+            // Clean up test file
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+    }
+    
+    // Helper functions for creating test image data
+    private func createTestTIFFData() -> Data {
+        // Create a simple test image and convert to TIFF
+        let testImage = createTestImageWithWhiteBackground()
+        
+        // Convert to TIFF using CGImageDestination
+        let data = NSMutableData()
+        if let destination = CGImageDestinationCreateWithData(data, UTType.tiff.identifier as CFString, 1, nil),
+           let cgImage = testImage.cgImage {
+            CGImageDestinationAddImage(destination, cgImage, nil)
+            CGImageDestinationFinalize(destination)
+        }
+        
+        return data as Data
+    }
+    
+    private func createTestJPEGData() -> Data {
+        // Create a simple test face image
+        let size = CGSize(width: 100, height: 120)
+        UIGraphicsBeginImageContextWithOptions(size, false, 1.0)
+        defer { UIGraphicsEndImageContext() }
+        
+        guard let context = UIGraphicsGetCurrentContext() else {
+            return Data()
+        }
+        
+        // Fill with light skin tone
+        context.setFillColor(UIColor(red: 0.9, green: 0.8, blue: 0.7, alpha: 1.0).cgColor)
+        context.fill(CGRect(origin: .zero, size: size))
+        
+        // Add simple face features
+        context.setFillColor(UIColor.black.cgColor)
+        // Eyes
+        context.fillEllipse(in: CGRect(x: 25, y: 35, width: 8, height: 8))
+        context.fillEllipse(in: CGRect(x: 67, y: 35, width: 8, height: 8))
+        // Mouth
+        context.fillEllipse(in: CGRect(x: 40, y: 65, width: 20, height: 8))
+        
+        let testImage = UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
+        return testImage.jpegData(compressionQuality: 0.9) ?? Data()
+    }
 }
 
 // MARK: - Signature Verification Tests

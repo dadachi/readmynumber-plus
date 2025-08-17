@@ -34,36 +34,6 @@
             endingLineNumber = "481"
             landmarkName = "parseCardTypeString(from:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "FAE0C353-D00A-4FB7-87C2-A6EF5513AD99 - 1c1cdd2c2584940c"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "readmynumber.ResidenceCardDetailView.parseCardTypeString(from: Foundation.Data) -&gt; Swift.String"
-                  moduleName = "readmynumber.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/adachi/pg/iphone/readmynumber-plus/readmynumber/ResidenceCardDetailView.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "481"
-                  endingLineNumber = "481">
-               </Location>
-               <Location
-                  uuid = "FAE0C353-D00A-4FB7-87C2-A6EF5513AD99 - 1c1cdd2c2584940c"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "readmynumber.ResidenceCardDetailView.parseCardTypeString(from: Foundation.Data) -&gt; Swift.String"
-                  moduleName = "readmynumber.debug.dylib"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/adachi/pg/iphone/readmynumber-plus/readmynumber/ResidenceCardDetailView.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "481"
-                  endingLineNumber = "481">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>
