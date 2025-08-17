@@ -27,6 +27,12 @@ struct MainTabView: View {
                     Image(systemName: "doc.text.viewfinder")
                     Text("M-Doc")
                 }
+            
+            TransparentBackgroundTestView()
+                .tabItem {
+                    Image(systemName: "photo")
+                    Text("透明背景")
+                }
         }
     }
 }

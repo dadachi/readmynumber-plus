@@ -1037,6 +1037,116 @@ struct FrontImageLoadingTests {
         
         return bigEndian || littleEndian
     }
+    
+    @Test("Test transparent background processing")
+    func testTransparentBackgroundProcessing() {
+        // Test the transparent background functionality
+        guard let frontImage = UIImage(named: "front_image_mmr") else {
+            // If Asset Catalog image not available, create a test image with white background
+            let testImage = createTestImageWithWhiteBackground()
+            let transparentImage = ImageProcessor.removeWhiteBackground(from: testImage, tolerance: 0.1)
+            #expect(transparentImage != nil, "Should be able to process test image with white background")
+            return
+        }
+        
+        // Test with actual front image
+        let transparentImage = ImageProcessor.removeWhiteBackground(from: frontImage, tolerance: 0.08)
+        #expect(transparentImage != nil, "Should successfully remove white background from front image")
+        
+        // Test with different tolerance values
+        let strictTransparent = ImageProcessor.removeWhiteBackground(from: frontImage, tolerance: 0.01)
+        let lenientTransparent = ImageProcessor.removeWhiteBackground(from: frontImage, tolerance: 0.2)
+        
+        #expect(strictTransparent != nil, "Should work with strict tolerance")
+        #expect(lenientTransparent != nil, "Should work with lenient tolerance")
+        
+        // Test PNG conversion (important for preserving transparency)
+        if let transparent = transparentImage {
+            let pngData = ImageProcessor.convertToPNGData(transparent)
+            #expect(pngData != nil, "Should be able to convert to PNG data")
+            #expect(pngData!.count > 0, "PNG data should not be empty")
+            
+            // Verify we can recreate image from PNG data
+            let recreatedImage = UIImage(data: pngData!)
+            #expect(recreatedImage != nil, "Should be able to recreate image from PNG data")
+        }
+    }
+    
+    @Test("Test before/after preview creation")
+    func testBeforeAfterPreviewCreation() {
+        // Create test images
+        let originalImage = createTestImageWithWhiteBackground()
+        let transparentImage = ImageProcessor.removeWhiteBackground(from: originalImage, tolerance: 0.1)
+        
+        guard let transparent = transparentImage else {
+            #expect(Bool(false), "Failed to create transparent image for preview test")
+            return
+        }
+        
+        // Test preview creation
+        let previewImage = ImageProcessor.createBeforeAfterPreview(
+            originalImage: originalImage,
+            transparentImage: transparent
+        )
+        
+        #expect(previewImage != nil, "Should be able to create before/after preview")
+        
+        if let preview = previewImage {
+            // Preview should be wider than original (side by side layout)
+            #expect(preview.size.width > originalImage.size.width, "Preview should be wider than original")
+            #expect(preview.size.height >= originalImage.size.height, "Preview should be at least as tall as original")
+        }
+    }
+    
+    @Test("Test advanced background removal")
+    func testAdvancedBackgroundRemoval() {
+        let testImage = createTestImageWithWhiteBackground()
+        
+        // Test advanced background removal with edge detection
+        let advancedResult = ImageProcessor.removeBackgroundAdvanced(
+            from: testImage,
+            cornerTolerance: 0.1,
+            edgeThreshold: 0.3
+        )
+        
+        #expect(advancedResult != nil, "Advanced background removal should succeed")
+        
+        // Test with different parameters
+        let conservativeResult = ImageProcessor.removeBackgroundAdvanced(
+            from: testImage,
+            cornerTolerance: 0.05,
+            edgeThreshold: 0.1
+        )
+        
+        #expect(conservativeResult != nil, "Conservative advanced removal should succeed")
+    }
+    
+    // Helper function to create a test image with white background
+    private func createTestImageWithWhiteBackground() -> UIImage {
+        let size = CGSize(width: 200, height: 150)
+        UIGraphicsBeginImageContextWithOptions(size, false, 1.0)
+        defer { UIGraphicsEndImageContext() }
+        
+        guard let context = UIGraphicsGetCurrentContext() else {
+            return UIImage() // Return empty image if context creation fails
+        }
+        
+        // Fill with white background
+        context.setFillColor(UIColor.white.cgColor)
+        context.fill(CGRect(origin: .zero, size: size))
+        
+        // Draw some colored content in the center
+        context.setFillColor(UIColor.blue.cgColor)
+        let contentRect = CGRect(x: 50, y: 40, width: 100, height: 70)
+        context.fill(contentRect)
+        
+        // Add some text
+        context.setFillColor(UIColor.red.cgColor)
+        let textRect = CGRect(x: 60, y: 55, width: 80, height: 40)
+        context.fill(textRect)
+        
+        return UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
+    }
 }
 
 // MARK: - Signature Verification Tests
