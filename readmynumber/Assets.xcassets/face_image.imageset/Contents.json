@@ -1,12 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "face_image.jpg",
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "filename" : "face_image_jp2_color.jp2",
+      "filename" : "face_image_jp2_80.jp2",
       "idiom" : "universal",
       "scale" : "1x"
     },
