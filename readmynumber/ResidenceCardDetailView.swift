@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
+import ImageIO
 
 struct ResidenceCardDetailView: View {
     let cardData: ResidenceCardData
@@ -13,6 +14,7 @@ struct ResidenceCardDetailView: View {
     @StateObject private var dataManager = ResidenceCardDataManager.shared
     @State private var frontImageJPEG: UIImage?
     @State private var faceImageJPEG: UIImage?
+    @State private var compositeImageWithTransparency: UIImage?
 
     var body: some View {
         ZStack {
@@ -123,6 +125,18 @@ struct ResidenceCardDetailView: View {
                                 .foregroundColor(.white)
                                 .cornerRadius(8)
                             }
+                            
+                            Button(action: createCompositeImage) {
+                                HStack {
+                                    Image(systemName: "rectangle.stack")
+                                    Text("合成・透明化")
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                            }
                         }
 
                         // 券面画像表示
@@ -157,6 +171,28 @@ struct ResidenceCardDetailView: View {
                             }
                         }
 
+                        // 合成画像（透明背景）表示
+                        if let compositeImage = compositeImageWithTransparency {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("合成画像（透明背景）")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                ZStack {
+                                    // チェッカーボード背景で透明度を可視化
+                                    CheckerboardPattern()
+                                        .frame(height: 200)
+                                        .cornerRadius(8)
+                                    
+                                    Image(uiImage: compositeImage)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxHeight: 200)
+                                        .cornerRadius(8)
+                                }
+                            }
+                        }
+                        
                         // 画像情報
                         VStack(alignment: .leading, spacing: 8) {
                             Text("券面画像: \(cardData.frontImage.count) bytes (元: TIFF)")
@@ -166,6 +202,13 @@ struct ResidenceCardDetailView: View {
                             Text("顔写真: \(cardData.faceImage.count) bytes (元: JPEG2000)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                            
+                            if compositeImageWithTransparency != nil {
+                                Text("合成画像: 透明背景付きPNG")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                                    .fontWeight(.semibold)
+                            }
                         }
                         .padding()
                         .background(colorScheme == .dark ? Color(UIColor.systemGray5) : Color.white)
@@ -375,25 +418,39 @@ struct ResidenceCardDetailView: View {
     // 画像変換処理
     private func convertImages() {
         // TIFFからJPEGへ変換
+        // まずUIImageとして直接読み込みを試みる
         if let tiffImage = UIImage(data: cardData.frontImage) {
             frontImageJPEG = tiffImage
-        } else {
+            print("Successfully loaded front image as UIImage")
+        } else if cardData.frontImage.count > 100 {
             // CGImageSourceを使用してTIFFを読み込む
             if let imageSource = CGImageSourceCreateWithData(cardData.frontImage as CFData, nil),
                let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
                 frontImageJPEG = UIImage(cgImage: cgImage)
+                print("Successfully loaded front image via CGImageSource")
+            } else {
+                print("Failed to load front image, data size: \(cardData.frontImage.count)")
             }
+        } else {
+            print("Front image data too small or invalid: \(cardData.frontImage.count) bytes")
         }
         
         // JPEG2000からJPEGへ変換
+        // まずUIImageとして直接読み込みを試みる
         if let jp2Image = UIImage(data: cardData.faceImage) {
             faceImageJPEG = jp2Image
-        } else {
+            print("Successfully loaded face image as UIImage")
+        } else if cardData.faceImage.count > 100 {
             // CGImageSourceを使用してJPEG2000を読み込む
             if let imageSource = CGImageSourceCreateWithData(cardData.faceImage as CFData, nil),
                let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
                 faceImageJPEG = UIImage(cgImage: cgImage)
+                print("Successfully loaded face image via CGImageSource")
+            } else {
+                print("Failed to load face image, data size: \(cardData.faceImage.count)")
             }
+        } else {
+            print("Face image data too small or invalid: \(cardData.faceImage.count) bytes")
         }
     }
     
@@ -404,16 +461,20 @@ struct ResidenceCardDetailView: View {
             return
         }
         
+        var exportedFiles: [URL] = []
+        
         do {
             // 券面画像をJPEGとして保存
             if let frontImage = frontImageJPEG,
                let jpegData = frontImage.jpegData(compressionQuality: 0.9) {
                 let frontImageURL = documentsDirectory.appendingPathComponent("residence_card_front.jpg")
                 try jpegData.write(to: frontImageURL)
+                exportedFiles.append(frontImageURL)
             } else {
                 // 変換に失敗した場合は元のTIFFを保存
                 let frontImageURL = documentsDirectory.appendingPathComponent("residence_card_front.tiff")
                 try cardData.frontImage.write(to: frontImageURL)
+                exportedFiles.append(frontImageURL)
             }
             
             // 顔写真をJPEGとして保存
@@ -421,10 +482,20 @@ struct ResidenceCardDetailView: View {
                let jpegData = faceImage.jpegData(compressionQuality: 0.9) {
                 let faceImageURL = documentsDirectory.appendingPathComponent("residence_card_face.jpg")
                 try jpegData.write(to: faceImageURL)
+                exportedFiles.append(faceImageURL)
             } else {
                 // 変換に失敗した場合は元のJPEG2000を保存
                 let faceImageURL = documentsDirectory.appendingPathComponent("residence_card_face.jp2")
                 try cardData.faceImage.write(to: faceImageURL)
+                exportedFiles.append(faceImageURL)
+            }
+            
+            // 合成画像（透明背景）をPNGとして保存
+            if let compositeImage = compositeImageWithTransparency,
+               let pngData = ImageProcessor.saveCompositeAsTransparentPNG(compositeImage) {
+                let compositeImageURL = documentsDirectory.appendingPathComponent("residence_card_composite_transparent.png")
+                try pngData.write(to: compositeImageURL)
+                exportedFiles.append(compositeImageURL)
             }
             
             showingExportSheet = true
@@ -567,6 +638,17 @@ struct ResidenceCardDetailView: View {
         return nil
     }
     
+    // 合成画像作成処理
+    private func createCompositeImage() {
+        // Create composite image with transparent background
+        if let compositeImage = ImageProcessor.createCompositeResidenceCard(from: cardData, tolerance: 0.08) {
+            compositeImageWithTransparency = compositeImage
+            showError(title: "成功", message: "合成画像を作成しました。白い背景が透明になり、顔写真が正しい位置に配置されています。")
+        } else {
+            showError(title: "エラー", message: "合成画像の作成に失敗しました。")
+        }
+    }
+    
     private func showError(title: String, message: String) {
         self.alertTitle = title
         self.alertMessage = message
@@ -575,13 +657,77 @@ struct ResidenceCardDetailView: View {
 }
 
 
+// MARK: - Preview Helper Functions
+private func loadImageDataFromAssetCatalog(imageName: String) -> Data? {
+    // Load image from Asset Catalog
+    if let uiImage = UIImage(named: imageName) {
+        // Try to get original data representation first (for TIFF/JP2)
+        if let cgImage = uiImage.cgImage {
+            let bitmap = NSMutableData()
+            if let destination = CGImageDestinationCreateWithData(bitmap as CFMutableData, UTType.tiff.identifier as CFString, 1, nil) {
+                CGImageDestinationAddImage(destination, cgImage, nil)
+                if CGImageDestinationFinalize(destination) {
+                    print("Successfully loaded \(imageName) from Asset Catalog: \(bitmap.length) bytes")
+                    return bitmap as Data
+                }
+            }
+        }
+        
+        // Fallback to JPEG representation
+        if let jpegData = uiImage.jpegData(compressionQuality: 1.0) {
+            print("Successfully loaded \(imageName) as JPEG from Asset Catalog: \(jpegData.count) bytes")
+            return jpegData
+        }
+    }
+    
+    print("Could not find image in Asset Catalog: \(imageName)")
+    return nil
+}
+
+private func loadFrontImageData() -> Data {
+    // Try to load front_image_mmr from Asset Catalog
+    if let data = loadImageDataFromAssetCatalog(imageName: "front_image_mmr") {
+        return data
+    }
+    
+    // Fallback to dummy TIFF data if image not found
+    print("Using fallback dummy data for front image")
+    // Create a simple valid TIFF header
+    var tiffHeader = Data()
+    tiffHeader.append(contentsOf: [0x4D, 0x4D]) // Big-endian
+    tiffHeader.append(contentsOf: [0x00, 0x2A]) // TIFF magic number
+    tiffHeader.append(contentsOf: [0x00, 0x00, 0x00, 0x08]) // IFD offset
+    tiffHeader.append(contentsOf: [0x00, 0x00]) // No IFD entries
+    return tiffHeader
+}
+
+private func loadFaceImageData() -> Data {
+    // Try to load face_image (which contains face_image_jp2_80.jp2) from Asset Catalog
+    if let data = loadImageDataFromAssetCatalog(imageName: "face_image") {
+        return data
+    }
+    
+    // Fallback to dummy JPEG data if image not found
+    print("Using fallback dummy data for face image")
+    // Create a simple valid JPEG header
+    var jpegHeader = Data()
+    jpegHeader.append(contentsOf: [0xFF, 0xD8, 0xFF, 0xE0]) // JPEG SOI and APP0
+    jpegHeader.append(contentsOf: [0x00, 0x10]) // APP0 length
+    jpegHeader.append(contentsOf: [0x4A, 0x46, 0x49, 0x46, 0x00]) // "JFIF\0"
+    jpegHeader.append(contentsOf: [0x01, 0x01]) // Version
+    jpegHeader.append(contentsOf: [0x00, 0x00, 0x01, 0x00, 0x01]) // Density
+    jpegHeader.append(contentsOf: [0x00, 0x00]) // Thumbnails
+    jpegHeader.append(contentsOf: [0xFF, 0xD9]) // EOI
+    return jpegHeader
+}
+
 #Preview {
-    // サンプルデータでプレビュー
+    // サンプルデータでプレビュー（実際の画像ファイルを使用）
     let sampleData = ResidenceCardData(
         commonData: Data([0xC0, 0x04, 0x01, 0x02, 0x03, 0x04]), // サンプル共通データ
         cardType: Data([0xC1, 0x01, 0x31]), // "1" = 在留カード
-        frontImage: Data(repeating: 0x00, count: 1000), // サンプル券面画像
-        faceImage: Data(repeating: 0x00, count: 500),   // サンプル顔写真
+        frontImage: loadFrontImageData(), // front_image_mmr.tif を使用
+        faceImage: loadFaceImageData(),   // face_image_jp2_80.jp2 を使用
         address: Data([0x11, 0x10, 0x6A, 0x65, 0x6E, 0x6B, 0x69, 0x6E, 0x73, 0x20, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73]), // サンプル住所
         additionalData: ResidenceCardData.AdditionalData(
             comprehensivePermission: Data([0x12, 0x04, 0x70, 0x65, 0x72, 0x6D]), // "perm"
@@ -593,4 +739,35 @@ struct ResidenceCardDetailView: View {
     )
     
     ResidenceCardDetailView(cardData: sampleData)
+}
+
+// MARK: - CheckerboardPattern for transparency visualization
+struct CheckerboardPattern: View {
+    let checkSize: CGFloat = 10
+    
+    var body: some View {
+        GeometryReader { geometry in
+            let numX = Int(ceil(geometry.size.width / checkSize))
+            let numY = Int(ceil(geometry.size.height / checkSize))
+            
+            VStack(spacing: 0) {
+                ForEach(0..<numY, id: \.self) { y in
+                    HStack(spacing: 0) {
+                        ForEach(0..<numX, id: \.self) { x in
+                            Rectangle()
+                                .fill(checkColor(x: x, y: y))
+                                .frame(width: checkSize, height: checkSize)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func checkColor(x: Int, y: Int) -> Color {
+        let isEvenX = x % 2 == 0
+        let isEvenY = y % 2 == 0
+        let useLight = (isEvenX && isEvenY) || (!isEvenX && !isEvenY)
+        return useLight ? Color.gray.opacity(0.2) : Color.gray.opacity(0.4)
+    }
 }
