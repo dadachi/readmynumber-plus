@@ -418,13 +418,22 @@ class ImageProcessor {
     
     // MARK: - ResidenceCardData Processing
     
-    /// Process ResidenceCardData.frontImage to make white background transparent and composite faceImage
+    /// Create three-layer composite: front_image_background.png + transparentFrontImage + faceImage
     /// - Parameters:
     ///   - cardData: The ResidenceCardData containing frontImage (TIFF) and faceImage data
     ///   - tolerance: Tolerance for white background removal (default 0.08)
-    /// - Returns: UIImage with transparent background and face composited, or nil if processing fails
+    /// - Returns: UIImage with three-layer composite, or nil if processing fails
     static func createCompositeResidenceCard(from cardData: ResidenceCardData, tolerance: CGFloat = 0.08) -> UIImage? {
-        // Step 1: Convert TIFF frontImage to UIImage
+        // Step 1: Load front_image_background.png as base layer
+        guard let backgroundImage = UIImage(named: "front_image_background") else {
+            print("Failed to load front_image_background.png from Asset Catalog")
+            print("Falling back to two-layer compositing...")
+            return createTwoLayerComposite(from: cardData, tolerance: tolerance)
+        }
+        
+        print("Loaded front_image_background.png as base - Size: \(backgroundImage.size)")
+        
+        // Step 2: Convert TIFF frontImage to UIImage
         guard let frontImage = convertTIFFDataToUIImage(data: cardData.frontImage) else {
             print("Failed to convert frontImage TIFF data to UIImage")
             return nil
@@ -432,7 +441,7 @@ class ImageProcessor {
         
         print("Converted frontImage from TIFF - Size: \(frontImage.size)")
         
-        // Step 2: Remove white background from front image
+        // Step 3: Remove white background from front image
         guard let transparentFrontImage = makeBackgroundTransparent(
             from: frontImage, 
             tolerance: tolerance, 
@@ -444,7 +453,7 @@ class ImageProcessor {
         
         print("Made frontImage background transparent")
         
-        // Step 3: Convert faceImage data to UIImage (could be JPEG2000 or other format)
+        // Step 4: Convert faceImage data to UIImage (could be JPEG2000 or other format)
         guard let faceImage = convertImageDataToUIImage(data: cardData.faceImage) else {
             print("Failed to convert faceImage data to UIImage")
             return nil
@@ -452,16 +461,17 @@ class ImageProcessor {
         
         print("Converted faceImage - Size: \(faceImage.size)")
         
-        // Step 4: Composite face image onto transparent front image
-        guard let compositeImage = compositeFaceOntoCard(
-            cardImage: transparentFrontImage,
+        // Step 5: Create three-layer composite
+        guard let compositeImage = createThreeLayerComposite(
+            backgroundImage: backgroundImage,
+            transparentFrontImage: transparentFrontImage,
             faceImage: faceImage
         ) else {
-            print("Failed to composite faceImage onto transparent frontImage")
+            print("Failed to create three-layer composite")
             return nil
         }
         
-        print("Successfully created composite residence card with transparent background")
+        print("Successfully created three-layer composite residence card")
         return compositeImage
     }
     
@@ -501,7 +511,72 @@ class ImageProcessor {
         return nil
     }
     
-    /// Composite face image onto the residence card image
+    /// Create three-layer composite: background + transparent front image + face image
+    /// - Parameters:
+    ///   - backgroundImage: The front_image_background.png with transparent background
+    ///   - transparentFrontImage: The processed front image with white background removed
+    ///   - faceImage: The face photo to composite
+    /// - Returns: Three-layer composite image or nil if compositing fails
+    private static func createThreeLayerComposite(
+        backgroundImage: UIImage,
+        transparentFrontImage: UIImage,
+        faceImage: UIImage
+    ) -> UIImage? {
+        let canvasSize = backgroundImage.size
+        let scale = backgroundImage.scale
+        
+        UIGraphicsBeginImageContextWithOptions(canvasSize, false, scale)
+        defer { UIGraphicsEndImageContext() }
+        
+        // Layer 1: Draw the background image (front_image_background.png)
+        backgroundImage.draw(in: CGRect(origin: .zero, size: canvasSize))
+        print("Drew background layer - Size: \(canvasSize)")
+        
+        // Layer 2: Draw the transparent front image on top
+        transparentFrontImage.draw(in: CGRect(origin: .zero, size: canvasSize))
+        print("Drew transparent front image layer")
+        
+        // Layer 3: Draw the face image at the correct position
+        let faceRect = calculateFacePosition(for: canvasSize)
+        faceImage.draw(in: faceRect)
+        print("Drew face image at position: \(faceRect)")
+        
+        return UIGraphicsGetImageFromCurrentImageContext()
+    }
+    
+    /// Fallback two-layer composite (original functionality)
+    /// - Parameters:
+    ///   - cardData: The ResidenceCardData
+    ///   - tolerance: Background removal tolerance
+    /// - Returns: Two-layer composite or nil if processing fails
+    private static func createTwoLayerComposite(from cardData: ResidenceCardData, tolerance: CGFloat) -> UIImage? {
+        // Step 1: Convert TIFF frontImage to UIImage
+        guard let frontImage = convertTIFFDataToUIImage(data: cardData.frontImage) else {
+            print("Failed to convert frontImage TIFF data to UIImage (fallback)")
+            return nil
+        }
+        
+        // Step 2: Remove white background from front image
+        guard let transparentFrontImage = makeBackgroundTransparent(
+            from: frontImage, 
+            tolerance: tolerance, 
+            backgroundColor: UIColor.white
+        ) else {
+            print("Failed to make frontImage background transparent (fallback)")
+            return nil
+        }
+        
+        // Step 3: Convert faceImage data to UIImage
+        guard let faceImage = convertImageDataToUIImage(data: cardData.faceImage) else {
+            print("Failed to convert faceImage data to UIImage (fallback)")
+            return nil
+        }
+        
+        // Step 4: Composite face image onto transparent front image
+        return compositeFaceOntoCard(cardImage: transparentFrontImage, faceImage: faceImage)
+    }
+    
+    /// Composite face image onto the residence card image (original two-layer function)
     /// - Parameters:
     ///   - cardImage: The residence card image with transparent background
     ///   - faceImage: The face photo to composite
@@ -516,7 +591,19 @@ class ImageProcessor {
         // Draw the transparent card image first
         cardImage.draw(in: CGRect(origin: .zero, size: cardSize))
         
-        // Calculate face position based on residence card specifications
+        // Calculate and draw face at correct position
+        let faceRect = calculateFacePosition(for: cardSize)
+        faceImage.draw(in: faceRect)
+        
+        print("Compositing face at position: \(faceRect)")
+        
+        return UIGraphicsGetImageFromCurrentImageContext()
+    }
+    
+    /// Calculate face position based on residence card specifications
+    /// - Parameter cardSize: The size of the card image
+    /// - Returns: CGRect for face positioning
+    private static func calculateFacePosition(for cardSize: CGSize) -> CGRect {
         // Face photo is typically positioned at approximately (72%, 35%) from top-left
         // with size about (22% width, 30% height) of the card
         let facePositionX = cardSize.width * 0.72
@@ -524,19 +611,12 @@ class ImageProcessor {
         let faceWidth = cardSize.width * 0.22
         let faceHeight = cardSize.height * 0.30
         
-        let faceRect = CGRect(
+        return CGRect(
             x: facePositionX,
             y: facePositionY,
             width: faceWidth,
             height: faceHeight
         )
-        
-        print("Compositing face at position: \(faceRect)")
-        
-        // Draw the face image
-        faceImage.draw(in: faceRect)
-        
-        return UIGraphicsGetImageFromCurrentImageContext()
     }
     
     /// Save composite residence card as PNG data

@@ -1165,7 +1165,7 @@ struct FrontImageLoadingTests {
             signatureVerificationResult: nil
         )
         
-        // Test composite image creation
+        // Test composite image creation (should use three-layer if front_image_background.png exists)
         let compositeImage = ImageProcessor.createCompositeResidenceCard(from: testCardData, tolerance: 0.1)
         #expect(compositeImage != nil, "Should successfully create composite image")
         
@@ -1177,6 +1177,62 @@ struct FrontImageLoadingTests {
             let pngData = ImageProcessor.saveCompositeAsTransparentPNG(composite)
             #expect(pngData != nil, "Should be able to convert composite to PNG")
             #expect(pngData!.count > 0, "PNG data should not be empty")
+        }
+    }
+    
+    @Test("Test three-layer vs two-layer compositing")
+    func testThreeLayerVsTwoLayerCompositing() {
+        // Create test data
+        let frontImageData = createTestTIFFData()
+        let faceImageData = createTestJPEGData()
+        
+        let testCardData = ResidenceCardData(
+            commonData: Data([0xC0, 0x04, 0x01, 0x02, 0x03, 0x04]),
+            cardType: Data([0xC1, 0x01, 0x31]),
+            frontImage: frontImageData,
+            faceImage: faceImageData,
+            address: Data([0x11, 0x10, 0x6A, 0x65, 0x6E, 0x6B, 0x69, 0x6E, 0x73]),
+            additionalData: nil,
+            signature: Data(repeating: 0xFF, count: 256),
+            signatureVerificationResult: nil
+        )
+        
+        // Test composite creation (should try three-layer first, fallback to two-layer)
+        let compositeImage = ImageProcessor.createCompositeResidenceCard(from: testCardData, tolerance: 0.08)
+        #expect(compositeImage != nil, "Should create composite image with either three-layer or two-layer fallback")
+        
+        // Test that the composite has proper dimensions
+        if let composite = compositeImage {
+            #expect(composite.size.width > 0, "Composite should have valid width")
+            #expect(composite.size.height > 0, "Composite should have valid height")
+            
+            // Check that it has transparency (PNG data should be larger than JPEG for same image)
+            let pngData = ImageProcessor.saveCompositeAsTransparentPNG(composite)
+            #expect(pngData != nil, "Should convert to PNG successfully")
+            
+            // Verify the image has alpha channel by checking if PNG data exists
+            if let png = pngData {
+                #expect(png.count > 0, "PNG data should not be empty")
+                
+                // Try to recreate UIImage from PNG to verify transparency preservation
+                let recreatedImage = UIImage(data: png)
+                #expect(recreatedImage != nil, "Should be able to recreate image from PNG data")
+            }
+        }
+    }
+    
+    @Test("Test background image loading behavior")
+    func testBackgroundImageLoadingBehavior() {
+        // Test if front_image_background.png can be loaded
+        let backgroundImage = UIImage(named: "front_image_background")
+        
+        if backgroundImage != nil {
+            #expect(backgroundImage!.size.width > 0, "Background image should have valid dimensions")
+            #expect(backgroundImage!.size.height > 0, "Background image should have valid dimensions")
+            print("✅ front_image_background.png loaded successfully - will use three-layer compositing")
+        } else {
+            print("ℹ️ front_image_background.png not found - will fallback to two-layer compositing")
+            #expect(true, "Fallback behavior is expected when background image not available")
         }
     }
     

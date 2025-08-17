@@ -32,7 +32,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "481"
             endingLineNumber = "481"
-            landmarkName = "parseCardTypeString(from:)"
+            landmarkName = "exportImages()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
