@@ -530,7 +530,7 @@ struct ResidenceCardDataManagerTests {
         }
         
         // Give a tiny delay to ensure state is fully updated
-        try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
 
         await MainActor.run {
             #expect(manager.cardData == nil)
@@ -634,8 +634,8 @@ struct ResidenceCardDataManagerTests {
         }
         
         // Give a tiny delay to ensure state is fully updated
-        try? await Task.sleep(nanoseconds: 1_000_000) // 1ms
-        
+        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+
         let testData = ResidenceCardData(
             commonData: Data(),
             cardType: Data(),

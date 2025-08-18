@@ -64,6 +64,9 @@ class ResidenceCardSignatureVerifier {
         static let checkCodeLength = 256 // 2048 bits
         static let hashLength = 32 // SHA-256 output
         static let rsaKeySize = 2048
+        // Fixed lengths for image data according to 在留カード等仕様書
+        static let frontImageFixedLength = 7000 // 券面（表）イメージ fixed length
+        static let faceImageFixedLength = 3000  // 顔画像 fixed length
     }
     
     // MARK: - Public Methods
@@ -156,13 +159,39 @@ class ResidenceCardSignatureVerifier {
     private func extractImageValue(from imageData: Data) -> Data? {
         // Extract the actual image data from TLV structure
         // Front image has tag 0xD0, face image has tag 0xD1
+        // According to 在留カード等仕様書 section 3.3.4.3 and 3.3.4.4:
+        // - Front image (0xD0) must be padded to 7000 bytes with 0x00
+        // - Face image (0xD1) must be padded to 3000 bytes with 0x00
+        
+        var extractedValue: Data?
+        var targetLength: Int?
+        
         if let value = parseTLV(data: imageData, tag: 0xD0) {
-            return value
+            extractedValue = value
+            targetLength = Constants.frontImageFixedLength
         } else if let value = parseTLV(data: imageData, tag: 0xD1) {
-            return value
+            extractedValue = value
+            targetLength = Constants.faceImageFixedLength
+        } else if !imageData.isEmpty {
+            // If not in TLV format, return the whole data
+            return imageData
         }
-        // If not in TLV format, return the whole data
-        return imageData.isEmpty ? nil : imageData
+        
+        guard let value = extractedValue, let fixedLength = targetLength else {
+            return nil
+        }
+        
+        // Pad with 0x00 to fixed length if necessary
+        if value.count < fixedLength {
+            var paddedValue = value
+            paddedValue.append(Data(repeating: 0x00, count: fixedLength - value.count))
+            return paddedValue
+        } else if value.count > fixedLength {
+            // If data is longer than fixed length, truncate it
+            return value.prefix(fixedLength)
+        }
+        
+        return value
     }
     
     private func extractPublicKey(from certificateData: Data) -> SecKey? {
