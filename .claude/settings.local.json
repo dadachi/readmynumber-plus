@@ -11,7 +11,8 @@
       "Bash(identify:*)",
       "Bash(echo:*)",
       "Bash(cp:*)",
-      "Bash(magick:*)"
+      "Bash(magick:*)",
+      "Bash(xcrun xcresulttool:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
