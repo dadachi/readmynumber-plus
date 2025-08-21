@@ -12,7 +12,9 @@
       "Bash(echo:*)",
       "Bash(cp:*)",
       "Bash(magick:*)",
-      "Bash(xcrun xcresulttool:*)"
+      "Bash(xcrun xcresulttool:*)",
+      "Bash(grep:*)",
+      "Bash(sed:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"
