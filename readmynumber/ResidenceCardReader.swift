@@ -244,7 +244,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     }
     
     // 暗号化・復号化処理
-    private func encryptCardNumber(cardNumber: String, sessionKey: Data) throws -> Data {
+    internal func encryptCardNumber(cardNumber: String, sessionKey: Data) throws -> Data {
         guard let cardNumberData = cardNumber.data(using: .ascii),
               cardNumberData.count == 12 else {
             throw CardReaderError.invalidCardNumber
@@ -635,7 +635,7 @@ extension ResidenceCardReader {
     ///   - kMac: MAC計算に使用する16バイト鍵
     /// - Returns: 暗号化データ、MAC、端末鍵のタプル
     /// - Throws: CardReaderError.cryptographyError 暗号化処理失敗時
-    private func generateAuthenticationData(rndICC: Data, kEnc: Data, kMac: Data) throws -> (eIFD: Data, mIFD: Data, kIFD: Data) {
+    internal func generateAuthenticationData(rndICC: Data, kEnc: Data, kMac: Data) throws -> (eIFD: Data, mIFD: Data, kIFD: Data) {
         // STEP 1: 端末側ランダム数生成（8バイト）
         // 暗号学的に安全な乱数を生成してリプレイ攻撃を防止
         let rndIFD = Data((0..<8).map { _ in UInt8.random(in: 0...255) })
@@ -686,7 +686,7 @@ extension ResidenceCardReader {
     ///   - encrypt: true=暗号化, false=復号化
     /// - Returns: 処理されたデータ
     /// - Throws: CardReaderError.cryptographyError 処理失敗時
-    private func performTDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
+    internal func performTDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
         guard key.count == 16 else {
             throw CardReaderError.cryptographyError("Invalid key length")
         }
@@ -753,7 +753,7 @@ extension ResidenceCardReader {
     ///   - key: 16バイトのMAC鍵
     /// - Returns: 8バイトのMAC値
     /// - Throws: CardReaderError.cryptographyError MAC計算失敗時
-    private func calculateRetailMAC(data: Data, key: Data) throws -> Data {
+    internal func calculateRetailMAC(data: Data, key: Data) throws -> Data {
         // Triple-DES暗号化によるMAC計算（Retail MAC簡易版）
         let mac = try performTDES(data: data, key: key, encrypt: true)
         
@@ -789,7 +789,7 @@ extension ResidenceCardReader {
     ///   - kICC: カード鍵（16バイト）
     /// - Returns: セッション鍵（16バイト）
     /// - Throws: なし（内部処理エラーなし）
-    private func generateSessionKey(kIFD: Data, kICC: Data) throws -> Data {
+    internal func generateSessionKey(kIFD: Data, kICC: Data) throws -> Data {
         // STEP 1: XOR演算による鍵の合成
         // K.IFD ⊕ K.ICC - 両方の鍵が寄与する複合鍵を作成
         let xorData = Data(zip(kIFD, kICC).map { $0 ^ $1 })
@@ -839,7 +839,7 @@ extension ResidenceCardReader {
     ///   - kMac: MAC検証用鍵（16バイト）
     /// - Returns: カード鍵K.ICC（16バイト）
     /// - Throws: CardReaderError.cryptographyError 検証失敗時
-    private func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, kEnc: Data, kMac: Data) throws -> Data {
+    internal func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, kEnc: Data, kMac: Data) throws -> Data {
         // STEP 1: MAC検証 - データ完全性の確認
         // カードから受信したM.ICCと、E.ICCから計算したMACを比較
         let calculatedMAC = try calculateRetailMAC(data: eICC, key: kMac)

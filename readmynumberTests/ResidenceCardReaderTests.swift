@@ -507,6 +507,547 @@ struct ResidenceCardReaderTests {
             }
         }
     }
+    
+    // MARK: - Cryptography Tests
+    
+    @Test("Triple-DES encryption and decryption")
+    func testTripleDESEncryptionDecryption() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test data
+        let plaintext = Data("Hello World Test 123456789!".utf8) // 27 bytes, will be padded
+        let key = Data((0..<16).map { _ in UInt8.random(in: 0...255) }) // 16-byte key
+        
+        // Encrypt
+        let encrypted = try reader.performTDES(data: plaintext, key: key, encrypt: true)
+        #expect(encrypted.count >= plaintext.count) // Should be at least as long due to padding
+        #expect(encrypted.count % 8 == 0) // Should be multiple of 8 (DES block size)
+        #expect(encrypted != plaintext) // Should be different from original
+        
+        // Decrypt
+        let decrypted = try reader.performTDES(data: encrypted, key: key, encrypt: false)
+        #expect(decrypted.prefix(plaintext.count) == plaintext) // Should match original
+        
+        // Test with different keys produce different results
+        let differentKey = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
+        let encrypted2 = try reader.performTDES(data: plaintext, key: differentKey, encrypt: true)
+        #expect(encrypted != encrypted2) // Different keys should produce different results
+    }
+    
+    @Test("Triple-DES with invalid key length")
+    func testTripleDESInvalidKeyLength() {
+        let reader = ResidenceCardReader()
+        
+        let plaintext = Data("Test".utf8)
+        
+        // Test with various invalid key lengths
+        let invalidKeys = [
+            Data([0x01]), // Too short (1 byte)
+            Data(repeating: 0xFF, count: 8), // Too short (8 bytes)
+            Data(repeating: 0xAA, count: 15), // Too short (15 bytes)
+            Data(repeating: 0xBB, count: 17), // Too long (17 bytes)
+            Data(repeating: 0xCC, count: 24), // Too long (24 bytes)
+            Data() // Empty
+        ]
+        
+        for invalidKey in invalidKeys {
+            #expect(throws: CardReaderError.self) {
+                _ = try reader.performTDES(data: plaintext, key: invalidKey, encrypt: true)
+            }
+        }
+    }
+    
+    @Test("Retail MAC calculation")
+    func testRetailMACCalculation() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test data
+        let data = Data("Test MAC calculation with Triple-DES".utf8)
+        let key = Data([
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+            0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10
+        ])
+        
+        // Calculate MAC
+        let mac = try reader.calculateRetailMAC(data: data, key: key)
+        #expect(mac.count == 8) // MAC should be 8 bytes
+        
+        // MAC should be deterministic
+        let mac2 = try reader.calculateRetailMAC(data: data, key: key)
+        #expect(mac == mac2) // Same data and key should produce same MAC
+        
+        // Different data should produce different MAC
+        let differentData = Data("Different test data".utf8)
+        let differentMAC = try reader.calculateRetailMAC(data: differentData, key: key)
+        #expect(mac != differentMAC) // Different data should produce different MAC
+        
+        // Different key should produce different MAC
+        let differentKey = Data([
+            0x10, 0x0F, 0x0E, 0x0D, 0x0C, 0x0B, 0x0A, 0x09,
+            0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01
+        ])
+        let macWithDifferentKey = try reader.calculateRetailMAC(data: data, key: differentKey)
+        #expect(mac != macWithDifferentKey) // Different key should produce different MAC
+    }
+    
+    @Test("Session key generation")
+    func testSessionKeyGeneration() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test data
+        let kIFD = Data([
+            0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+            0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00
+        ])
+        let kICC = Data([
+            0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88,
+            0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00
+        ])
+        
+        // Generate session key
+        let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        #expect(sessionKey.count == 16) // Should be 16 bytes
+        
+        // Should be deterministic
+        let sessionKey2 = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        #expect(sessionKey == sessionKey2) // Same inputs should produce same result
+        
+        // Different inputs should produce different results
+        let differentKIFD = Data(repeating: 0x12, count: 16)
+        let differentSessionKey = try reader.generateSessionKey(kIFD: differentKIFD, kICC: kICC)
+        #expect(sessionKey != differentSessionKey) // Different kIFD should produce different result
+        
+        // Test XOR operation correctness
+        let expectedXOR = Data(zip(kIFD, kICC).map { $0 ^ $1 })
+        #expect(expectedXOR.count == 16) // Sanity check
+        
+        // Verify the XOR result is different from both inputs (unless they're identical)
+        #expect(expectedXOR != kIFD)
+        #expect(expectedXOR != kICC)
+    }
+    
+    @Test("Authentication data generation")
+    func testAuthenticationDataGeneration() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test data
+        let rndICC = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]) // 8 bytes
+        let kEnc = Data((0..<16).map { UInt8($0) }) // 16 bytes
+        let kMac = Data((16..<32).map { UInt8($0) }) // 16 bytes, different from kEnc
+        
+        // Generate authentication data
+        let (eIFD, mIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        
+        // Verify data sizes
+        #expect(eIFD.count == 32) // Encrypted data should be 32 bytes (matches input plaintext size)
+        #expect(mIFD.count == 8) // MAC should be 8 bytes
+        #expect(kIFD.count == 16) // Generated key should be 16 bytes
+        
+        // Generate again - should produce different results due to random components
+        let (eIFD2, mIFD2, kIFD2) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        
+        // Random components should make results different
+        #expect(eIFD != eIFD2) // Different random kIFD and rndIFD should produce different encrypted data
+        #expect(mIFD != mIFD2) // Different encrypted data should produce different MAC
+        #expect(kIFD != kIFD2) // Random kIFD should be different
+        
+        // Test that MAC is valid for the encrypted data
+        let calculatedMAC = try reader.calculateRetailMAC(data: eIFD, key: kMac)
+        #expect(calculatedMAC == mIFD) // MAC should match
+    }
+    
+    @Test("Card authentication data verification")
+    func testCardAuthenticationDataVerification() throws {
+        let reader = ResidenceCardReader()
+        
+        // Simulate the mutual authentication flow
+        let rndICC = Data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11]) // 8 bytes
+        let kEnc = Data([
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+            0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10
+        ])
+        let kMac = Data([
+            0x10, 0x0F, 0x0E, 0x0D, 0x0C, 0x0B, 0x0A, 0x09,
+            0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01
+        ])
+        
+        // Generate IFD authentication data first
+        let (eIFD, mIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        
+        // Simulate card response: create ICC authentication data
+        // In real scenario, card would generate its own rndIFD echo and kICC
+        let rndIFD = Data([0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0]) // 8 bytes
+        let kICC = Data([0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12, 
+                         0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88]) // 16 bytes
+        
+        // Create ICC authentication data: rndICC + rndIFD + kICC
+        let iccAuthData = rndICC + rndIFD + kICC // 32 bytes total
+        let eICC = try reader.performTDES(data: iccAuthData, key: kEnc, encrypt: true)
+        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        
+        // Test verification
+        let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        #expect(extractedKICC == kICC) // Should extract the correct kICC
+        
+        // Test verification failure with wrong MAC
+        let wrongMAC = Data(repeating: 0xFF, count: 8)
+        #expect(throws: CardReaderError.cryptographyError("MAC verification failed")) {
+            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: wrongMAC, rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        }
+        
+        // Test verification failure with wrong rndICC
+        let wrongRndICC = Data(repeating: 0x00, count: 8)
+        #expect(throws: CardReaderError.cryptographyError("RND.ICC verification failed")) {
+            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: wrongRndICC, kEnc: kEnc, kMac: kMac)
+        }
+    }
+    
+    @Test("Card number encryption")
+    func testCardNumberEncryption() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test data
+        let cardNumber = "AB12345678CD"
+        let sessionKey = Data([
+            0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+            0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00
+        ])
+        
+        // Encrypt card number
+        let encryptedCardNumber = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        
+        // Verify encryption properties
+        #expect(encryptedCardNumber.count == 16) // Should be 16 bytes (padded to block boundary)
+        #expect(encryptedCardNumber != Data(cardNumber.utf8)) // Should be different from plaintext
+        
+        // Test deterministic encryption
+        let encryptedCardNumber2 = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        #expect(encryptedCardNumber == encryptedCardNumber2) // Should be deterministic with same inputs
+        
+        // Test different session keys produce different results
+        let differentSessionKey = Data(repeating: 0x42, count: 16)
+        let encryptedWithDifferentKey = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: differentSessionKey)
+        #expect(encryptedCardNumber != encryptedWithDifferentKey) // Different key should produce different result
+        
+        // Test decryption to verify round-trip
+        let decrypted = try reader.performTDES(data: encryptedCardNumber, key: sessionKey, encrypt: false)
+        let decryptedPadded = try reader.removePadding(data: decrypted)
+        let decryptedString = String(data: decryptedPadded, encoding: .utf8)
+        #expect(decryptedString == cardNumber) // Should decrypt back to original
+    }
+    
+    // MARK: - Edge Cases and Error Handling Tests
+    
+    @Test("Triple-DES with empty data")
+    func testTripleDESWithEmptyData() throws {
+        let reader = ResidenceCardReader()
+        let key = Data(repeating: 0x42, count: 16)
+        
+        // Empty data should still work (will be padded)
+        let encrypted = try reader.performTDES(data: Data(), key: key, encrypt: true)
+        #expect(encrypted.count > 0) // Should produce some output due to padding
+        #expect(encrypted.count % 8 == 0) // Should be multiple of block size
+        
+        // Decrypt empty encrypted data
+        let decrypted = try reader.performTDES(data: encrypted, key: key, encrypt: false)
+        let unpaddedDecrypted = try reader.removePadding(data: decrypted)
+        #expect(unpaddedDecrypted.isEmpty) // Should decrypt back to empty
+    }
+    
+    @Test("Triple-DES with large data")
+    func testTripleDESWithLargeData() throws {
+        let reader = ResidenceCardReader()
+        let key = Data(repeating: 0x33, count: 16)
+        
+        // Test with large data (multiple blocks)
+        let largeData = Data(repeating: 0xAB, count: 1024) // 1KB
+        let encrypted = try reader.performTDES(data: largeData, key: key, encrypt: true)
+        #expect(encrypted.count >= largeData.count)
+        #expect(encrypted.count % 8 == 0) // Multiple of block size
+        
+        // Verify decryption
+        let decrypted = try reader.performTDES(data: encrypted, key: key, encrypt: false)
+        #expect(decrypted.prefix(largeData.count) == largeData)
+    }
+    
+    @Test("Retail MAC with empty data")
+    func testRetailMACWithEmptyData() throws {
+        let reader = ResidenceCardReader()
+        let key = Data(repeating: 0x55, count: 16)
+        
+        // MAC of empty data should still work
+        let mac = try reader.calculateRetailMAC(data: Data(), key: key)
+        #expect(mac.count == 8) // Should still produce 8-byte MAC
+        
+        // Should be deterministic
+        let mac2 = try reader.calculateRetailMAC(data: Data(), key: key)
+        #expect(mac == mac2)
+    }
+    
+    @Test("Session key generation with identical keys")
+    func testSessionKeyGenerationWithIdenticalKeys() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test with identical kIFD and kICC
+        let identicalKey = Data(repeating: 0x77, count: 16)
+        let sessionKey = try reader.generateSessionKey(kIFD: identicalKey, kICC: identicalKey)
+        
+        #expect(sessionKey.count == 16)
+        // XOR of identical data should be all zeros, but SHA-1 will still produce valid output
+        #expect(sessionKey != identicalKey)
+        #expect(sessionKey != Data(repeating: 0x00, count: 16)) // Should not be all zeros due to SHA-1
+    }
+    
+    @Test("Session key generation with all zeros")
+    func testSessionKeyGenerationWithAllZeros() throws {
+        let reader = ResidenceCardReader()
+        
+        let zeroKey = Data(repeating: 0x00, count: 16)
+        let sessionKey = try reader.generateSessionKey(kIFD: zeroKey, kICC: zeroKey)
+        
+        #expect(sessionKey.count == 16)
+        #expect(sessionKey != zeroKey) // Should be different due to SHA-1 processing
+    }
+    
+    @Test("Authentication data with wrong key lengths")
+    func testAuthenticationDataWithWrongKeyLengths() {
+        let reader = ResidenceCardReader()
+        let rndICC = Data(repeating: 0x11, count: 8)
+        
+        // Test with wrong kEnc length
+        let wrongKEnc = Data(repeating: 0x22, count: 15) // 15 bytes instead of 16
+        let correctKMac = Data(repeating: 0x33, count: 16)
+        
+        #expect(throws: CardReaderError.self) {
+            _ = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: wrongKEnc, kMac: correctKMac)
+        }
+        
+        // Test with wrong kMac length
+        let correctKEnc = Data(repeating: 0x44, count: 16)
+        let wrongKMac = Data(repeating: 0x55, count: 17) // 17 bytes instead of 16
+        
+        #expect(throws: CardReaderError.self) {
+            _ = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: correctKEnc, kMac: wrongKMac)
+        }
+    }
+    
+    @Test("Card authentication verification with corrupted data")
+    func testCardAuthenticationVerificationWithCorruptedData() throws {
+        let reader = ResidenceCardReader()
+        
+        let rndICC = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
+        let kEnc = Data(repeating: 0x11, count: 16)
+        let kMac = Data(repeating: 0x22, count: 16)
+        
+        // Create valid ICC authentication data first
+        let rndIFD = Data([0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80])
+        let kICC = Data(repeating: 0x99, count: 16)
+        let iccAuthData = rndICC + rndIFD + kICC
+        let eICC = try reader.performTDES(data: iccAuthData, key: kEnc, encrypt: true)
+        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        
+        // Test with corrupted encrypted data
+        var corruptedEICC = eICC
+        corruptedEICC[0] = corruptedEICC[0] ^ 0xFF // Flip bits in first byte
+        
+        #expect(throws: CardReaderError.self) {
+            _ = try reader.verifyAndExtractKICC(eICC: corruptedEICC, mICC: mICC, rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        }
+        
+        // Test with wrong encrypted data size
+        let wrongSizeEICC = Data(repeating: 0xAA, count: 16) // Too small (16 bytes instead of 32)
+        let wrongSizeMAC = try reader.calculateRetailMAC(data: wrongSizeEICC, key: kMac)
+        
+        // This should fail during RND.ICC verification because decrypted data structure is wrong
+        #expect(throws: CardReaderError.self) {
+            _ = try reader.verifyAndExtractKICC(eICC: wrongSizeEICC, mICC: wrongSizeMAC, rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        }
+    }
+    
+    @Test("Card number encryption with invalid session key")
+    func testCardNumberEncryptionWithInvalidSessionKey() {
+        let reader = ResidenceCardReader()
+        let cardNumber = "AB12345678CD"
+        
+        // Test with wrong session key length
+        let wrongSizeKey = Data(repeating: 0x42, count: 8) // 8 bytes instead of 16
+        
+        #expect(throws: CardReaderError.self) {
+            _ = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: wrongSizeKey)
+        }
+        
+        // Test with empty session key
+        let emptyKey = Data()
+        
+        #expect(throws: CardReaderError.self) {
+            _ = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: emptyKey)
+        }
+    }
+    
+    @Test("Padding removal edge cases")
+    func testPaddingRemovalEdgeCases() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test with minimal valid padding
+        let minimalPadding = Data([0x80]) // Just the padding marker
+        let unpadded1 = try reader.removePadding(data: minimalPadding)
+        #expect(unpadded1.isEmpty)
+        
+        // Test with data followed by minimal padding
+        let dataWithMinimalPadding = Data([0x01, 0x02, 0x03, 0x80])
+        let unpadded2 = try reader.removePadding(data: dataWithMinimalPadding)
+        #expect(unpadded2 == Data([0x01, 0x02, 0x03]))
+        
+        // Test with maximum padding (all zeros after 0x80)
+        let maxPadding = Data([0x01, 0x80] + Data(repeating: 0x00, count: 100))
+        let unpadded3 = try reader.removePadding(data: maxPadding)
+        #expect(unpadded3 == Data([0x01]))
+        
+        // Test error cases
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.removePadding(data: Data()) // Empty data
+        }
+        
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.removePadding(data: Data([0x01, 0x02])) // No padding marker
+        }
+        
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.removePadding(data: Data([0x01, 0x80, 0x01])) // Invalid padding (non-zero after 0x80)
+        }
+    }
+    
+    @Test("BER length parsing edge cases")
+    func testBERLengthParsingEdgeCases() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test boundary values for short form
+        let shortForm127 = Data([0x7F, 0xFF])
+        let (length127, offset127) = try reader.parseBERLength(data: shortForm127, offset: 0)
+        #expect(length127 == 127)
+        #expect(offset127 == 1)
+        
+        // Test minimum extended form
+        let extendedForm128 = Data([0x81, 0x80, 0xFF])
+        let (length128, offset128) = try reader.parseBERLength(data: extendedForm128, offset: 0)
+        #expect(length128 == 128)
+        #expect(offset128 == 2)
+        
+        // Test maximum for 0x82 form
+        let maxExtended = Data([0x82, 0xFF, 0xFF, 0xFF])
+        let (maxLength, maxOffset) = try reader.parseBERLength(data: maxExtended, offset: 0)
+        #expect(maxLength == 65535)
+        #expect(maxOffset == 3)
+        
+        // Test error cases
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.parseBERLength(data: Data([0x81]), offset: 0) // Incomplete extended form
+        }
+        
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.parseBERLength(data: Data([0x82, 0x01]), offset: 0) // Incomplete 0x82 form
+        }
+        
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.parseBERLength(data: Data([0x01]), offset: 10) // Offset beyond data
+        }
+    }
+    
+    @Test("Complete mutual authentication simulation")
+    func testCompleteMutualAuthenticationSimulation() throws {
+        let reader = ResidenceCardReader()
+        
+        // Simulate complete mutual authentication flow
+        let cardNumber = "AB12345678CD"
+        let (kEnc, kMac) = try reader.generateKeys(from: cardNumber)
+        
+        // Step 1: IFD generates challenge response
+        let rndICC = Data((0..<8).map { _ in UInt8.random(in: 0...255) }) // Card challenge
+        let (eIFD, mIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        
+        // Step 2: Simulate card processing and response
+        // Card verifies IFD authentication data (we'll skip this)
+        // Card generates its response
+        let rndIFD = Data((0..<8).map { _ in UInt8.random(in: 0...255) }) // IFD challenge echo
+        let kICC = Data((0..<16).map { _ in UInt8.random(in: 0...255) }) // Card key
+        
+        let iccAuthData = rndICC + rndIFD + kICC // Card's authentication data
+        let eICC = try reader.performTDES(data: iccAuthData, key: kEnc, encrypt: true)
+        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        
+        // Step 3: IFD verifies card response
+        let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        #expect(extractedKICC == kICC)
+        
+        // Step 4: Generate session key
+        let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        #expect(sessionKey.count == 16)
+        
+        // Step 5: Use session key for card number encryption
+        let encryptedCardNumber = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        #expect(encryptedCardNumber.count == 16)
+        
+        // Verify round-trip
+        let decrypted = try reader.performTDES(data: encryptedCardNumber, key: sessionKey, encrypt: false)
+        let unpaddedDecrypted = try reader.removePadding(data: decrypted)
+        let decryptedCardNumber = String(data: unpaddedDecrypted, encoding: .utf8)
+        #expect(decryptedCardNumber == cardNumber)
+    }
+    
+    @Test("Key generation with various card number formats")
+    func testKeyGenerationWithVariousCardNumberFormats() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test with different valid card numbers
+        let cardNumbers = [
+            "AA00000000BB",
+            "ZZ99999999XX",
+            "MN12345678PQ",
+            "AB12345678CD"
+        ]
+        
+        var generatedKeys: [Data] = []
+        
+        for cardNumber in cardNumbers {
+            let (kEnc, kMac) = try reader.generateKeys(from: cardNumber)
+            #expect(kEnc.count == 16)
+            #expect(kMac.count == 16)
+            #expect(kEnc == kMac) // Should be identical for this implementation
+            
+            // Keys should be different for different card numbers
+            #expect(!generatedKeys.contains(kEnc))
+            generatedKeys.append(kEnc)
+        }
+        
+        // Verify all keys are different
+        #expect(Set(generatedKeys).count == cardNumbers.count)
+    }
+    
+    @Test("Cryptographic operations stress test")
+    func testCryptographicOperationsStressTest() throws {
+        let reader = ResidenceCardReader()
+        
+        // Generate multiple random keys and test operations
+        for i in 0..<10 {
+            let key = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
+            let data = Data("Stress test data \(i)".utf8)
+            
+            // Test encryption/decryption
+            let encrypted = try reader.performTDES(data: data, key: key, encrypt: true)
+            let decrypted = try reader.performTDES(data: encrypted, key: key, encrypt: false)
+            #expect(decrypted.prefix(data.count) == data)
+            
+            // Test MAC calculation
+            let mac = try reader.calculateRetailMAC(data: data, key: key)
+            #expect(mac.count == 8)
+            
+            // Test session key generation
+            let kIFD = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
+            let kICC = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
+            let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+            #expect(sessionKey.count == 16)
+        }
+    }
 }
 
 // MARK: - ResidenceCardDataManager Tests
