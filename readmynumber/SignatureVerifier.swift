@@ -4,25 +4,78 @@ import Security
 
 // MARK: - Residence Card Signature Verifier
 // Implementation of section 3.4.3.1 (署名検証方法) from 在留カード等仕様書
-class ResidenceCardSignatureVerifier {
+//
+// This class implements the digital signature verification process for Japanese Residence Cards
+// according to the technical specification document. The verification process follows the
+// standardized data reading procedures and authentication sequence defined in sections 3.5
+// and 3.5.2 of the specification.
+//
+// Data Reading Procedure (3.5 データの読み出し手順):
+// The residence card IC chip contains multiple data files (DF/EF) that must be read in a
+// specific sequence:
+// 1. DF1/EF01 - 券面（表）イメージ (Front card image data)
+// 2. DF1/EF02 - 顔画像 (Face photo image data)  
+// 3. DF3/EF01 - 署名用データ (Digital signature data)
+//
+// Authentication Sequence (3.5.2 認証シーケンス):
+// The signature verification follows this standardized sequence:
+// 1. Read signature data from DF3/EF01 containing:
+//    - チェックコード (Check code - encrypted hash, tag 0xDA, 256 bytes)
+//    - 公開鍵証明書 (Public key certificate - X.509 format, tag 0xDB)
+// 2. Extract RSA-2048 public key from X.509 certificate
+// 3. Decrypt check code using RSA public key (signature verification operation)
+// 4. Extract SHA-256 hash from decrypted data (remove PKCS#1 v1.5 padding)
+// 5. Read and process image data from DF1/EF01 and DF1/EF02
+// 6. Apply fixed-length padding (7000 bytes for front, 3000 bytes for face)
+// 7. Concatenate padded image data and calculate SHA-256 hash
+// 8. Compare calculated hash with extracted hash for verification
+//
+// APDU Command Sequence Context:
+// This verification process works with data obtained through NFC APDU commands:
+// 1. SELECT DF1 (00 A4 01 0C 02 00 01) - Select DF1 directory
+// 2. SELECT EF01 (00 A4 02 0C 02 00 01) - Select front image file
+// 3. READ BINARY (00 B0 xx xx Le) - Read front image data in blocks
+// 4. SELECT EF02 (00 A4 02 0C 02 00 02) - Select face image file  
+// 5. READ BINARY (00 B0 xx xx Le) - Read face image data in blocks
+// 6. SELECT DF3 (00 A4 01 0C 02 00 03) - Select DF3 directory
+// 7. SELECT EF01 (00 A4 02 0C 02 00 01) - Select signature data file
+// 8. READ BINARY (00 B0 xx xx Le) - Read signature data in blocks
+//
+// The APDU responses contain the TLV-structured data that this verifier processes.
+public class ResidenceCardSignatureVerifier {
     
     // MARK: - Types
-    struct VerificationResult {
-        let isValid: Bool
-        let error: VerificationError?
-        let details: VerificationDetails?
+    public struct VerificationResult {
+        public let isValid: Bool
+        public let error: VerificationError?
+        public let details: VerificationDetails?
+        
+        public init(isValid: Bool, error: VerificationError?, details: VerificationDetails?) {
+            self.isValid = isValid
+            self.error = error
+            self.details = details
+        }
     }
     
-    struct VerificationDetails {
-        let checkCodeHash: String?
-        let calculatedHash: String?
-        let certificateSubject: String?
-        let certificateIssuer: String?
-        let certificateNotBefore: Date?
-        let certificateNotAfter: Date?
+    public struct VerificationDetails {
+        public let checkCodeHash: String?
+        public let calculatedHash: String?
+        public let certificateSubject: String?
+        public let certificateIssuer: String?
+        public let certificateNotBefore: Date?
+        public let certificateNotAfter: Date?
+        
+        public init(checkCodeHash: String?, calculatedHash: String?, certificateSubject: String?, certificateIssuer: String?, certificateNotBefore: Date?, certificateNotAfter: Date?) {
+            self.checkCodeHash = checkCodeHash
+            self.calculatedHash = calculatedHash
+            self.certificateSubject = certificateSubject
+            self.certificateIssuer = certificateIssuer
+            self.certificateNotBefore = certificateNotBefore
+            self.certificateNotAfter = certificateNotAfter
+        }
     }
     
-    enum VerificationError: LocalizedError {
+    public enum VerificationError: LocalizedError {
         case missingCheckCode
         case missingCertificate
         case invalidCertificate
@@ -33,7 +86,7 @@ class ResidenceCardSignatureVerifier {
         case invalidPaddingFormat
         case missingImageData
         
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
             case .missingCheckCode:
                 return "チェックコードが見つかりません"
@@ -58,32 +111,54 @@ class ResidenceCardSignatureVerifier {
     }
     
     // MARK: - Constants
+    // These constants are defined according to 在留カード等仕様書 specifications
     private enum Constants {
-        static let checkCodeTag: UInt8 = 0xDA
-        static let certificateTag: UInt8 = 0xDB
-        static let checkCodeLength = 256 // 2048 bits
-        static let hashLength = 32 // SHA-256 output
-        static let rsaKeySize = 2048
-        // Fixed lengths for image data according to 在留カード等仕様書
-        static let frontImageFixedLength = 7000 // 券面（表）イメージ fixed length
-        static let faceImageFixedLength = 3000  // 顔画像 fixed length
+        // TLV Tags for signature data extraction (section 3.5.2 認証シーケンス)
+        static let checkCodeTag: UInt8 = 0xDA      // チェックコード (encrypted hash)
+        static let certificateTag: UInt8 = 0xDB    // 公開鍵証明書 (X.509 certificate)
+        
+        // Cryptographic parameters for RSA-2048 with SHA-256
+        static let checkCodeLength = 256           // RSA-2048 signature length (2048 bits = 256 bytes)
+        static let hashLength = 32                 // SHA-256 output length (256 bits = 32 bytes)
+        static let rsaKeySize = 2048               // RSA key size for signature verification
+        
+        // Fixed-length requirements for image data (sections 3.3.4.3 and 3.3.4.4)
+        // These lengths ensure consistent hash calculation during signature verification
+        static let frontImageFixedLength = 7000   // 券面（表）イメージ fixed length
+        static let faceImageFixedLength = 3000    // 顔画像 fixed length
     }
+    
+    // MARK: - Initializer
+    
+    public init() {}
     
     // MARK: - Public Methods
     
-    /// Verify the signature according to section 3.4.3.1 of 在留カード等仕様書
+    /// Verify the digital signature according to section 3.4.3.1 of 在留カード等仕様書
+    /// 
+    /// This method implements the complete authentication sequence (3.5.2 認証シーケンス) by:
+    /// 1. Following the data reading procedure (3.5 データの読み出し手順)
+    /// 2. Performing cryptographic verification using RSA-2048 and SHA-256
+    /// 3. Ensuring data integrity through fixed-length padding validation
+    ///
+    /// The verification process validates that the image data has not been tampered with
+    /// by comparing a digitally signed hash with a calculated hash of the actual image data.
+    /// 
     /// - Parameters:
-    ///   - signatureData: The signature data from DF3/EF01
-    ///   - frontImageData: The front image data from DF1/EF01 (券面イメージ)
-    ///   - faceImageData: The face image data from DF1/EF02 (顔画像)
-    /// - Returns: Verification result with details
-    func verifySignature(
+    ///   - signatureData: The signature data from DF3/EF01 containing encrypted hash and certificate
+    ///   - frontImageData: The front image data from DF1/EF01 (券面イメージ) - must be exactly 7000 bytes after padding
+    ///   - faceImageData: The face image data from DF1/EF02 (顔画像) - must be exactly 3000 bytes after padding
+    /// - Returns: Verification result with detailed information about the verification process
+    public func verifySignature(
         signatureData: Data,
         frontImageData: Data,
         faceImageData: Data
     ) -> VerificationResult {
         
-        // Step 1: Extract check code and certificate from signature data
+        // STEP 1: Extract signature components from DF3/EF01
+        // Following 3.5.2 認証シーケンス - Parse TLV structure to extract:
+        // - Tag 0xDA: チェックコード (encrypted hash, 256 bytes for RSA-2048)
+        // - Tag 0xDB: 公開鍵証明書 (X.509 certificate in DER format)
         guard let checkCode = extractCheckCode(from: signatureData) else {
             return VerificationResult(isValid: false, error: .missingCheckCode, details: nil)
         }
@@ -96,41 +171,57 @@ class ResidenceCardSignatureVerifier {
             return VerificationResult(isValid: false, error: .missingCertificate, details: nil)
         }
         
-        // Step 2: Extract public key from X.509 certificate
+        // STEP 2: Extract RSA-2048 public key from X.509 certificate
+        // The certificate is in DER format and contains the issuer's public key
+        // used for verifying the digital signature created during card personalization
         guard let publicKey = extractPublicKey(from: certificateData) else {
             return VerificationResult(isValid: false, error: .publicKeyExtractionFailed, details: nil)
         }
         
-        // Step 3: Decrypt check code with RSA public key (公開鍵でチェックコードを復号)
+        // STEP 3: Decrypt (verify) check code using RSA-2048 public key
+        // In RSA signature verification, we "decrypt" the signature with the public key
+        // to retrieve the original hash that was encrypted with the private key during signing
+        // This implements the mathematical operation: signature^e mod n = padded_hash
         guard let decryptedData = rsaDecrypt(checkCode: checkCode, publicKey: publicKey) else {
             return VerificationResult(isValid: false, error: .rsaDecryptionFailed, details: nil)
         }
         
-        // Step 4: Extract hash from decrypted data (remove PKCS#1 v1.5 padding)
+        // STEP 4: Extract SHA-256 hash from PKCS#1 v1.5 padded data
+        // The decrypted data contains padding in format: 0x00 || 0x01 || PS || 0x00 || DigestInfo
+        // where PS is padding string of 0xFF bytes and DigestInfo contains the SHA-256 hash
         guard let extractedHash = extractHashFromPKCS1(decryptedData) else {
             return VerificationResult(isValid: false, error: .invalidPaddingFormat, details: nil)
         }
         
-        // Step 5: Extract actual image data from TLV structure
+        // STEP 5: Process image data following 3.5 データの読み出し手順
+        // Extract image values from DF1/EF01 (front) and DF1/EF02 (face) and apply fixed-length padding
+        // According to sections 3.3.4.3 and 3.3.4.4: 
+        // - Front image must be exactly 7000 bytes (pad with 0x00 if shorter)
+        // - Face image must be exactly 3000 bytes (pad with 0x00 if shorter)
         guard let frontImageValue = extractImageValue(from: frontImageData),
               let faceImageValue = extractImageValue(from: faceImageData) else {
             return VerificationResult(isValid: false, error: .missingImageData, details: nil)
         }
         
-        // Step 6: Concatenate image data (署名対象データを連結)
+        // STEP 6: Create signature target data (署名対象データ)
+        // Concatenate the fixed-length padded image data in the specified order:
+        // [7000-byte front image] + [3000-byte face image] = 10000 bytes total
+        // This is the exact data that was hashed during card personalization
         let concatenatedData = frontImageValue + faceImageValue
         
-        // Step 7: Calculate SHA-256 hash of concatenated data
+        // STEP 7: Calculate SHA-256 hash of the signature target data
+        // This recreates the same hash calculation that was performed during card issuance
         let calculatedHash = SHA256.hash(data: concatenatedData)
         let calculatedHashData = Data(calculatedHash)
         
-        // Step 8: Compare hashes
+        // STEP 8: Compare extracted hash with calculated hash
+        // If they match, the image data integrity is verified and has not been tampered with
         let isValid = extractedHash == calculatedHashData
         
         // Get certificate details for display
         let details = extractCertificateDetails(from: certificateData)
         
-        var verificationDetails = VerificationDetails(
+        let verificationDetails = VerificationDetails(
             checkCodeHash: extractedHash.hexString,
             calculatedHash: calculatedHashData.hexString,
             certificateSubject: details.subject,
@@ -157,11 +248,21 @@ class ResidenceCardSignatureVerifier {
     }
     
     private func extractImageValue(from imageData: Data) -> Data? {
-        // Extract the actual image data from TLV structure
-        // Front image has tag 0xD0, face image has tag 0xD1
-        // According to 在留カード等仕様書 section 3.3.4.3 and 3.3.4.4:
-        // - Front image (0xD0) must be padded to 7000 bytes with 0x00
-        // - Face image (0xD1) must be padded to 3000 bytes with 0x00
+        // Extract and process image data following the TLV structure defined in 3.5 データの読み出し手順
+        // 
+        // TLV Structure Analysis:
+        // - Tag 0xD0: 券面（表）イメージ (Front card image)
+        // - Tag 0xD1: 顔画像 (Face photo image)
+        //
+        // According to sections 3.3.4.3 and 3.3.4.4 of 在留カード等仕様書:
+        // The signature verification requires fixed-length data to ensure consistency:
+        // - Front image (0xD0): Fixed length of 7000 bytes
+        // - Face image (0xD1): Fixed length of 3000 bytes
+        // - If actual data is shorter, pad with 0x00 bytes at the end
+        // - If actual data is longer, truncate to fixed length
+        //
+        // This padding is crucial for signature verification as the hash calculation
+        // during card personalization used these exact fixed lengths.
         
         var extractedValue: Data?
         var targetLength: Int?
@@ -278,6 +379,20 @@ class ResidenceCardSignatureVerifier {
     }
     
     private func parseTLV(data: Data, tag: UInt8) -> Data? {
+        // Parse TLV (Tag-Length-Value) structure following BER-TLV encoding rules
+        // as specified in 在留カード等仕様書 for data reading procedure (3.5 データの読み出し手順)
+        //
+        // TLV Structure Format:
+        // [Tag: 1 byte][Length: 1-4 bytes][Value: variable length]
+        //
+        // Length Encoding (BER-TLV):
+        // - Short form (≤ 127): Length byte directly contains the value (0x00-0x7F)
+        // - Long form (> 127): 
+        //   - First byte: 0x81 = next 1 byte contains length (up to 255)
+        //   - First byte: 0x82 = next 2 bytes contain length (up to 65535)
+        //   - Examples: 0x82 1B 58 = 7000 bytes, 0x82 0B B8 = 3000 bytes
+        //
+        // This parser handles the APDU response data structure from residence card IC chip
         var offset = 0
         
         while offset < data.count {
@@ -289,28 +404,36 @@ class ResidenceCardSignatureVerifier {
             
             let lengthByte = data[offset + 1]
             
+            // Parse length field according to BER-TLV encoding
             if lengthByte <= 0x7F {
+                // Short form: length value fits in 7 bits
                 length = Int(lengthByte)
                 lengthFieldSize = 1
             } else if lengthByte == 0x81 {
+                // Long form: next 1 byte contains the length
                 guard offset + 3 <= data.count else { break }
                 length = Int(data[offset + 2])
                 lengthFieldSize = 2
             } else if lengthByte == 0x82 {
+                // Long form: next 2 bytes contain the length (most common for image data)
+                // Example: 0x82 1B 58 = 0x1B58 = 7000 bytes
                 guard offset + 4 <= data.count else { break }
                 length = Int(data[offset + 2]) * 256 + Int(data[offset + 3])
                 lengthFieldSize = 3
             } else {
+                // Unsupported length encoding
                 break
             }
             
             let valueStart = offset + 1 + lengthFieldSize
             guard valueStart + length <= data.count else { break }
             
+            // Return the value if we found the target tag
             if currentTag == tag {
                 return data.subdata(in: valueStart..<(valueStart + length))
             }
             
+            // Move to next TLV element
             offset = valueStart + length
         }
         
