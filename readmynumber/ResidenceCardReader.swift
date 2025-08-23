@@ -699,7 +699,8 @@ extension ResidenceCardReader {
         
         // TDES 3-key implementation using CommonCrypto
         // Allocate enough space for result including padding
-        let paddedSize = ((data.count + kCCBlockSize3DES - 1) / kCCBlockSize3DES) * kCCBlockSize3DES
+        // For empty data, we still need at least one block
+        let paddedSize = max(kCCBlockSize3DES, ((data.count + kCCBlockSize3DES - 1) / kCCBlockSize3DES) * kCCBlockSize3DES)
         let bufferSize = paddedSize + kCCBlockSize3DES
         var result = Data(count: bufferSize)
         var numBytesProcessed: size_t = 0
@@ -712,7 +713,7 @@ extension ResidenceCardReader {
                 key3DES.withUnsafeBytes { keyBytes in
                     CCCrypt(operation,
                            CCAlgorithm(kCCAlgorithm3DES),       // Triple-DES
-                           CCOptions(data.count % 8 == 0 ? 0 : kCCOptionPKCS7Padding), // パディングは必要な場合のみ
+                           CCOptions(data.isEmpty || data.count % 8 != 0 ? kCCOptionPKCS7Padding : 0), // 空データまたは8の倍数でない場合はパディング
                            keyBytes.bindMemory(to: UInt8.self).baseAddress, 
                            kCCKeySize3DES,                       // 24 bytes for 3DES
                            nil,                                  // IV = zeros（CBCモード）
@@ -928,19 +929,27 @@ extension ResidenceCardReader {
     }
     
     internal func removePadding(data: Data) throws -> Data {
-        // ISO/IEC 7816-4 パディング除去
-        guard let lastPaddingIndex = data.lastIndex(of: 0x80) else {
+        guard !data.isEmpty else {
+            return data
+        }
+        
+        // PKCS#7 パディング除去
+        let paddingLength = Int(data.last!)
+        
+        // パディング長が有効範囲内かチェック
+        guard paddingLength > 0 && paddingLength <= kCCBlockSize3DES && paddingLength <= data.count else {
             throw CardReaderError.invalidResponse
         }
         
-        // 0x80以降がすべて0x00であることを確認
-        for i in (lastPaddingIndex + 1)..<data.count {
-            guard data[i] == 0x00 else {
+        // パディングバイトがすべて同じ値（パディング長）かチェック
+        let paddingStart = data.count - paddingLength
+        for i in paddingStart..<data.count {
+            guard data[i] == paddingLength else {
                 throw CardReaderError.invalidResponse
             }
         }
         
-        return data.prefix(lastPaddingIndex)
+        return data.prefix(paddingStart)
     }
     
     internal func isResidenceCard(cardType: Data) -> Bool {
