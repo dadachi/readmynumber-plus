@@ -142,8 +142,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
         // - RND.IFD（端末乱数8バイト）+ RND.ICC（カード乱数8バイト）+ K.IFD（端末鍵16バイト）
         // - この32バイトデータを3DES暗号化してE.IFDを作成
         // - E.IFDのRetail MACを計算してM.IFDを作成
-        let (eIFD, mIFD, kIFD) = try generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
-        
+        let (eIFD, mIFD, rndIFD, kIFD) = try generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+
         // STEP 3: MUTUAL AUTHENTICATE - 相互認証実行
         // E.IFD（32バイト暗号化データ）+ M.IFD（8バイトMAC）を送信
         // カードからE.ICC（32バイト）+ M.ICC（8バイト）を受信
@@ -169,8 +169,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
         // 1. M.ICCを検証してE.ICCの完全性を確認
         // 2. E.ICCを復号してRND.ICCの一致を確認（リプレイ攻撃防止）
         // 3. K.ICC（カード鍵16バイト）を抽出
-        let kICC = try verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, kEnc: kEnc, kMac: kMac)
-        
+      let kICC = try verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+
         // セッション鍵生成: K.Session = SHA-1((K.IFD ⊕ K.ICC) || 00000001)[0..15]
         // この鍵は以降のセキュアメッセージング通信で使用されます
         sessionKey = try generateSessionKey(kIFD: kIFD, kICC: kICC)
@@ -635,7 +635,7 @@ extension ResidenceCardReader {
     ///   - kMac: MAC計算に使用する16バイト鍵
     /// - Returns: 暗号化データ、MAC、端末鍵のタプル
     /// - Throws: CardReaderError.cryptographyError 暗号化処理失敗時
-    internal func generateAuthenticationData(rndICC: Data, kEnc: Data, kMac: Data) throws -> (eIFD: Data, mIFD: Data, kIFD: Data) {
+  internal func generateAuthenticationData(rndICC: Data, kEnc: Data, kMac: Data) throws -> (eIFD: Data, mIFD: Data, rndIFD: Data, kIFD: Data) {
         // STEP 1: 端末側ランダム数生成（8バイト）
         // 暗号学的に安全な乱数を生成してリプレイ攻撃を防止
         let rndIFD = Data((0..<8).map { _ in UInt8.random(in: 0...255) })
@@ -656,7 +656,7 @@ extension ResidenceCardReader {
         // 暗号化データの完全性を保護するため8バイトMACを計算
         let mIFD = try calculateRetailMAC(data: eIFD, key: kMac)
         
-        return (eIFD: eIFD, mIFD: mIFD, kIFD: kIFD)
+    return (eIFD: eIFD, mIFD: mIFD, rndIFD: rndIFD, kIFD: kIFD)
     }
     
     /// Triple-DES 暗号化・復号化処理
@@ -857,8 +857,9 @@ extension ResidenceCardReader {
     /// 1. MAC検証: M.ICCを検証してE.ICCの完全性を確認
     /// 2. 復号化: E.ICCを3DES復号してカード認証データを取得
     /// 3. チャレンジ検証: RND.ICCの一致を確認（リプレイ攻撃防止）
-    /// 4. 鍵抽出: 復号データからK.ICC（16バイト）を抽出
-    /// 
+    /// 4. 端末乱数による相互性の検証: RND.IFDの一致を確認（エコーバック確認）
+    /// 5. 鍵抽出: 復号データからK.ICC（16バイト）を抽出
+    ///
     /// データ構造（復号後）:
     /// - RND.ICC（8バイト）: カードが最初に送信した乱数
     /// - RND.IFD（8バイト）: 端末が送信した乱数（エコーバック）
@@ -874,11 +875,12 @@ extension ResidenceCardReader {
     ///   - eICC: カードの暗号化認証データ（32バイト）
     ///   - mICC: カードのMAC（8バイト）
     ///   - rndICC: 事前に受信したカード乱数（8バイト）
+    ///   - rndIFD: 端末乱数（8バイト）
     ///   - kEnc: 復号用暗号化鍵（16バイト）
     ///   - kMac: MAC検証用鍵（16バイト）
     /// - Returns: カード鍵K.ICC（16バイト）
     /// - Throws: CardReaderError.cryptographyError 検証失敗時
-    internal func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, kEnc: Data, kMac: Data) throws -> Data {
+    internal func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, rndIFD: Data, kEnc: Data, kMac: Data) throws -> Data {
         // STEP 1: MAC検証 - データ完全性の確認
         // カードから受信したM.ICCと、E.ICCから計算したMACを比較
         let calculatedMAC = try calculateRetailMAC(data: eICC, key: kMac)
@@ -896,8 +898,14 @@ extension ResidenceCardReader {
         guard decrypted.prefix(8) == rndICC else {
             throw CardReaderError.cryptographyError("RND.ICC verification failed")
         }
-        
-        // STEP 4: カード鍵K.ICCの抽出
+
+        // STEP 4: 端末乱数による相互性の検証
+        // 復号データの8バイト目から16バイト目までが端末のRND.IFDと一致することを確認
+        guard decrypted.subdata(in: 8..<16) == rndIFD else {
+            throw CardReaderError.cryptographyError("RND.IFD verification failed")
+        }
+
+        // STEP 5: カード鍵K.ICCの抽出
         // 復号データの最後16バイトがK.ICC（カードセッション鍵素材）
         // この鍵はK.IFDとXORされて最終セッション鍵を生成
         return decrypted.suffix(16)
