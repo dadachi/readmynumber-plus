@@ -258,23 +258,28 @@ class ResidenceCardReader: NSObject, ObservableObject {
     }
     
     internal func decryptSMResponse(encryptedData: Data) throws -> Data {
+        // セッションキーの存在確認
+        guard let sessionKey = sessionKey else {
+            throw CardReaderError.cryptographyError("Session key not available")
+        }
+        
         // TLV構造から暗号化データを取り出す
         guard encryptedData.count > 3,
               encryptedData[0] == 0x86 else {
             throw CardReaderError.invalidResponse
         }
         
-        let (length, offset) = try parseBERLength(data: encryptedData, offset: 1)
-        guard encryptedData.count >= offset + length,
+        let (length, nextOffset) = try parseBERLength(data: encryptedData, offset: 1)
+        guard encryptedData.count >= nextOffset + length,
               length > 1,
-              encryptedData[offset] == 0x01 else {
+              encryptedData[nextOffset] == 0x01 else {
             throw CardReaderError.invalidResponse
         }
         
-        let ciphertext = encryptedData.subdata(in: (offset + 1)..<(offset + length))
+        let ciphertext = encryptedData.subdata(in: (nextOffset + 1)..<(nextOffset + length))
         
         // 復号化
-        let decrypted = try performTDES(data: ciphertext, key: sessionKey!, encrypt: false)
+        let decrypted = try performTDES(data: ciphertext, key: sessionKey, encrypt: false)
         
         // パディング除去
         return try removePadding(data: decrypted)
@@ -534,8 +539,14 @@ extension ResidenceCardReader {
             return true // All same character is invalid
         }
         
-        // Check for sequential patterns in the numeric part
+        // Check for repetitive patterns in the numeric part
         let numericPart = String(cardNumber.dropFirst(2).dropLast(2))
+        let numericUniqueChars = Set(numericPart)
+        if numericUniqueChars.count == 1 {
+            return true // All same digit in numeric part is invalid
+        }
+        
+        // Check for sequential patterns in the numeric part
         if isSequentialPattern(numericPart) {
             return true
         }
