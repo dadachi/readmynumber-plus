@@ -635,8 +635,8 @@ struct ResidenceCardReaderTests {
         let kMac = Data((16..<32).map { UInt8($0) }) // 16 bytes, different from kEnc
         
         // Generate authentication data
-        let (eIFD, mIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
-        
+      let (eIFD, mIFD, rndIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+
         // Verify data sizes
         // Note: eIFD might be larger than 32 due to PKCS#7 padding in 3DES
         #expect(eIFD.count >= 32) // Encrypted data should be at least 32 bytes (with padding)
@@ -645,8 +645,8 @@ struct ResidenceCardReaderTests {
         #expect(kIFD.count == 16) // Generated key should be 16 bytes
         
         // Generate again - should produce different results due to random components
-        let (eIFD2, mIFD2, kIFD2) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
-        
+        let (eIFD2, mIFD2, rndIFD2, kIFD2) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+
         // Random components should make results different
         #expect(eIFD != eIFD2) // Different random kIFD and rndIFD should produce different encrypted data
         #expect(mIFD != mIFD2) // Different encrypted data should produce different MAC
@@ -683,11 +683,11 @@ struct ResidenceCardReaderTests {
         ])
         
         // Generate IFD authentication data first
-        let (eIFD, mIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
-        
+        let (eIFD, mIFD, rndIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+
         // Simulate card response: create ICC authentication data
         // In real scenario, card would generate its own rndIFD echo and kICC
-        let rndIFD = Data([0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0]) // 8 bytes
+//        let rndIFD = Data([0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0]) // 8 bytes
         let kICC = Data([0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12, 
                          0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88]) // 16 bytes
         
@@ -697,19 +697,19 @@ struct ResidenceCardReaderTests {
         let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
         
         // Test verification
-        let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+      let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         #expect(extractedKICC == kICC) // Should extract the correct kICC
         
         // Test verification failure with wrong MAC
         let wrongMAC = Data(repeating: 0xFF, count: 8)
         #expect(throws: CardReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: wrongMAC, rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: wrongMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
         
         // Test verification failure with wrong rndICC
         let wrongRndICC = Data(repeating: 0x00, count: 8)
         #expect(throws: CardReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: wrongRndICC, kEnc: kEnc, kMac: kMac)
+            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: wrongRndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
     }
     
@@ -878,7 +878,7 @@ struct ResidenceCardReaderTests {
         corruptedEICC[0] = corruptedEICC[0] ^ 0xFF // Flip bits in first byte
         
         #expect(throws: CardReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(eICC: corruptedEICC, mICC: mICC, rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+          _ = try reader.verifyAndExtractKICC(eICC: corruptedEICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
         
         // Test with wrong encrypted data size
@@ -887,7 +887,7 @@ struct ResidenceCardReaderTests {
         
         // This should fail during RND.ICC verification because decrypted data structure is wrong
         #expect(throws: CardReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(eICC: wrongSizeEICC, mICC: wrongSizeMAC, rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+          _ = try reader.verifyAndExtractKICC(eICC: wrongSizeEICC, mICC: wrongSizeMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
     }
     
@@ -994,12 +994,12 @@ struct ResidenceCardReaderTests {
         
         // Step 1: IFD generates challenge response
         let rndICC = Data((0..<8).map { _ in UInt8.random(in: 0...255) }) // Card challenge
-        let (eIFD, mIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
-        
+        let (eIFD, mIFD, rndIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+
         // Step 2: Simulate card processing and response
         // Card verifies IFD authentication data (we'll skip this)
         // Card generates its response
-        let rndIFD = Data((0..<8).map { _ in UInt8.random(in: 0...255) }) // IFD challenge echo
+//        let rndIFD = Data((0..<8).map { _ in UInt8.random(in: 0...255) }) // IFD challenge echo
         let kICC = Data((0..<16).map { _ in UInt8.random(in: 0...255) }) // Card key
         
         let iccAuthData = rndICC + rndIFD + kICC // Card's authentication data
@@ -1007,7 +1007,7 @@ struct ResidenceCardReaderTests {
         let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
         
         // Step 3: IFD verifies card response
-        let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+      let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         #expect(extractedKICC == kICC)
         
         // Step 4: Generate session key
