@@ -553,8 +553,12 @@ struct ResidenceCardReaderTests {
         }
     }
     
-    // Disabled due to simulator timeout - @Test("Retail MAC calculation")
-    private func _testRetailMACCalculation_disabled() throws {
+    #if targetEnvironment(simulator)
+    // Skipped in simulator due to performance issues with CommonCrypto
+    #else
+    @Test("Retail MAC calculation")
+    #endif
+    func testRetailMACCalculation() throws {
         let reader = ResidenceCardReader()
         
         // Test data
@@ -622,8 +626,12 @@ struct ResidenceCardReaderTests {
         #expect(expectedXOR != kICC)
     }
     
-    // Disabled - @Test("Authentication data generation")
-    func _testAuthenticationDataGeneration_disabled() throws {
+    #if targetEnvironment(simulator)
+    // Skipped in simulator due to performance issues
+    #else
+    @Test("Authentication data generation")
+    #endif
+    func testAuthenticationDataGeneration() throws {
         let reader = ResidenceCardReader()
         
         // Test data
@@ -652,8 +660,12 @@ struct ResidenceCardReaderTests {
         #expect(calculatedMAC == mIFD) // MAC should match
     }
     
-    // Disabled - @Test("Card authentication data verification")
-    func _testCardAuthenticationDataVerification_disabled() throws {
+    #if targetEnvironment(simulator)
+    // Skipped in simulator due to performance issues
+    #else
+    @Test("Card authentication data verification")
+    #endif
+    func testCardAuthenticationDataVerification() throws {
         let reader = ResidenceCardReader()
         
         // Simulate the mutual authentication flow
@@ -698,8 +710,12 @@ struct ResidenceCardReaderTests {
         }
     }
     
-    // Disabled - @Test("Card number encryption")
-    func _testCardNumberEncryption_disabled() throws {
+    #if targetEnvironment(simulator)
+    // Skipped in simulator due to performance issues
+    #else
+    @Test("Card number encryption")
+    #endif
+    func testCardNumberEncryption() throws {
         let reader = ResidenceCardReader()
         
         // Test data
@@ -734,8 +750,12 @@ struct ResidenceCardReaderTests {
     
     // MARK: - Edge Cases and Error Handling Tests
     
-    // Disabled - @Test("Triple-DES with empty data")
-    func _testTripleDESWithEmptyData_disabled() throws {
+    #if targetEnvironment(simulator)
+    // Skipped in simulator due to performance issues
+    #else
+    @Test("Triple-DES with empty data")
+    #endif
+    func testTripleDESWithEmptyData() throws {
         let reader = ResidenceCardReader()
         let key = Data(repeating: 0x42, count: 16)
         
@@ -750,9 +770,12 @@ struct ResidenceCardReaderTests {
         #expect(unpaddedDecrypted.isEmpty) // Should decrypt back to empty
     }
     
-    // Disabled: simulator timeout issue
-    // @Test("Triple-DES with large data")
-    func _testTripleDESWithLargeData_disabled() throws {
+    #if targetEnvironment(simulator)
+    // Skipped in simulator due to performance issues
+    #else
+    @Test("Triple-DES with large data")
+    #endif
+    func testTripleDESWithLargeData() throws {
         let reader = ResidenceCardReader()
         let key = Data(repeating: 0x33, count: 16)
         
@@ -763,8 +786,12 @@ struct ResidenceCardReaderTests {
         #expect(encrypted.count % 8 == 0) // Multiple of block size
     }
     
-    // Disabled - @Test("Retail MAC with empty data")
-    func _testRetailMACWithEmptyData_disabled() throws {
+    #if targetEnvironment(simulator)
+    // Skipped in simulator due to performance issues
+    #else
+    @Test("Retail MAC with empty data")
+    #endif
+    func testRetailMACWithEmptyData() throws {
         let reader = ResidenceCardReader()
         let key = Data(repeating: 0x55, count: 16)
         
@@ -824,8 +851,12 @@ struct ResidenceCardReaderTests {
         }
     }
     
-    // Disabled - @Test("Card authentication verification with corrupted data")
-    func _testCardAuthenticationVerificationWithCorruptedData_disabled() throws {
+    #if targetEnvironment(simulator)
+    // Skipped in simulator due to performance issues
+    #else
+    @Test("Card authentication verification with corrupted data")
+    #endif
+    func testCardAuthenticationVerificationWithCorruptedData() throws {
         let reader = ResidenceCardReader()
         
         let rndICC = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
@@ -946,8 +977,12 @@ struct ResidenceCardReaderTests {
         }
     }
     
-    // Disabled - @Test("Complete mutual authentication simulation")
-    func _testCompleteMutualAuthenticationSimulation_disabled() throws {
+    #if targetEnvironment(simulator)
+    // Skipped in simulator due to performance issues
+    #else
+    @Test("Complete mutual authentication simulation")
+    #endif
+    func testCompleteMutualAuthenticationSimulation() throws {
         let reader = ResidenceCardReader()
         
         // Simulate complete mutual authentication flow
@@ -1016,9 +1051,12 @@ struct ResidenceCardReaderTests {
         #expect(Set(generatedKeys).count == cardNumbers.count)
     }
     
-    // Temporarily disabled: simulator timeout issue
-    // @Test("Cryptographic operations stress test")
-    func _testCryptographicOperationsStressTest_disabled() throws {
+    #if targetEnvironment(simulator)
+    // Skipped in simulator due to performance issues
+    #else
+    @Test("Cryptographic operations stress test")
+    #endif
+    func testCryptographicOperationsStressTest() throws {
         let reader = ResidenceCardReader()
         
         // Generate multiple random keys and test operations
@@ -1055,9 +1093,8 @@ struct ResidenceCardDataManagerTests {
         #expect(instance1 === instance2)
     }
     
-    // Disabled: async test concurrency issue
-    // @Test("Set and clear card data")
-    func _testSetAndClearCardData_disabled() async {
+    @Test("Set and clear card data")
+    func testSetAndClearCardData() async {
         let manager = ResidenceCardDataManager.shared
         
         // Clear any existing data to ensure clean state
@@ -1066,7 +1103,7 @@ struct ResidenceCardDataManagerTests {
         }
         
         // Give a tiny delay to ensure state is fully updated
-        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1000ms
 
         await MainActor.run {
             #expect(manager.cardData == nil)
@@ -1170,7 +1207,7 @@ struct ResidenceCardDataManagerTests {
         }
         
         // Give a tiny delay to ensure state is fully updated
-        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1000ms
 
         let testData = ResidenceCardData(
             commonData: Data(),
