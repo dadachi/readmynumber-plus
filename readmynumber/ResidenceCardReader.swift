@@ -930,7 +930,29 @@ extension ResidenceCardReader {
     
     internal func removePadding(data: Data) throws -> Data {
         guard !data.isEmpty else {
-            return data
+            throw CardReaderError.invalidResponse
+        }
+        
+        // Try ISO/IEC 7816-4 padding first (0x80 format)
+        if let paddingIndex = data.lastIndex(of: 0x80) {
+            // Check that all bytes after 0x80 are 0x00
+            for i in (paddingIndex + 1)..<data.count {
+                guard data[i] == 0x00 else {
+                    // Invalid ISO 7816-4 padding - has non-zero bytes after 0x80
+                    // Don't fallback to PKCS#7 if 0x80 is present but invalid
+                    throw CardReaderError.invalidResponse
+                }
+            }
+            return data.prefix(paddingIndex)
+        }
+        
+        // No 0x80 found, try PKCS#7 padding
+        return try removePKCS7Padding(data: data)
+    }
+    
+    private func removePKCS7Padding(data: Data) throws -> Data {
+        guard !data.isEmpty else {
+            throw CardReaderError.invalidResponse
         }
         
         // PKCS#7 パディング除去
