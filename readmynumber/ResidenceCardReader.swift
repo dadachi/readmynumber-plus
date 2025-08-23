@@ -756,14 +756,16 @@ extension ResidenceCardReader {
     /// 在留カード等仕様書で規定されたRetail MAC（リテールMAC）を計算します。
     /// これはデータの完全性を保護するためのメッセージ認証コードです。
     /// 
-    /// アルゴリズム:
-    /// 1. 入力データ全体を3DES暗号化
-    /// 2. 暗号化結果の最後8バイトをMACとして取得
+    /// アルゴリズム（ISO/IEC 9797-1 Algorithm 3準拠）:
+    /// 1. Padding Method 2適用: 0x80を追加し、必要に応じて0x00でパディング
+    /// 2. 初期変換: 最後のブロック以外をDES（K1）で処理
+    /// 3. 最終変換: 最後のブロックを3DES（K1,K2,K1）で処理
+    /// 4. 最終ブロック（8バイト）をMACとして返す
     /// 
     /// 仕様準拠:
     /// - ISO/IEC 9797-1 Algorithm 3（Retail MAC）
-    /// - Triple-DES based MAC
-    /// - PKCS#7パディング適用
+    /// - ISO/IEC 9797-1 Padding Method 2
+    /// - 2-key Triple-DES
     /// - 出力長: 8バイト
     /// 
     /// セキュリティ機能:
@@ -771,12 +773,9 @@ extension ResidenceCardReader {
     /// - 完全性保護
     /// - 認証機能（鍵を知る者のみが正しいMACを生成可能）
     /// 
-    /// 注意: これは簡易実装です。完全なRetail MACはより複雑な処理を要求しますが、
-    /// 在留カード仕様では最終8バイトの取得で十分とされています。
-    /// 
     /// - Parameters:
     ///   - data: MAC計算対象データ
-    ///   - key: 16バイトのMAC鍵
+    ///   - key: 16バイトのMAC鍵（K1||K2）
     /// - Returns: 8バイトのMAC値
     /// - Throws: CardReaderError.cryptographyError MAC計算失敗時
     internal func calculateRetailMAC(data: Data, key: Data) throws -> Data {
@@ -784,21 +783,74 @@ extension ResidenceCardReader {
             throw CardReaderError.cryptographyError("Invalid key length for Retail MAC")
         }
         
-        // Simplified Retail MAC implementation using full 3DES
-        // This is a common simplified approach that works reliably
-        
-        // Apply padding
+        // ISO/IEC 9797-1 Padding Method 2: Add 0x80 followed by 0x00s
         var paddedData = data
         paddedData.append(0x80)
         while paddedData.count % 8 != 0 {
             paddedData.append(0x00)
         }
         
-        // Use CBC-MAC with 3DES
-        let encrypted = try performTDES(data: paddedData, key: key, encrypt: true)
+        // Split the key for DES operations
+        let k1 = key.prefix(8)
+        let k2 = key.suffix(8)
         
-        // Return the last 8 bytes as MAC
-        return encrypted.suffix(8)
+        // Process data in 8-byte blocks
+        let numBlocks = paddedData.count / 8
+        var mac = Data(repeating: 0, count: 8) // Initialize with zeros (IV)
+        
+        for i in 0..<numBlocks {
+            let blockStart = i * 8
+            let block = paddedData.subdata(in: blockStart..<(blockStart + 8))
+            
+            // XOR with previous MAC result (CBC mode)
+            let xorBlock = Data(zip(block, mac).map { $0 ^ $1 })
+            
+            if i < numBlocks - 1 {
+                // Initial transformation: Single DES with K1 for all blocks except the last
+                mac = try performSingleDES(data: xorBlock, key: k1, encrypt: true)
+            } else {
+                // Final transformation: Triple DES for the last block
+                // DES-EDE3: Encrypt with K1, Decrypt with K2, Encrypt with K1
+                let step1 = try performSingleDES(data: xorBlock, key: k1, encrypt: true)
+                let step2 = try performSingleDES(data: step1, key: k2, encrypt: false)
+                mac = try performSingleDES(data: step2, key: k1, encrypt: true)
+            }
+        }
+        
+        return mac
+    }
+    
+    /// Single DES operation helper for Retail MAC
+    private func performSingleDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
+        guard key.count == 8 && data.count == 8 else {
+            throw CardReaderError.cryptographyError("Invalid data or key length for single DES")
+        }
+        
+        var result = Data(repeating: 0, count: 8)
+        var numBytesProcessed: size_t = 0
+        
+        let status = result.withUnsafeMutableBytes { resultBytes in
+            data.withUnsafeBytes { dataBytes in
+                key.withUnsafeBytes { keyBytes in
+                    CCCrypt(
+                        encrypt ? CCOperation(kCCEncrypt) : CCOperation(kCCDecrypt),
+                        CCAlgorithm(kCCAlgorithmDES),
+                        CCOptions(kCCOptionECBMode), // ECB mode for single block
+                        keyBytes.bindMemory(to: UInt8.self).baseAddress, kCCKeySizeDES,
+                        nil, // No IV for ECB mode
+                        dataBytes.bindMemory(to: UInt8.self).baseAddress, 8,
+                        resultBytes.bindMemory(to: UInt8.self).baseAddress, 8,
+                        &numBytesProcessed
+                    )
+                }
+            }
+        }
+        
+        guard status == kCCSuccess else {
+            throw CardReaderError.cryptographyError("Single DES operation failed")
+        }
+        
+        return result
     }
     
     /// セッション鍵生成（在留カード等仕様書 3.5.2.3）
