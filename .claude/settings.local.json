@@ -14,7 +14,8 @@
       "Bash(magick:*)",
       "Bash(xcrun xcresulttool:*)",
       "Bash(grep:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(timeout 300 xcodebuild:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits"

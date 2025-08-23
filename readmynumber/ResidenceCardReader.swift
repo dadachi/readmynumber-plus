@@ -26,8 +26,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
     // MARK: - Properties
     private var session: NFCTagReaderSession?
     private var cardNumber: String = ""
-    private var sessionKey: Data?
-    private var readCompletion: ((Result<ResidenceCardData, Error>) -> Void)?
+    internal var sessionKey: Data? // Made internal for testing
+    internal var readCompletion: ((Result<ResidenceCardData, Error>) -> Void)? // Made internal for testing
     @Published var isReadingInProgress: Bool = false
     
     // MARK: - Public Methods
@@ -67,7 +67,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     // MARK: - Private Methods
     
     // MFの選択
-    private func selectMF(tag: NFCISO7816Tag) async throws {
+    internal func selectMF(tag: NFCISO7816Tag) async throws {
         let command = NFCISO7816APDU(
             instructionClass: 0x00,
             instructionCode: Command.selectFile,
@@ -82,7 +82,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     }
     
     // DFの選択
-    private func selectDF(tag: NFCISO7816Tag, aid: Data) async throws {
+    internal func selectDF(tag: NFCISO7816Tag, aid: Data) async throws {
         let command = NFCISO7816APDU(
             instructionClass: 0x00,
             instructionCode: Command.selectFile,
@@ -116,7 +116,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     /// - 在留カード等仕様書 3.5.2 認証シーケンス
     /// - ISO/IEC 7816-4 セキュアメッセージング
     /// - FIPS 46-3 Triple-DES暗号化標準
-    private func performAuthentication(tag: NFCISO7816Tag) async throws {
+    internal func performAuthentication(tag: NFCISO7816Tag) async throws {
         // STEP 1: GET CHALLENGE - ICCチャレンジ取得
         // カードから8バイトのランダムな乱数（RND.ICC）を取得します。
         // この乱数は認証プロセスでリプレイ攻撃を防ぐために使用されます。
@@ -207,7 +207,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     }
     
     // バイナリ読み出し（SMあり）
-    private func readBinaryWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+    internal func readBinaryWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
         let leData = Data([0x96, 0x02, 0x00, 0x00])
         
         let command = NFCISO7816APDU(
@@ -227,7 +227,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     }
     
     // バイナリ読み出し（平文）
-    private func readBinaryPlain(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+    internal func readBinaryPlain(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
         let command = NFCISO7816APDU(
             instructionClass: 0x00,
             instructionCode: Command.readBinary,
@@ -257,24 +257,29 @@ class ResidenceCardReader: NSObject, ObservableObject {
         return try performTDES(data: paddedData, key: sessionKey, encrypt: true)
     }
     
-    private func decryptSMResponse(encryptedData: Data) throws -> Data {
+    internal func decryptSMResponse(encryptedData: Data) throws -> Data {
+        // セッションキーの存在確認
+        guard let sessionKey = sessionKey else {
+            throw CardReaderError.cryptographyError("Session key not available")
+        }
+        
         // TLV構造から暗号化データを取り出す
         guard encryptedData.count > 3,
               encryptedData[0] == 0x86 else {
             throw CardReaderError.invalidResponse
         }
         
-        let (length, offset) = try parseBERLength(data: encryptedData, offset: 1)
-        guard encryptedData.count >= offset + length,
+        let (length, nextOffset) = try parseBERLength(data: encryptedData, offset: 1)
+        guard encryptedData.count >= nextOffset + length,
               length > 1,
-              encryptedData[offset] == 0x01 else {
+              encryptedData[nextOffset] == 0x01 else {
             throw CardReaderError.invalidResponse
         }
         
-        let ciphertext = encryptedData.subdata(in: (offset + 1)..<(offset + length))
+        let ciphertext = encryptedData.subdata(in: (nextOffset + 1)..<(nextOffset + length))
         
         // 復号化
-        let decrypted = try performTDES(data: ciphertext, key: sessionKey!, encrypt: false)
+        let decrypted = try performTDES(data: ciphertext, key: sessionKey, encrypt: false)
         
         // パディング除去
         return try removePadding(data: decrypted)
@@ -330,7 +335,7 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
         }
     }
     
-    private func readCard(tag: NFCISO7816Tag) async throws -> ResidenceCardData {
+    internal func readCard(tag: NFCISO7816Tag) async throws -> ResidenceCardData {
         // 1. MF選択
         try await selectMF(tag: tag)
         
@@ -499,7 +504,7 @@ extension ResidenceCardReader {
     }
     
     /// Validate individual characters in the card number
-    private func isValidCharacters(_ cardNumber: String) -> Bool {
+    internal func isValidCharacters(_ cardNumber: String) -> Bool {
         let characters = Array(cardNumber)
         
         // First 2 characters: uppercase letters A-Z
@@ -527,15 +532,21 @@ extension ResidenceCardReader {
     }
     
     /// Additional validation for known invalid patterns
-    private func hasInvalidPatterns(_ cardNumber: String) -> Bool {
+    internal func hasInvalidPatterns(_ cardNumber: String) -> Bool {
         // Check for obviously invalid patterns like all same characters
         let uniqueChars = Set(cardNumber)
         if uniqueChars.count == 1 {
             return true // All same character is invalid
         }
         
-        // Check for sequential patterns in the numeric part
+        // Check for repetitive patterns in the numeric part
         let numericPart = String(cardNumber.dropFirst(2).dropLast(2))
+        let numericUniqueChars = Set(numericPart)
+        if numericUniqueChars.count == 1 {
+            return true // All same digit in numeric part is invalid
+        }
+        
+        // Check for sequential patterns in the numeric part
         if isSequentialPattern(numericPart) {
             return true
         }
@@ -544,7 +555,7 @@ extension ResidenceCardReader {
     }
     
     /// Check if numeric part contains obvious sequential patterns
-    private func isSequentialPattern(_ numericString: String) -> Bool {
+    internal func isSequentialPattern(_ numericString: String) -> Bool {
         guard numericString.count >= 3 else { return false }
         
         let digits = numericString.compactMap { $0.wholeNumberValue }
@@ -821,7 +832,7 @@ extension ResidenceCardReader {
     }
     
     /// Single DES operation helper for Retail MAC
-    private func performSingleDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
+    internal func performSingleDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
         guard key.count == 8 && data.count == 8 else {
             throw CardReaderError.cryptographyError("Invalid data or key length for single DES")
         }
@@ -1010,7 +1021,7 @@ extension ResidenceCardReader {
         return try removePKCS7Padding(data: data)
     }
     
-    private func removePKCS7Padding(data: Data) throws -> Data {
+    internal func removePKCS7Padding(data: Data) throws -> Data {
         guard !data.isEmpty else {
             throw CardReaderError.invalidResponse
         }

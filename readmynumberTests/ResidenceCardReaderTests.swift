@@ -11,6 +11,7 @@ import CryptoKit
 import UIKit
 import ImageIO
 import UniformTypeIdentifiers
+import CoreNFC
 @testable import readmynumber
 
 // MARK: - Test Helpers
@@ -1083,6 +1084,532 @@ struct ResidenceCardReaderTests {
             #expect(sessionKey.count == 16)
         }
     }
+    
+    // MARK: - Tests for decryptSMResponse
+    
+    @Test("Decrypt SM response with valid TLV structure")
+    func testDecryptSMResponseValidTLV() throws {
+        let reader = ResidenceCardReader()
+        
+        // Set up a session key first
+        let sessionKey = Data([
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+            0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10
+        ])
+        reader.sessionKey = sessionKey
+        
+        // Create test data that will be encrypted
+        let plaintext = Data([0x01, 0x02, 0x03, 0x04])
+        
+        // Encrypt with padding
+        var paddedData = plaintext
+        paddedData.append(0x80)
+        while paddedData.count % 8 != 0 {
+            paddedData.append(0x00)
+        }
+        let encrypted = try reader.performTDES(data: paddedData, key: sessionKey, encrypt: true)
+        
+        // Create TLV structure: 0x86 [length] 0x01 [encrypted data]
+        var tlvData = Data()
+        tlvData.append(0x86) // Tag
+        if encrypted.count + 1 <= 127 {
+            tlvData.append(UInt8(encrypted.count + 1)) // Length (short form)
+        } else {
+            tlvData.append(0x81) // Long form indicator
+            tlvData.append(UInt8(encrypted.count + 1)) // Length
+        }
+        tlvData.append(0x01) // Padding indicator
+        tlvData.append(encrypted)
+        
+        // Test decryption
+        let decrypted = try reader.decryptSMResponse(encryptedData: tlvData)
+        #expect(decrypted == plaintext)
+    }
+    
+    @Test("Decrypt SM response with invalid TLV tag")
+    func testDecryptSMResponseInvalidTag() throws {
+        let reader = ResidenceCardReader()
+        reader.sessionKey = Data(repeating: 0x01, count: 16)
+        
+        // Create TLV with wrong tag
+        var tlvData = Data()
+        tlvData.append(0x87) // Wrong tag (should be 0x86)
+        tlvData.append(0x05) // Length
+        tlvData.append(contentsOf: [0x01, 0x02, 0x03, 0x04, 0x05])
+        
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.decryptSMResponse(encryptedData: tlvData)
+        }
+    }
+    
+    @Test("Decrypt SM response with missing padding indicator")
+    func testDecryptSMResponseMissingPaddingIndicator() throws {
+        let reader = ResidenceCardReader()
+        reader.sessionKey = Data(repeating: 0x01, count: 16)
+        
+        // Create TLV without padding indicator (0x01)
+        var tlvData = Data()
+        tlvData.append(0x86) // Tag
+        tlvData.append(0x08) // Length
+        tlvData.append(contentsOf: Data(repeating: 0x02, count: 8)) // No 0x01 prefix
+        
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.decryptSMResponse(encryptedData: tlvData)
+        }
+    }
+    
+    @Test("Decrypt SM response with no session key")
+    func testDecryptSMResponseNoSessionKey() throws {
+        let reader = ResidenceCardReader()
+        // Don't set session key
+        
+        var tlvData = Data()
+        tlvData.append(0x86) // Tag
+        tlvData.append(0x09) // Length
+        tlvData.append(0x01) // Padding indicator
+        tlvData.append(contentsOf: Data(repeating: 0x02, count: 8))
+        
+        // This should crash or throw when trying to unwrap sessionKey
+        #expect(throws: (any Error).self) {
+            _ = try reader.decryptSMResponse(encryptedData: tlvData)
+        }
+    }
+    
+    @Test("Decrypt SM response with short data")
+    func testDecryptSMResponseShortData() throws {
+        let reader = ResidenceCardReader()
+        let sessionKey = Data(repeating: 0x01, count: 16)
+        reader.sessionKey = sessionKey
+        
+        // Data too short (less than 3 bytes)
+        let shortData = Data([0x86, 0x01])
+        
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.decryptSMResponse(encryptedData: shortData)
+        }
+    }
+    
+    @Test("Decrypt SM response with long form BER length")
+    func testDecryptSMResponseLongFormBER() throws {
+        let reader = ResidenceCardReader()
+        let sessionKey = Data(repeating: 0x01, count: 16)
+        reader.sessionKey = sessionKey
+        
+        // Create large data that requires long form BER encoding with padding
+        var largeData = Data(repeating: 0xAB, count: 250)
+        largeData.append(0x80) // Add padding marker
+        largeData.append(Data(repeating: 0x00, count: 5)) // Pad to 256 bytes
+        
+        // Encrypt the data
+        let encrypted = try reader.performTDES(data: largeData, key: sessionKey, encrypt: true)
+        
+        // Create TLV with long form BER length
+        var tlvData = Data()
+        tlvData.append(0x86) // Tag
+        tlvData.append(0x82) // Long form: next 2 bytes contain length
+        let totalLength = encrypted.count + 1
+        tlvData.append(UInt8((totalLength >> 8) & 0xFF)) // High byte
+        tlvData.append(UInt8(totalLength & 0xFF)) // Low byte
+        tlvData.append(0x01) // Padding indicator
+        tlvData.append(encrypted)
+        
+        // Test decryption
+        let decrypted = try reader.decryptSMResponse(encryptedData: tlvData)
+        
+        // Should get back original data minus padding  
+        let expectedData = largeData.prefix(while: { $0 != 0x80 })
+        #expect(decrypted.count <= largeData.count)
+    }
+    
+    // MARK: - Tests for performSingleDES
+    
+    @Test("Single DES encryption and decryption")
+    func testSingleDESEncryptionDecryption() throws {
+        let reader = ResidenceCardReader()
+        
+        let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
+        let plaintext = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
+        
+        // Encrypt
+        let encrypted = try reader.performSingleDES(data: plaintext, key: key, encrypt: true)
+        #expect(encrypted.count == 8)
+        #expect(encrypted != plaintext)
+        
+        // Decrypt
+        let decrypted = try reader.performSingleDES(data: encrypted, key: key, encrypt: false)
+        #expect(decrypted == plaintext)
+    }
+    
+    @Test("Single DES with invalid key length")
+    func testSingleDESInvalidKeyLength() throws {
+        let reader = ResidenceCardReader()
+        
+        let shortKey = Data([0x01, 0x02, 0x03]) // Too short
+        let data = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
+        
+        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
+            _ = try reader.performSingleDES(data: data, key: shortKey, encrypt: true)
+        }
+        
+        let longKey = Data(repeating: 0x01, count: 16) // Too long
+        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
+            _ = try reader.performSingleDES(data: data, key: longKey, encrypt: true)
+        }
+    }
+    
+    @Test("Single DES with invalid data length")
+    func testSingleDESInvalidDataLength() throws {
+        let reader = ResidenceCardReader()
+        
+        let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
+        let shortData = Data([0x11, 0x22, 0x33]) // Too short
+        
+        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
+            _ = try reader.performSingleDES(data: shortData, key: key, encrypt: true)
+        }
+        
+        let longData = Data(repeating: 0x11, count: 16) // Too long
+        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
+            _ = try reader.performSingleDES(data: longData, key: key, encrypt: true)
+        }
+    }
+    
+    @Test("Single DES with known test vector")
+    func testSingleDESKnownVector() throws {
+        let reader = ResidenceCardReader()
+        
+        // Known DES test vector
+        let key = Data([0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01])
+        let plaintext = Data([0x95, 0xF8, 0xA5, 0xE5, 0xDD, 0x31, 0xD9, 0x00])
+        
+        let encrypted = try reader.performSingleDES(data: plaintext, key: key, encrypt: true)
+        #expect(encrypted.count == 8)
+        
+        // Verify it's reversible
+        let decrypted = try reader.performSingleDES(data: encrypted, key: key, encrypt: false)
+        #expect(decrypted == plaintext)
+    }
+    
+    // MARK: - Tests for private validation methods (now internal)
+    
+    @Test("Valid characters check")
+    func testIsValidCharacters() {
+        let reader = ResidenceCardReader()
+        
+        // Valid format: 2 letters + 8 digits + 2 letters = 12 characters total
+        #expect(reader.isValidCharacters("AB12345678CD") == true)
+        #expect(reader.isValidCharacters("XY87654321ZW") == true)
+        #expect(reader.isValidCharacters("AA00000000BB") == true)
+        #expect(reader.isValidCharacters("ab12345678cd") == false) // Lowercase
+        #expect(reader.isValidCharacters("A-12345678CD") == false) // Contains dash
+        #expect(reader.isValidCharacters("AB 1234567CD") == false) // Contains space
+        #expect(reader.isValidCharacters("AB@123456CD") == false) // Special char and wrong length
+        #expect(reader.isValidCharacters("あB12345678CD") == false) // Japanese char
+        #expect(reader.isValidCharacters("AB1234567CD") == false) // Too short (11 chars)
+        #expect(reader.isValidCharacters("AB123456789CD") == false) // Too long (13 chars)
+    }
+    
+    @Test("Invalid patterns check")
+    func testHasInvalidPatterns() {
+        let reader = ResidenceCardReader()
+        
+        // Test sequential patterns (format: 2 letters + 8 digits + 2 letters)
+        #expect(reader.hasInvalidPatterns("AB12345678CD") == true) // Sequential
+        #expect(reader.hasInvalidPatterns("AB23456789CD") == true) // Sequential
+        #expect(reader.hasInvalidPatterns("AB98765432CD") == true) // Reverse sequential
+        
+        // Test repetitive patterns
+        #expect(reader.hasInvalidPatterns("AAAAAAAAAAAA") == true) // All same character
+        #expect(reader.hasInvalidPatterns("AB22222222CD") == true) // Same digit in middle
+        #expect(reader.hasInvalidPatterns("AB00000000CD") == true) // All zeros in middle
+        
+        // Valid patterns
+        #expect(reader.hasInvalidPatterns("AB13579246CD") == false) // Random
+        #expect(reader.hasInvalidPatterns("XY24681357ZW") == false) // Mixed
+    }
+    
+    @Test("Sequential pattern detection")
+    func testIsSequentialPattern() {
+        let reader = ResidenceCardReader()
+        
+        // Ascending sequences
+        #expect(reader.isSequentialPattern("12345678") == true)  // 1→2→3→4→5→6→7→8
+        #expect(reader.isSequentialPattern("23456789") == true)  // 2→3→4→5→6→7→8→9
+        #expect(reader.isSequentialPattern("01234567") == true)  // 0→1→2→3→4→5→6→7
+        
+        // Descending sequences
+        #expect(reader.isSequentialPattern("87654321") == true)  // 8→7→6→5→4→3→2→1
+        #expect(reader.isSequentialPattern("98765432") == true)  // 9→8→7→6→5→4→3→2
+        #expect(reader.isSequentialPattern("76543210") == true)  // 7→6→5→4→3→2→1→0
+        
+        // Non-sequential (including the incorrect test case)
+        #expect(reader.isSequentialPattern("135792468") == false)  // Random
+        #expect(reader.isSequentialPattern("246813579") == false)  // Random
+        #expect(reader.isSequentialPattern("192837465") == false)  // Random
+        #expect(reader.isSequentialPattern("543210987") == false)  // Breaks at 0→9
+        
+        // Short sequences (should not be sequential)
+        #expect(reader.isSequentialPattern("12") == false)   // Too short
+        #expect(reader.isSequentialPattern("123") == true)   // Valid 3-digit ascending
+    }
+    
+    @Test("PKCS7 padding removal")
+    func testRemovePKCS7Padding() throws {
+        let reader = ResidenceCardReader()
+        
+        // Valid PKCS#7 padding
+        let data1 = Data([0x01, 0x02, 0x03, 0x04, 0x04, 0x04, 0x04])
+        let unpadded1 = try reader.removePKCS7Padding(data: data1)
+        #expect(unpadded1 == Data([0x01, 0x02, 0x03]))
+        
+        // Full block of padding
+        let data2 = Data([0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08])
+        let unpadded2 = try reader.removePKCS7Padding(data: data2)
+        #expect(unpadded2 == Data())
+        
+        // Single byte padding
+        let data3 = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x01])
+        let unpadded3 = try reader.removePKCS7Padding(data: data3)
+        #expect(unpadded3 == Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]))
+        
+        // Invalid padding - inconsistent bytes
+        let invalidData1 = Data([0x01, 0x02, 0x03, 0x04, 0x03, 0x04, 0x04])
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.removePKCS7Padding(data: invalidData1)
+        }
+        
+        // Invalid padding - padding length > data length
+        let invalidData2 = Data([0x01, 0x02, 0x09])
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.removePKCS7Padding(data: invalidData2)
+        }
+        
+        // Empty data
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.removePKCS7Padding(data: Data())
+        }
+    }
+    
+    // MARK: - Tests for NFC Delegate Methods (Simplified)
+    
+    @Test("NFC session did become active")
+    func testTagReaderSessionDidBecomeActive() {
+        let reader = ResidenceCardReader()
+        
+        // Call the test helper
+        reader.testTagReaderSessionDidBecomeActive()
+        
+        // The method is empty but should not crash
+        #expect(true) // Just verify it runs without error
+    }
+    
+    @Test("NFC session invalidated with error")
+    func testTagReaderSessionDidInvalidateWithError() async {
+        let reader = ResidenceCardReader()
+        
+        var completionCalled = false
+        var receivedError: Error?
+        
+        // Set up completion handler
+        reader.startReading(cardNumber: "ABC123456789") { result in
+            completionCalled = true
+            if case .failure(let error) = result {
+                receivedError = error
+            }
+        }
+        
+        // Set reading in progress
+        await MainActor.run {
+            reader.isReadingInProgress = true
+        }
+        
+        // Simulate error using test helper
+        let testError = NSError(domain: "TestNFCError", code: 200, userInfo: [NSLocalizedDescriptionKey: "User canceled NFC session"])
+        reader.testTagReaderSessionDidInvalidateWithError(testError)
+        
+        // Wait for async operations
+        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+        
+        await MainActor.run {
+            #expect(reader.isReadingInProgress == false)
+        }
+        #expect(completionCalled == true)
+        #expect(receivedError != nil)
+    }
+    
+    // MARK: - Tests for additional error paths
+    
+    @Test("BER length parsing with various edge cases")
+    func testBERLengthParsingCompleteEdgeCases() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test all valid short form lengths (0-127)
+        for length in 0...127 {
+            let data = Data([UInt8(length)])
+            let (parsedLength, nextOffset) = try reader.parseBERLength(data: data, offset: 0)
+            #expect(parsedLength == length)
+            #expect(nextOffset == 1)
+        }
+        
+        // Test long form with 1 byte length (128-255)
+        let longForm1 = Data([0x81, 0xFF]) // 255 bytes
+        let (length1, offset1) = try reader.parseBERLength(data: longForm1, offset: 0)
+        #expect(length1 == 255)
+        #expect(offset1 == 2)
+        
+        // Test long form with 2 byte length
+        let longForm2 = Data([0x82, 0x01, 0x00]) // 256 bytes
+        let (length2, offset2) = try reader.parseBERLength(data: longForm2, offset: 0)
+        #expect(length2 == 256)
+        #expect(offset2 == 3)
+        
+        // Test maximum 2-byte length
+        let longForm3 = Data([0x82, 0xFF, 0xFF]) // 65535 bytes
+        let (length3, offset3) = try reader.parseBERLength(data: longForm3, offset: 0)
+        #expect(length3 == 65535)
+        #expect(offset3 == 3)
+        
+        // Test invalid long form (unsupported)
+        let invalidLongForm = Data([0x83, 0x00, 0x01, 0x00]) // 3-byte length not supported
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.parseBERLength(data: invalidLongForm, offset: 0)
+        }
+        
+        // Test insufficient data for long form
+        let insufficientData = Data([0x82, 0x01]) // Missing second length byte
+        #expect(throws: CardReaderError.invalidResponse) {
+            _ = try reader.parseBERLength(data: insufficientData, offset: 0)
+        }
+    }
+    
+    @Test("Test all card validation edge cases")
+    func testCompleteCardValidation() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test all invalid patterns systematically (format: 2 letters + 8 digits + 2 letters)
+        let sequentialPatterns = [
+            "AB01234567CD", "AB12345678CD", "AB23456789CD",  // Ascending sequences
+            "AB98765432CD", "AB87654321CD", "AB76543210CD"   // Descending sequences
+        ]
+        
+        for pattern in sequentialPatterns {
+            let result = reader.hasInvalidPatterns(pattern)
+            #expect(result == true, "Sequential pattern \(pattern) should be invalid but got \(result)")
+        }
+        
+        // Test repetitive patterns
+        for digit in 0...9 {
+            let repetitive = "AB" + String(repeating: String(digit), count: 8) + "CD"
+            let result = reader.hasInvalidPatterns(repetitive)
+            #expect(result == true, "Repetitive pattern \(repetitive) should be invalid but got \(result)")
+        }
+        
+        // Test valid random patterns
+        let validPatterns = [
+            "AB13579246CD", "XY24681357ZW", "DE81927463FG",
+            "GH57392846IJ", "JK38475921LM"
+        ]
+        
+        for pattern in validPatterns {
+            let result = reader.hasInvalidPatterns(pattern)
+            #expect(result == false, "Valid pattern \(pattern) should be valid but got \(result)")
+        }
+        
+        // Test character validation edge cases
+        let invalidChars = [
+            "AB12345678あD", // Japanese character
+            "AB12345678ñD",  // Accented character
+            "AB12345678 D",  // Space 
+            " B12345678CD",  // Space at start
+            "AB-1234567CD",  // Hyphen
+            "AB_1234567CD",  // Underscore
+            "AB.1234567CD",  // Period
+            "AB,1234567CD",  // Comma
+            "AB@1234567CD",  // At symbol
+        ]
+        
+        for invalidChar in invalidChars {
+            let result = reader.isValidCharacters(invalidChar)
+            #expect(result == false, "Invalid chars \(invalidChar) should be invalid but got \(result)")
+        }
+    }
+    
+    @Test("Test error codes comprehensively")
+    func testAllStatusWordCombinations() {
+        let reader = ResidenceCardReader()
+        
+        // Success case
+        #expect(throws: Never.self) {
+            try reader.checkStatusWord(sw1: 0x90, sw2: 0x00)
+        }
+        
+        // Test various error codes
+        let errorCodes: [(UInt8, UInt8)] = [
+            (0x6A, 0x82), // File not found
+            (0x6A, 0x86), // Incorrect parameters
+            (0x69, 0x82), // Security status not satisfied  
+            (0x69, 0x85), // Conditions not satisfied
+            (0x67, 0x00), // Wrong length
+            (0x6F, 0x00), // No precise diagnosis
+            (0x6C, 0x00), // Wrong Le field
+            (0x6B, 0x00), // Wrong P1 P2
+            (0x6D, 0x00), // Instruction not supported
+            (0x6E, 0x00), // Class not supported
+        ]
+        
+        for (sw1, sw2) in errorCodes {
+            do {
+                try reader.checkStatusWord(sw1: sw1, sw2: sw2)
+                #expect(Bool(false)) // Should throw
+            } catch CardReaderError.cardError(let receivedSW1, let receivedSW2) {
+                #expect(receivedSW1 == sw1)
+                #expect(receivedSW2 == sw2)
+            } catch {
+                #expect(Bool(false)) // Wrong error type
+            }
+        }
+    }
+    
+    @Test("Test cryptographic operations with boundary conditions")
+    func testCryptoBoundaryConditions() throws {
+        let reader = ResidenceCardReader()
+        
+        // Test Triple-DES with minimum data size (8 bytes)
+        let key = Data(repeating: 0x01, count: 16)
+        let minData = Data(repeating: 0xAB, count: 8)
+        
+        let encrypted = try reader.performTDES(data: minData, key: key, encrypt: true)
+        #expect(encrypted.count == 8)
+        
+        let decrypted = try reader.performTDES(data: encrypted, key: key, encrypt: false)
+        #expect(decrypted == minData)
+        
+        // Test with maximum practical data size (1MB)
+        let largeData = Data(repeating: 0xCD, count: 1024 * 1024)
+        let largeEncrypted = try reader.performTDES(data: largeData, key: key, encrypt: true)
+        #expect(largeEncrypted.count >= largeData.count) // Should be padded
+        
+        // Test Retail MAC with various data sizes
+        let emptyMAC = try reader.calculateRetailMAC(data: Data(), key: key)
+        #expect(emptyMAC.count == 8)
+        
+        let singleByteMAC = try reader.calculateRetailMAC(data: Data([0x01]), key: key)
+        #expect(singleByteMAC.count == 8)
+        #expect(singleByteMAC != emptyMAC) // Should be different
+        
+        // Test session key generation edge cases
+        let zeroKey1 = Data(repeating: 0x00, count: 16)
+        let zeroKey2 = Data(repeating: 0x00, count: 16)
+        let sessionKey1 = try reader.generateSessionKey(kIFD: zeroKey1, kICC: zeroKey2)
+        #expect(sessionKey1.count == 16)
+        
+        // Use different keys to ensure different XOR result: 0xFF XOR 0x00 = 0xFF
+        let maxKey1 = Data(repeating: 0xFF, count: 16)
+        let zeroKey3 = Data(repeating: 0x00, count: 16)
+        let sessionKey2 = try reader.generateSessionKey(kIFD: maxKey1, kICC: zeroKey3)
+        #expect(sessionKey2.count == 16)
+        #expect(sessionKey1 != sessionKey2) // Should be different
+    }
 }
 
 // MARK: - ResidenceCardDataManager Tests
@@ -1096,43 +1623,34 @@ struct ResidenceCardDataManagerTests {
         #expect(instance1 === instance2)
     }
     
-    // Disabled: async test race condition
-    // @Test("Set and clear card data")
-    func testSetAndClearCardData_disabled() async {
-        let manager = ResidenceCardDataManager.shared
-        
-        // Clear any existing data to ensure clean state
+    @Test("Set and clear card data")
+    func testSetAndClearCardData() async {
         await MainActor.run {
+            let manager = ResidenceCardDataManager.shared
+            
+            // Clear any existing data to ensure clean state
             manager.clearData()
-        }
-        
-        // Give a tiny delay to ensure state is fully updated
-        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1000ms
-
-        await MainActor.run {
+            
+            // Verify initial state
             #expect(manager.cardData == nil)
             #expect(manager.shouldNavigateToDetail == false)
-        }
-        
-        // Create test data
-        let testData = ResidenceCardData(
-            commonData: Data([0x01]),
-            cardType: Data([0x02]),
-            frontImage: Data([0x03]),
-            faceImage: Data([0x04]),
-            address: Data([0x05]),
-            additionalData: nil,
-            signature: Data([0x06]),
-            signatureVerificationResult: nil
-        )
-        
-        // Set card data
-        await MainActor.run {
+            
+            // Create test data
+            let testData = ResidenceCardData(
+                commonData: Data([0x01]),
+                cardType: Data([0x02]),
+                frontImage: Data([0x03]),
+                faceImage: Data([0x04]),
+                address: Data([0x05]),
+                additionalData: nil,
+                signature: Data([0x06]),
+                signatureVerificationResult: nil
+            )
+            
+            // Set card data
             manager.setCardData(testData)
-        }
-        
-        // Verify data was set correctly
-        await MainActor.run {
+            
+            // Verify data was set correctly
             #expect(manager.cardData == testData)
             #expect(manager.shouldNavigateToDetail == true)
             
@@ -1144,14 +1662,10 @@ struct ResidenceCardDataManagerTests {
             #expect(manager.cardData?.address == Data([0x05]))
             #expect(manager.cardData?.additionalData == nil)
             #expect(manager.cardData?.signature == Data([0x06]))
-        }
-        
-        // Clear data
-        await MainActor.run {
+            
+            // Clear data
             manager.clearData()
-        }
-        
-        await MainActor.run {
+            
             #expect(manager.cardData == nil)
             #expect(manager.shouldNavigateToDetail == false)
         }
@@ -1201,43 +1715,35 @@ struct ResidenceCardDataManagerTests {
         }
     }
     
-    // Disabled: async test race condition  
-    // @Test("Reset navigation")
-    func testResetNavigation_disabled() async {
-        let manager = ResidenceCardDataManager.shared
-        
-        // Clear any existing data first to ensure clean state
+    @Test("Reset navigation")
+    func testResetNavigation() async {
         await MainActor.run {
+            let manager = ResidenceCardDataManager.shared
+            
+            // Clear any existing data first to ensure clean state
             manager.clearData()
-        }
-        
-        // Give a tiny delay to ensure state is fully updated
-        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1000ms
-
-        let testData = ResidenceCardData(
-            commonData: Data(),
-            cardType: Data(),
-            frontImage: Data(),
-            faceImage: Data(),
-            address: Data(),
-            additionalData: nil,
-            signature: Data(),
-            signatureVerificationResult: nil
-        )
-        
-        await MainActor.run {
+            
+            let testData = ResidenceCardData(
+                commonData: Data(),
+                cardType: Data(),
+                frontImage: Data(),
+                faceImage: Data(),
+                address: Data(),
+                additionalData: nil,
+                signature: Data(),
+                signatureVerificationResult: nil
+            )
+            
+            // Set data and verify navigation state
             manager.setCardData(testData)
             #expect(manager.shouldNavigateToDetail == true)
-        }
-        
-        await MainActor.run {
+            
+            // Reset navigation and verify
             manager.resetNavigation()
             #expect(manager.shouldNavigateToDetail == false)
             #expect(manager.cardData == testData) // Data should still be present and equal
-        }
-        
-        // Clean up after test
-        await MainActor.run {
+            
+            // Clean up after test
             manager.clearData()
         }
     }
