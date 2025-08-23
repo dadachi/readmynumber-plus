@@ -688,37 +688,63 @@ extension ResidenceCardReader {
     /// - Throws: CardReaderError.cryptographyError 処理失敗時
     internal func performTDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
         guard key.count == 16 else {
-            throw CardReaderError.cryptographyError("Invalid key length")
+            throw CardReaderError.cryptographyError("Invalid key length: \(key.count), expected 16")
         }
         
-        // TDES 2-key implementation using CommonCrypto
-        var result = Data(count: data.count + kCCBlockSize3DES)
+        // Convert 2-key (16 bytes) to 3-key (24 bytes) for CommonCrypto
+        // For 2-key 3DES: K1=key[0..7], K2=key[8..15], K3=K1
+        var key3DES = Data()
+        key3DES.append(key)           // K1 and K2 (16 bytes)
+        key3DES.append(key.prefix(8)) // K3 = K1 (8 bytes)
+        
+        // TDES 3-key implementation using CommonCrypto
+        // Allocate enough space for result including padding
+        // For empty data, we still need at least one block
+        let paddedSize = max(kCCBlockSize3DES, ((data.count + kCCBlockSize3DES - 1) / kCCBlockSize3DES) * kCCBlockSize3DES)
+        let bufferSize = paddedSize + kCCBlockSize3DES
+        var result = Data(count: bufferSize)
         var numBytesProcessed: size_t = 0
         
         let operation = encrypt ? CCOperation(kCCEncrypt) : CCOperation(kCCDecrypt)
         
-        let resultCount = result.count
-        let keyCount = key.count
-        let dataCount = data.count
-        
         // CommonCrypto APIを使用した3DES処理
-        let status = data.withUnsafeBytes { dataBytes in
-            key.withUnsafeBytes { keyBytes in
-                result.withUnsafeMutableBytes { resultBytes in
+        let status = result.withUnsafeMutableBytes { resultBytes in
+            data.withUnsafeBytes { dataBytes in
+                key3DES.withUnsafeBytes { keyBytes in
                     CCCrypt(operation,
-                           CCAlgorithm(kCCAlgorithm3DES),        // Triple-DES
-                           CCOptions(kCCOptionPKCS7Padding),    // PKCS#7パディング
-                           keyBytes.bindMemory(to: UInt8.self).baseAddress, keyCount,
+                           CCAlgorithm(kCCAlgorithm3DES),       // Triple-DES
+                           CCOptions(data.isEmpty || data.count % 8 != 0 ? kCCOptionPKCS7Padding : 0), // 空データまたは8の倍数でない場合はパディング
+                           keyBytes.bindMemory(to: UInt8.self).baseAddress, 
+                           kCCKeySize3DES,                       // 24 bytes for 3DES
                            nil,                                  // IV = zeros（CBCモード）
-                           dataBytes.bindMemory(to: UInt8.self).baseAddress, dataCount,
-                           resultBytes.bindMemory(to: UInt8.self).baseAddress, resultCount,
+                           dataBytes.bindMemory(to: UInt8.self).baseAddress, 
+                           data.count,                           // data length
+                           resultBytes.bindMemory(to: UInt8.self).baseAddress, 
+                           bufferSize,                           // output buffer size
                            &numBytesProcessed)
                 }
             }
         }
         
         guard status == kCCSuccess else {
-            throw CardReaderError.cryptographyError("TDES operation failed")
+            let errorMessage: String
+            switch Int(status) {
+            case Int(kCCParamError):
+                errorMessage = "TDES parameter error"
+            case Int(kCCBufferTooSmall):
+                errorMessage = "TDES buffer too small"
+            case Int(kCCMemoryFailure):
+                errorMessage = "TDES memory failure"
+            case Int(kCCAlignmentError):
+                errorMessage = "TDES alignment error"
+            case Int(kCCDecodeError):
+                errorMessage = "TDES decode error"
+            case Int(kCCUnimplemented):
+                errorMessage = "TDES unimplemented"
+            default:
+                errorMessage = "TDES operation failed with status: \(status)"
+            }
+            throw CardReaderError.cryptographyError(errorMessage)
         }
         
         result.count = numBytesProcessed
@@ -754,12 +780,25 @@ extension ResidenceCardReader {
     /// - Returns: 8バイトのMAC値
     /// - Throws: CardReaderError.cryptographyError MAC計算失敗時
     internal func calculateRetailMAC(data: Data, key: Data) throws -> Data {
-        // Triple-DES暗号化によるMAC計算（Retail MAC簡易版）
-        let mac = try performTDES(data: data, key: key, encrypt: true)
+        guard key.count == 16 else {
+            throw CardReaderError.cryptographyError("Invalid key length for Retail MAC")
+        }
         
-        // 暗号化結果の最終8バイトをMACとして返す
-        // これは在留カード等仕様書で規定された方法
-        return mac.suffix(8)
+        // Simplified Retail MAC implementation using full 3DES
+        // This is a common simplified approach that works reliably
+        
+        // Apply padding
+        var paddedData = data
+        paddedData.append(0x80)
+        while paddedData.count % 8 != 0 {
+            paddedData.append(0x00)
+        }
+        
+        // Use CBC-MAC with 3DES
+        let encrypted = try performTDES(data: paddedData, key: key, encrypt: true)
+        
+        // Return the last 8 bytes as MAC
+        return encrypted.suffix(8)
     }
     
     /// セッション鍵生成（在留カード等仕様書 3.5.2.3）
@@ -890,19 +929,49 @@ extension ResidenceCardReader {
     }
     
     internal func removePadding(data: Data) throws -> Data {
-        // ISO/IEC 7816-4 パディング除去
-        guard let lastPaddingIndex = data.lastIndex(of: 0x80) else {
+        guard !data.isEmpty else {
             throw CardReaderError.invalidResponse
         }
         
-        // 0x80以降がすべて0x00であることを確認
-        for i in (lastPaddingIndex + 1)..<data.count {
-            guard data[i] == 0x00 else {
+        // Try ISO/IEC 7816-4 padding first (0x80 format)
+        if let paddingIndex = data.lastIndex(of: 0x80) {
+            // Check that all bytes after 0x80 are 0x00
+            for i in (paddingIndex + 1)..<data.count {
+                guard data[i] == 0x00 else {
+                    // Invalid ISO 7816-4 padding - has non-zero bytes after 0x80
+                    // Don't fallback to PKCS#7 if 0x80 is present but invalid
+                    throw CardReaderError.invalidResponse
+                }
+            }
+            return data.prefix(paddingIndex)
+        }
+        
+        // No 0x80 found, try PKCS#7 padding
+        return try removePKCS7Padding(data: data)
+    }
+    
+    private func removePKCS7Padding(data: Data) throws -> Data {
+        guard !data.isEmpty else {
+            throw CardReaderError.invalidResponse
+        }
+        
+        // PKCS#7 パディング除去
+        let paddingLength = Int(data.last!)
+        
+        // パディング長が有効範囲内かチェック
+        guard paddingLength > 0 && paddingLength <= kCCBlockSize3DES && paddingLength <= data.count else {
+            throw CardReaderError.invalidResponse
+        }
+        
+        // パディングバイトがすべて同じ値（パディング長）かチェック
+        let paddingStart = data.count - paddingLength
+        for i in paddingStart..<data.count {
+            guard data[i] == paddingLength else {
                 throw CardReaderError.invalidResponse
             }
         }
         
-        return data.prefix(lastPaddingIndex)
+        return data.prefix(paddingStart)
     }
     
     internal func isResidenceCard(cardType: Data) -> Bool {
