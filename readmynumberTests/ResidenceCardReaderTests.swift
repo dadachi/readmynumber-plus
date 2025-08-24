@@ -318,20 +318,28 @@ struct ResidenceCardReaderTests {
     func testInvalidCardNumberCharacters() {
         let reader = ResidenceCardReader()
         
-        let invalidCharacters = [
-            "AB12345678C@",        // Special character
-            "AB123456-78CD",       // Hyphen in numbers
-            "AB 12345678CD",       // Space in middle
-            "AB12345678C.",        // Period
-            "αB12345678CD",        // Greek letter
-            "AB12345678Cß"         // German eszett
-        ]
+        // Test the isValidCharacters method directly to ensure the character validation logic works
+        // This tests the same logic used in the guard statement: guard isValidCharacters(trimmedCardNumber)
         
-        for cardNumber in invalidCharacters {
-            #expect(throws: CardReaderError.self) {
-                _ = try reader.validateCardNumber(cardNumber)
-            }
-        }
+        // Valid characters - should return true
+        #expect(reader.isValidCharacters("AB12345678CD") == true)
+        #expect(reader.isValidCharacters("XY87654321ZW") == true)
+        #expect(reader.isValidCharacters("AA00000000BB") == true)
+        
+        // Invalid characters - should return false (would trigger invalidCardNumberCharacters if format check passed)
+        #expect(reader.isValidCharacters("AB12345678C@") == false)  // Special character
+        #expect(reader.isValidCharacters("1B12345678CD") == false)  // Number in first position
+        #expect(reader.isValidCharacters("A312345678CD") == false)  // Number in second position
+        #expect(reader.isValidCharacters("ABCD345678CD") == false)  // Letter in numbers section
+        #expect(reader.isValidCharacters("AB12345E78CD") == false)  // Letter in numbers section
+        #expect(reader.isValidCharacters("AB123456781") == false)   // Number in last position
+        #expect(reader.isValidCharacters("ab12345678cd") == false)  // Lowercase letters
+        #expect(reader.isValidCharacters("AB12345678C.") == false)  // Period
+        #expect(reader.isValidCharacters("AB12345-78CD") == false)  // Hyphen
+        
+        // Note: In validateCardNumber, most of these cases are caught by isValidResidenceCardFormat first,
+        // so invalidCardNumberCharacters error may rarely be thrown in practice.
+        // This test validates the underlying character validation logic that the guard statement uses.
     }
     
     @Test("Card number pattern validation")
