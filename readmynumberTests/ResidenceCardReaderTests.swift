@@ -912,6 +912,37 @@ struct ResidenceCardReaderTests {
         }
     }
     
+    @Test("Card number encryption with invalid card number")
+    func testCardNumberEncryptionWithInvalidCardNumber() {
+        let reader = ResidenceCardReader()
+        let validSessionKey = Data(repeating: 0x01, count: 16)
+        
+        // Test with card number that's too short
+        #expect(throws: CardReaderError.invalidCardNumber) {
+            _ = try reader.encryptCardNumber(cardNumber: "AB12345678C", sessionKey: validSessionKey)
+        }
+        
+        // Test with card number that's too long
+        #expect(throws: CardReaderError.invalidCardNumber) {
+            _ = try reader.encryptCardNumber(cardNumber: "AB12345678CDE", sessionKey: validSessionKey)
+        }
+        
+        // Test with card number containing non-ASCII characters
+        #expect(throws: CardReaderError.invalidCardNumber) {
+            _ = try reader.encryptCardNumber(cardNumber: "AB1234567あCD", sessionKey: validSessionKey)
+        }
+        
+        // Test with empty card number
+        #expect(throws: CardReaderError.invalidCardNumber) {
+            _ = try reader.encryptCardNumber(cardNumber: "", sessionKey: validSessionKey)
+        }
+        
+        // Test with card number containing extended ASCII characters
+        #expect(throws: CardReaderError.invalidCardNumber) {
+            _ = try reader.encryptCardNumber(cardNumber: "AB12345678C\u{00FF}", sessionKey: validSessionKey)
+        }
+    }
+    
     @Test("Padding removal edge cases")
     func testPaddingRemovalEdgeCases() throws {
         let reader = ResidenceCardReader()
