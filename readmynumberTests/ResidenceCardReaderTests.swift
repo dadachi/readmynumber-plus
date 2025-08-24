@@ -2357,6 +2357,179 @@ struct ResidenceCardReaderTests {
         }
     }
     
+    @Test("Test performTDES with block-aligned data")
+    func testPerformTDESBlockAligned() throws {
+        let reader = ResidenceCardReader()
+        let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                       0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10])
+        
+        // Test with exactly 8 bytes (one block) - no padding needed
+        let oneBlock = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
+        let encryptedOne = try reader.performTDES(data: oneBlock, key: key, encrypt: true)
+        #expect(encryptedOne.count == 8)
+        #expect(encryptedOne != oneBlock)
+        
+        let decryptedOne = try reader.performTDES(data: encryptedOne, key: key, encrypt: false)
+        #expect(decryptedOne == oneBlock)
+        
+        // Test with exactly 16 bytes (two blocks) - no padding needed
+        let twoBlocks = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+                             0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00])
+        let encryptedTwo = try reader.performTDES(data: twoBlocks, key: key, encrypt: true)
+        #expect(encryptedTwo.count == 16)
+        #expect(encryptedTwo != twoBlocks)
+        
+        let decryptedTwo = try reader.performTDES(data: encryptedTwo, key: key, encrypt: false)
+        #expect(decryptedTwo == twoBlocks)
+        
+        // Test with 24 bytes (three blocks) - no padding needed
+        let threeBlocks = Data(repeating: 0x42, count: 24)
+        let encryptedThree = try reader.performTDES(data: threeBlocks, key: key, encrypt: true)
+        #expect(encryptedThree.count == 24)
+        
+        let decryptedThree = try reader.performTDES(data: encryptedThree, key: key, encrypt: false)
+        #expect(decryptedThree == threeBlocks)
+    }
+    
+    @Test("Test performTDES with various data sizes")
+    func testPerformTDESVariousSizes() throws {
+        let reader = ResidenceCardReader()
+        let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                       0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10])
+        
+        // Test various non-aligned sizes that require padding
+        for size in [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 17] {
+            let data = Data(repeating: UInt8(size), count: size)
+            let encrypted = try reader.performTDES(data: data, key: key, encrypt: true)
+            
+            // Should be padded to next 8-byte boundary
+            let expectedSize = ((size + 7) / 8) * 8
+            #expect(encrypted.count == expectedSize)
+            
+            // Decrypt and verify padding is included
+            let decrypted = try reader.performTDES(data: encrypted, key: key, encrypt: false)
+            #expect(decrypted.count == expectedSize)
+            #expect(decrypted.prefix(size) == data)
+        }
+    }
+    
+    @Test("Test performTDES decrypt operation with various inputs")
+    func testPerformTDESDecrypt() throws {
+        let reader = ResidenceCardReader()
+        let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                       0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10])
+        
+        // Test decrypt with pre-encrypted data
+        let originalData = Data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE])
+        let encrypted = try reader.performTDES(data: originalData, key: key, encrypt: true)
+        
+        // Decrypt operation
+        let decrypted = try reader.performTDES(data: encrypted, key: key, encrypt: false)
+        #expect(decrypted.count == 8) // Padded size
+        #expect(decrypted.prefix(5) == originalData)
+        
+        // Test decrypt with different block-aligned sizes
+        let eightBytes = Data(repeating: 0x33, count: 8)
+        let encryptedEight = try reader.performTDES(data: eightBytes, key: key, encrypt: true)
+        let decryptedEight = try reader.performTDES(data: encryptedEight, key: key, encrypt: false)
+        #expect(decryptedEight == eightBytes)
+        
+        // Test decrypt with 16-byte input
+        let sixteenBytes = Data(repeating: 0x44, count: 16)
+        let encryptedSixteen = try reader.performTDES(data: sixteenBytes, key: key, encrypt: true)
+        let decryptedSixteen = try reader.performTDES(data: encryptedSixteen, key: key, encrypt: false)
+        #expect(decryptedSixteen == sixteenBytes)
+    }
+    
+    @Test("Test performTDES edge cases")
+    func testPerformTDESEdgeCases() throws {
+        let reader = ResidenceCardReader()
+        let key = Data([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        
+        // Test with all zeros data
+        let zeros = Data(repeating: 0x00, count: 8)
+        let encryptedZeros = try reader.performTDES(data: zeros, key: key, encrypt: true)
+        #expect(encryptedZeros.count == 8)
+        #expect(encryptedZeros != zeros)
+        
+        // Test with all ones data
+        let ones = Data(repeating: 0xFF, count: 8)
+        let encryptedOnes = try reader.performTDES(data: ones, key: key, encrypt: true)
+        #expect(encryptedOnes.count == 8)
+        #expect(encryptedOnes != ones)
+        #expect(encryptedOnes != encryptedZeros)
+        
+        // Test with alternating pattern
+        let pattern = Data([0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55])
+        let encryptedPattern = try reader.performTDES(data: pattern, key: key, encrypt: true)
+        #expect(encryptedPattern.count == 8)
+        let decryptedPattern = try reader.performTDES(data: encryptedPattern, key: key, encrypt: false)
+        #expect(decryptedPattern == pattern)
+        
+        // Test large data (multiple blocks with padding)
+        let largeData = Data(repeating: 0x12, count: 100)
+        let encryptedLarge = try reader.performTDES(data: largeData, key: key, encrypt: true)
+        #expect(encryptedLarge.count == 104) // Next multiple of 8
+        
+        let decryptedLarge = try reader.performTDES(data: encryptedLarge, key: key, encrypt: false)
+        #expect(decryptedLarge.count == 104)
+        #expect(decryptedLarge.prefix(100) == largeData)
+    }
+    
+    @Test("Test performTDES comprehensive coverage")
+    func testPerformTDESComprehensiveCoverage() throws {
+        let reader = ResidenceCardReader()
+        let key = Data(repeating: 0x01, count: 16)
+        
+        // Test various scenarios to ensure comprehensive code coverage
+        
+        // 1. Test both encrypt = true and encrypt = false branches
+        let testData = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
+        
+        let encrypted = try reader.performTDES(data: testData, key: key, encrypt: true)
+        #expect(encrypted.count == 8)
+        
+        let decrypted = try reader.performTDES(data: encrypted, key: key, encrypt: false) 
+        #expect(decrypted == testData)
+        
+        // 2. Test data.isEmpty branch (padding path)
+        let emptyData = Data()
+        let encryptedEmpty = try reader.performTDES(data: emptyData, key: key, encrypt: true)
+        #expect(encryptedEmpty.count == 8)
+        
+        // 3. Test data.count % 8 != 0 branch (padding path)
+        let unevenData = Data([0xAA, 0xBB, 0xCC])
+        let encryptedUneven = try reader.performTDES(data: unevenData, key: key, encrypt: true)
+        #expect(encryptedUneven.count == 8)
+        
+        // 4. Test data.count % 8 == 0 branch (no padding path)
+        let evenData = Data(repeating: 0x42, count: 16)
+        let encryptedEven = try reader.performTDES(data: evenData, key: key, encrypt: true)
+        #expect(encryptedEven.count == 16)
+        
+        // 5. Test different key patterns to ensure key processing works
+        let alternateKey = Data([0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00,
+                                0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF])
+        let altEncrypted = try reader.performTDES(data: testData, key: alternateKey, encrypt: true)
+        #expect(altEncrypted.count == 8)
+        #expect(altEncrypted != encrypted) // Different key should produce different result
+        
+        // 6. Test boundary conditions for buffer size calculation
+        let largeData = Data(repeating: 0x55, count: 1000)
+        let encryptedLarge = try reader.performTDES(data: largeData, key: key, encrypt: true)
+        #expect(encryptedLarge.count == 1000) // Already aligned to 8-byte boundary
+        
+        // 7. Test max function in buffer size calculation with small data
+        let tinyData = Data([0x99])
+        let encryptedTiny = try reader.performTDES(data: tinyData, key: key, encrypt: true)
+        #expect(encryptedTiny.count == 8) // Should be padded to at least kCCBlockSize3DES
+        
+        // 8. Test numBytesProcessed assignment and result.count assignment
+        let result = try reader.performTDES(data: testData, key: key, encrypt: true)
+        #expect(result.count == 8) // Ensures numBytesProcessed was used correctly
+    }
+    
 }
 
 // MARK: - ResidenceCardDataManager Tests
