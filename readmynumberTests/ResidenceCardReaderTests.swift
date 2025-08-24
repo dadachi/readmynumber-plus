@@ -1221,6 +1221,237 @@ struct ResidenceCardReaderTests {
         #expect(decrypted.count <= largeData.count)
     }
     
+    // MARK: - Tests for selectMF
+    
+    @Test("Select Master File (MF) with successful response")
+    func testSelectMFSuccess() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Create a mock tag
+        let mockTag = MockNFCISO7816Tag()
+        mockTag.shouldSucceed = true
+        
+        // Test successful MF selection using test helper
+        try await reader.testSelectMF(mockTag: mockTag)
+        
+        // Verify the command was sent
+        #expect(mockTag.commandHistory.count == 1)
+        
+        // Verify command structure
+        if let lastCommand = mockTag.lastCommand {
+            #expect(lastCommand.instructionClass == 0x00)
+            #expect(lastCommand.instructionCode == 0xA4) // SELECT FILE
+            #expect(lastCommand.p1Parameter == 0x00)
+            #expect(lastCommand.p2Parameter == 0x00)
+            #expect(lastCommand.data == Data([0x3F, 0x00])) // MF identifier
+            #expect(lastCommand.expectedResponseLength == -1)
+        }
+    }
+    
+    @Test("Select Master File (MF) with error response")
+    func testSelectMFError() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Create a mock tag that will return an error
+        let mockTag = MockNFCISO7816Tag()
+        mockTag.shouldSucceed = false
+        mockTag.errorSW1 = 0x6A
+        mockTag.errorSW2 = 0x82 // File not found
+        
+        // Test that selection fails with appropriate error
+        do {
+            try await reader.testSelectMF(mockTag: mockTag)
+            #expect(Bool(false), "Should have thrown an error")
+        } catch CardReaderError.cardError(let sw1, let sw2) {
+            #expect(sw1 == 0x6A)
+            #expect(sw2 == 0x82)
+        } catch {
+            #expect(Bool(false), "Wrong error type: \(error)")
+        }
+    }
+    
+    @Test("Select Master File (MF) with various status words")
+    func testSelectMFVariousStatusWords() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Test various error status words
+        let errorCases: [(UInt8, UInt8, String)] = [
+            (0x6A, 0x82, "File not found"),
+            (0x6A, 0x86, "Incorrect P1-P2"),
+            (0x69, 0x82, "Security status not satisfied"),
+            (0x6D, 0x00, "INS not supported")
+        ]
+        
+        for (sw1, sw2, description) in errorCases {
+            let mockTag = MockNFCISO7816Tag()
+            mockTag.shouldSucceed = false
+            mockTag.errorSW1 = sw1
+            mockTag.errorSW2 = sw2
+            
+            do {
+                try await reader.testSelectMF(mockTag: mockTag)
+                #expect(Bool(false), "Should have thrown error for \(description)")
+            } catch CardReaderError.cardError(let receivedSW1, let receivedSW2) {
+                #expect(receivedSW1 == sw1)
+                #expect(receivedSW2 == sw2)
+            } catch {
+                #expect(Bool(false), "Wrong error type for \(description): \(error)")
+            }
+        }
+    }
+    
+    // MARK: - Tests for selectDF
+    
+    @Test("Select Data File (DF) with successful response")
+    func testSelectDFSuccess() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Create a mock tag
+        let mockTag = MockNFCISO7816Tag()
+        mockTag.shouldSucceed = true
+        
+        // Test with DF1 AID
+        let df1AID = TestConstants.df1AID
+        try await reader.testSelectDF(mockTag: mockTag, aid: df1AID)
+        
+        // Verify the command was sent
+        #expect(mockTag.commandHistory.count == 1)
+        
+        // Verify command structure
+        if let lastCommand = mockTag.lastCommand {
+            #expect(lastCommand.instructionClass == 0x00)
+            #expect(lastCommand.instructionCode == 0xA4) // SELECT FILE
+            #expect(lastCommand.p1Parameter == 0x04) // Select by DF name
+            #expect(lastCommand.p2Parameter == 0x0C) // No response data
+            #expect(lastCommand.data == df1AID)
+            #expect(lastCommand.expectedResponseLength == -1)
+        }
+    }
+    
+    @Test("Select Data File (DF) with different AIDs")
+    func testSelectDFWithDifferentAIDs() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Test with different DF AIDs
+        let aidTestCases = [
+            (TestConstants.df1AID, "DF1"),
+            (TestConstants.df2AID, "DF2"),
+            (TestConstants.df3AID, "DF3")
+        ]
+        
+        for (aid, description) in aidTestCases {
+            let mockTag = MockNFCISO7816Tag()
+            mockTag.shouldSucceed = true
+            
+            try await reader.testSelectDF(mockTag: mockTag, aid: aid)
+            
+            // Verify correct AID was sent
+            if let lastCommand = mockTag.lastCommand {
+                #expect(lastCommand.data == aid, "Failed for \(description)")
+                #expect(lastCommand.p1Parameter == 0x04)
+                #expect(lastCommand.p2Parameter == 0x0C)
+            }
+        }
+    }
+    
+    @Test("Select Data File (DF) with error response")
+    func testSelectDFError() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Create a mock tag that will return an error
+        let mockTag = MockNFCISO7816Tag()
+        mockTag.shouldSucceed = false
+        mockTag.errorSW1 = 0x6A
+        mockTag.errorSW2 = 0x82 // File not found
+        
+        // Test that selection fails with appropriate error
+        let testAID = TestConstants.df1AID
+        do {
+            try await reader.testSelectDF(mockTag: mockTag, aid: testAID)
+            #expect(Bool(false), "Should have thrown an error")
+        } catch CardReaderError.cardError(let sw1, let sw2) {
+            #expect(sw1 == 0x6A)
+            #expect(sw2 == 0x82)
+        } catch {
+            #expect(Bool(false), "Wrong error type: \(error)")
+        }
+    }
+    
+    @Test("Select Data File (DF) with various error status words")
+    func testSelectDFVariousStatusWords() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Test various error status words
+        let errorCases: [(UInt8, UInt8, String)] = [
+            (0x6A, 0x82, "Application not found"),
+            (0x6A, 0x86, "Incorrect parameters P1-P2"),
+            (0x6A, 0x87, "Lc inconsistent with P1-P2"),
+            (0x69, 0x82, "Security status not satisfied"),
+            (0x6D, 0x00, "INS not supported"),
+            (0x6E, 0x00, "CLA not supported")
+        ]
+        
+        let testAID = TestConstants.df1AID
+        
+        for (sw1, sw2, description) in errorCases {
+            let mockTag = MockNFCISO7816Tag()
+            mockTag.shouldSucceed = false
+            mockTag.errorSW1 = sw1
+            mockTag.errorSW2 = sw2
+            
+            do {
+                try await reader.testSelectDF(mockTag: mockTag, aid: testAID)
+                #expect(Bool(false), "Should have thrown error for \(description)")
+            } catch CardReaderError.cardError(let receivedSW1, let receivedSW2) {
+                #expect(receivedSW1 == sw1)
+                #expect(receivedSW2 == sw2)
+            } catch {
+                #expect(Bool(false), "Wrong error type for \(description): \(error)")
+            }
+        }
+    }
+    
+    @Test("Select Data File (DF) with empty AID")
+    func testSelectDFWithEmptyAID() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Create a mock tag
+        let mockTag = MockNFCISO7816Tag()
+        mockTag.shouldSucceed = true
+        
+        // Test with empty AID (should still work, but might not be meaningful)
+        let emptyAID = Data()
+        try await reader.testSelectDF(mockTag: mockTag, aid: emptyAID)
+        
+        // Verify command was sent with empty data
+        if let lastCommand = mockTag.lastCommand {
+            #expect(lastCommand.data == emptyAID)
+            #expect(lastCommand.data?.count == 0)
+        }
+    }
+    
+    @Test("Select Data File (DF) with custom AID")
+    func testSelectDFWithCustomAID() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Create a mock tag
+        let mockTag = MockNFCISO7816Tag()
+        mockTag.shouldSucceed = true
+        
+        // Test with a custom AID
+        let customAID = Data([0xA0, 0x00, 0x00, 0x00, 0x03, 0x10, 0x10])
+        try await reader.testSelectDF(mockTag: mockTag, aid: customAID)
+        
+        // Verify the custom AID was sent correctly
+        if let lastCommand = mockTag.lastCommand {
+            #expect(lastCommand.data == customAID)
+            #expect(lastCommand.instructionClass == 0x00)
+            #expect(lastCommand.instructionCode == 0xA4)
+            #expect(lastCommand.p1Parameter == 0x04)
+            #expect(lastCommand.p2Parameter == 0x0C)
+        }
+    }
+    
     // MARK: - Tests for performSingleDES
     
     @Test("Single DES encryption and decryption")

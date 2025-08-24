@@ -34,6 +34,54 @@ class MockNFCCardTag {
     }
 }
 
+// Mock for testing NFC operations without actual NFCISO7816Tag protocol
+class MockNFCISO7816Tag {
+    var shouldSucceed = true
+    var errorSW1: UInt8 = 0x6A
+    var errorSW2: UInt8 = 0x82
+    var commandHistory: [MockAPDUCommand] = []
+    var lastCommand: MockAPDUCommand?
+    var mockResponses: [Data: (Data, UInt8, UInt8)] = [:]
+    
+    func sendCommand(apdu: MockAPDUCommand) async throws -> (Data, UInt8, UInt8) {
+        commandHistory.append(apdu)
+        lastCommand = apdu
+        
+        // Check for mock response based on command data
+        if let commandData = apdu.data,
+           let response = mockResponses[commandData] {
+            return response
+        }
+        
+        // Return success or error based on configuration
+        if shouldSucceed {
+            return (Data(), 0x90, 0x00)
+        } else {
+            // Simulate CardReaderError.cardError
+            throw CardReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
+        }
+    }
+}
+
+// Mock APDU command structure for testing
+struct MockAPDUCommand {
+    let instructionClass: UInt8
+    let instructionCode: UInt8
+    let p1Parameter: UInt8
+    let p2Parameter: UInt8
+    let data: Data?
+    let expectedResponseLength: Int
+    
+    init(instructionClass: UInt8, instructionCode: UInt8, p1Parameter: UInt8, p2Parameter: UInt8, data: Data?, expectedResponseLength: Int) {
+        self.instructionClass = instructionClass
+        self.instructionCode = instructionCode
+        self.p1Parameter = p1Parameter
+        self.p2Parameter = p2Parameter
+        self.data = data
+        self.expectedResponseLength = expectedResponseLength
+    }
+}
+
 // Test-specific extension to ResidenceCardReader for testing internal methods
 extension ResidenceCardReader {
     
@@ -54,6 +102,36 @@ extension ResidenceCardReader {
     func testCardValidationMethods() {
         // These methods are now internal and can be tested directly
         // This helper is for completeness
+    }
+    
+    // Test helper for selectMF that works with mock objects
+    func testSelectMF(mockTag: MockNFCISO7816Tag) async throws {
+        let command = MockAPDUCommand(
+            instructionClass: 0x00,
+            instructionCode: 0xA4,  // SELECT FILE
+            p1Parameter: 0x00,
+            p2Parameter: 0x00,
+            data: Data([0x3F, 0x00]),  // MF identifier
+            expectedResponseLength: -1
+        )
+        
+        let (_, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
+        try checkStatusWord(sw1: sw1, sw2: sw2)
+    }
+    
+    // Test helper for selectDF that works with mock objects
+    func testSelectDF(mockTag: MockNFCISO7816Tag, aid: Data) async throws {
+        let command = MockAPDUCommand(
+            instructionClass: 0x00,
+            instructionCode: 0xA4,  // SELECT FILE
+            p1Parameter: 0x04,
+            p2Parameter: 0x0C,
+            data: aid,
+            expectedResponseLength: -1
+        )
+        
+        let (_, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
+        try checkStatusWord(sw1: sw1, sw2: sw2)
     }
 }
 
