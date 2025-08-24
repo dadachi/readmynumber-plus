@@ -712,6 +712,12 @@ struct ResidenceCardReaderTests {
         #expect(throws: CardReaderError.self) {
             _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: wrongRndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
+        
+        // Test verification failure with wrong rndIFD - this tests the guard decrypted.subdata(in: 8..<16) == rndIFD
+        let wrongRndIFD = Data(repeating: 0xFF, count: 8)
+        #expect(throws: CardReaderError.cryptographyError("RND.IFD verification failed")) {
+            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: wrongRndIFD, kEnc: kEnc, kMac: kMac)
+        }
     }
     
     #if targetEnvironment(simulator)
