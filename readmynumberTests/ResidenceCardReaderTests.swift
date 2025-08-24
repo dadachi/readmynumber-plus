@@ -2292,6 +2292,62 @@ struct ResidenceCardReaderTests {
         #expect(sessionKey2.count == 16)
         #expect(sessionKey1 != sessionKey2) // Should be different
     }
+    
+    // MARK: - performTDES Essential Tests
+    
+    @Test("Test performTDES basic functionality")
+    func testPerformTDESBasic() throws {
+        let reader = ResidenceCardReader()
+        let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                       0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10])
+        let plaintext = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
+        
+        // Test encryption/decryption round trip with block-aligned data
+        let encrypted = try reader.performTDES(data: plaintext, key: key, encrypt: true)
+        #expect(encrypted.count == 8)
+        #expect(encrypted != plaintext)
+        
+        let decrypted = try reader.performTDES(data: encrypted, key: key, encrypt: false)
+        #expect(decrypted == plaintext)
+        
+        // Test empty data with PKCS7 padding
+        let emptyData = Data()
+        let encryptedEmpty = try reader.performTDES(data: emptyData, key: key, encrypt: true)
+        #expect(encryptedEmpty.count >= 8) // Should be at least one block (with padding)
+        let decryptedEmpty = try reader.performTDES(data: encryptedEmpty, key: key, encrypt: false)
+        #expect(decryptedEmpty.isEmpty) // Should match original empty data
+        
+        // Test non-aligned data that requires padding
+        let shortData = Data([0xAA, 0xBB, 0xCC])
+        let encryptedShort = try reader.performTDES(data: shortData, key: key, encrypt: true)
+        #expect(encryptedShort.count == 8) // Should be padded to one block
+        let decryptedShort = try reader.performTDES(data: encryptedShort, key: key, encrypt: false)
+        #expect(decryptedShort == shortData) // Should match original
+    }
+    
+    @Test("Test performTDES key validation")
+    func testPerformTDESKeyValidation() throws {
+        let reader = ResidenceCardReader()
+        let plaintext = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
+        
+        // Test invalid key lengths
+        let shortKey = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]) // 7 bytes
+        let longKey = Data(repeating: 0x01, count: 17) // 17 bytes
+        let emptyKey = Data()
+        
+        #expect(throws: CardReaderError.self) {
+            _ = try reader.performTDES(data: plaintext, key: shortKey, encrypt: true)
+        }
+        
+        #expect(throws: CardReaderError.self) {
+            _ = try reader.performTDES(data: plaintext, key: longKey, encrypt: true)
+        }
+        
+        #expect(throws: CardReaderError.self) {
+            _ = try reader.performTDES(data: plaintext, key: emptyKey, encrypt: true)
+        }
+    }
+    
 }
 
 // MARK: - ResidenceCardDataManager Tests
