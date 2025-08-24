@@ -53,6 +53,26 @@ class MockNFCISO7816Tag {
             return response
         }
         
+        // Special handling for READ BINARY commands
+        if apdu.instructionCode == 0xB0 { // READ BINARY
+            if shouldSucceed {
+                let offset = (UInt16(apdu.p1Parameter) << 8) | UInt16(apdu.p2Parameter)
+                
+                if apdu.instructionClass == 0x08 { // Secure Messaging READ BINARY
+                    // Return encrypted SM response - create mock TLV structure
+                    let plainData = Data(repeating: UInt8(offset & 0xFF), count: 100) // 100 bytes of plain data
+                    let encryptedResponse = MockTestUtils.createMockEncryptedSMResponse(plaintext: plainData)
+                    return (encryptedResponse, 0x90, 0x00)
+                } else {
+                    // Plain READ BINARY
+                    let mockData = Data(repeating: UInt8(offset & 0xFF), count: 256) // 256 bytes of data
+                    return (mockData, 0x90, 0x00)
+                }
+            } else {
+                throw CardReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
+            }
+        }
+        
         // Return success or error based on configuration
         if shouldSucceed {
             return (Data(), 0x90, 0x00)
@@ -132,6 +152,43 @@ extension ResidenceCardReader {
         
         let (_, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
         try checkStatusWord(sw1: sw1, sw2: sw2)
+    }
+    
+    // Test helper for readBinaryPlain that works with mock objects
+    func testReadBinaryPlain(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+        let command = MockAPDUCommand(
+            instructionClass: 0x00,
+            instructionCode: 0xB0,  // READ BINARY
+            p1Parameter: p1,
+            p2Parameter: p2,
+            data: Data(),
+            expectedResponseLength: 65536
+        )
+        
+        let (data, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
+        try checkStatusWord(sw1: sw1, sw2: sw2)
+        
+        return data
+    }
+    
+    // Test helper for readBinaryWithSM that works with mock objects
+    func testReadBinaryWithSM(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+        let leData = Data([0x96, 0x02, 0x00, 0x00])
+        
+        let command = MockAPDUCommand(
+            instructionClass: 0x08, // SM command class
+            instructionCode: 0xB0,  // READ BINARY
+            p1Parameter: p1,
+            p2Parameter: p2,
+            data: leData,
+            expectedResponseLength: 65536
+        )
+        
+        let (encryptedData, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
+        try checkStatusWord(sw1: sw1, sw2: sw2)
+        
+        // Decrypt the SM response
+        return try decryptSMResponse(encryptedData: encryptedData)
     }
 }
 
