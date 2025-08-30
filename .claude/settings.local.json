@@ -15,9 +15,13 @@
       "Bash(xcrun xcresulttool:*)",
       "Bash(grep:*)",
       "Bash(sed:*)",
-      "Bash(timeout 300 xcodebuild:*)"
+      "Bash(timeout 300 xcodebuild:*)",
+      "Bash(timeout 60 xcodebuild:*)"
     ],
     "deny": [],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "/private/tmp"
+    ]
   }
 }
