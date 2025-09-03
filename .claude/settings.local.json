@@ -16,7 +16,9 @@
       "Bash(grep:*)",
       "Bash(sed:*)",
       "Bash(timeout 300 xcodebuild:*)",
-      "Bash(timeout 60 xcodebuild:*)"
+      "Bash(timeout 60 xcodebuild:*)",
+      "Bash(xcrun swift test:*)",
+      "Bash(timeout:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",

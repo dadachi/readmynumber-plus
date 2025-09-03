@@ -23,6 +23,11 @@ class ResidenceCardReader: NSObject, ObservableObject {
                               0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
     }
     
+    // MARK: - APDU Response Limits
+    // iOS NFC APDU response limitation remains active as of 2025
+    // Reference: https://developer.apple.com/forums/thread/120496
+    private static let maxAPDUResponseLength: Int = 1694
+    
     // MARK: - Properties
     private var session: NFCTagReaderSession?
     private var cardNumber: String = ""
@@ -208,7 +213,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
     
     // バイナリ読み出し（SMあり）
     internal func readBinaryWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        let leData = Data([0x96, 0x02, 0x00, 0x00])
+        // Try reading with APDU limit first
+        let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(Self.maxAPDUResponseLength).bigEndian, Array.init))
         
         let command = NFCISO7816APDU(
             instructionClass: 0x08, // SMコマンド
@@ -216,31 +222,218 @@ class ResidenceCardReader: NSObject, ObservableObject {
             p1Parameter: p1,
             p2Parameter: p2,
             data: leData,
-            expectedResponseLength: 65536
+            expectedResponseLength: Self.maxAPDUResponseLength
         )
         
         let (encryptedData, sw1, sw2) = try await tag.sendCommand(apdu: command)
         try checkStatusWord(sw1: sw1, sw2: sw2)
         
-        // 復号化
-        return try decryptSMResponse(encryptedData: encryptedData)
+        // Try to decrypt the response to see if we have complete data
+        do {
+            let decryptedData = try decryptSMResponse(encryptedData: encryptedData)
+            
+            // Check if the data appears complete by examining the TLV structure
+            // If the response seems truncated, fall back to chunked reading
+            if encryptedData.count >= Self.maxAPDUResponseLength - 100 { // Allow for some overhead
+                // Response might be truncated, try chunked reading
+                return try await readBinaryChunkedWithSM(tag: tag, p1: p1, p2: p2)
+            }
+            
+            return decryptedData
+        } catch {
+            // If decryption fails, it might be due to incomplete data
+            // Try chunked reading as fallback
+            return try await readBinaryChunkedWithSM(tag: tag, p1: p1, p2: p2)
+        }
+    }
+    
+    // バイナリ読み出し（SMあり、チャンク対応）
+    internal func readBinaryChunkedWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+        // First, read a small chunk to determine the actual data size from TLV structure
+        let initialChunkSize = min(Self.maxAPDUResponseLength, 512)
+        let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(initialChunkSize).bigEndian, Array.init))
+        
+        let initialCommand = NFCISO7816APDU(
+            instructionClass: 0x08,
+            instructionCode: Command.readBinary,
+            p1Parameter: p1,
+            p2Parameter: p2,
+            data: leData,
+            expectedResponseLength: initialChunkSize
+        )
+        
+        let (initialResponse, sw1, sw2) = try await tag.sendCommand(apdu: initialCommand)
+        try checkStatusWord(sw1: sw1, sw2: sw2)
+        
+        // Parse TLV to determine total data size
+        guard initialResponse.count >= 3,
+              initialResponse[0] == 0x86 else {
+            throw CardReaderError.invalidResponse
+        }
+        
+        let (totalLength, tlvHeaderSize) = try parseBERLength(data: initialResponse, offset: 1)
+        let totalTLVSize = 1 + tlvHeaderSize + totalLength // tag + length + value
+        
+        // If the total data fits in what we already read, return it
+        if totalTLVSize <= initialResponse.count {
+            return try decryptSMResponse(encryptedData: initialResponse)
+        }
+        
+        // Calculate how many additional chunks we need
+        var allData = initialResponse
+        var currentOffset = initialResponse.count
+        
+        while currentOffset < totalTLVSize {
+            let remainingBytes = totalTLVSize - currentOffset
+            let chunkSize = min(remainingBytes, Self.maxAPDUResponseLength)
+            
+            // Calculate P1, P2 for offset-based reading
+            // Offset encoding: P1 = (offset >> 8) & 0x7F, P2 = offset & 0xFF
+            let offsetP1 = UInt8((currentOffset >> 8) & 0x7F)
+            let offsetP2 = UInt8(currentOffset & 0xFF)
+            
+            let chunkLeData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(chunkSize).bigEndian, Array.init))
+            
+            let chunkCommand = NFCISO7816APDU(
+                instructionClass: 0x08,
+                instructionCode: Command.readBinary,
+                p1Parameter: offsetP1,
+                p2Parameter: offsetP2,
+                data: chunkLeData,
+                expectedResponseLength: chunkSize
+            )
+            
+            let (chunkData, chunkSW1, chunkSW2) = try await tag.sendCommand(apdu: chunkCommand)
+            try checkStatusWord(sw1: chunkSW1, sw2: chunkSW2)
+            
+            allData.append(chunkData)
+            currentOffset += chunkData.count
+            
+            // Safety check to prevent infinite loops
+            if chunkData.isEmpty {
+                break
+            }
+        }
+        
+        // Decrypt the complete reassembled data
+        return try decryptSMResponse(encryptedData: allData)
     }
     
     // バイナリ読み出し（平文）
     internal func readBinaryPlain(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+        // Try reading with APDU limit first
         let command = NFCISO7816APDU(
             instructionClass: 0x00,
             instructionCode: Command.readBinary,
             p1Parameter: p1,
             p2Parameter: p2,
             data: Data(),
-            expectedResponseLength: 65536
+            expectedResponseLength: Self.maxAPDUResponseLength
         )
         
         let (data, sw1, sw2) = try await tag.sendCommand(apdu: command)
         try checkStatusWord(sw1: sw1, sw2: sw2)
         
+        // Check if the response might be truncated
+        // If we received close to the maximum response length, the data might be larger
+        if data.count >= Self.maxAPDUResponseLength - 100 { // Allow for some overhead
+            // Try to determine if there's more data by checking TLV structure
+            if data.count >= 3 {
+                do {
+                    let (length, headerSize) = try parseBERLength(data: data, offset: 1)
+                    let expectedTotalSize = 1 + headerSize + length
+                    
+                    if expectedTotalSize > data.count {
+                        // Data is larger than what we received, use chunked reading
+                        return try await readBinaryChunkedPlain(tag: tag, p1: p1, p2: p2)
+                    }
+                } catch {
+                    // If TLV parsing fails, the data might still be truncated
+                    // For safety, use chunked reading if we got a full response
+                    return try await readBinaryChunkedPlain(tag: tag, p1: p1, p2: p2)
+                }
+            }
+        }
+        
         return data
+    }
+    
+    // バイナリ読み出し（平文、チャンク対応）
+    internal func readBinaryChunkedPlain(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+        // First, read a small chunk to determine the actual data size from TLV structure
+        let initialChunkSize = min(Self.maxAPDUResponseLength, 512)
+        
+        let initialCommand = NFCISO7816APDU(
+            instructionClass: 0x00,
+            instructionCode: Command.readBinary,
+            p1Parameter: p1,
+            p2Parameter: p2,
+            data: Data(),
+            expectedResponseLength: initialChunkSize
+        )
+        
+        let (initialResponse, sw1, sw2) = try await tag.sendCommand(apdu: initialCommand)
+        try checkStatusWord(sw1: sw1, sw2: sw2)
+        
+        // Parse TLV to determine total data size
+        // For plain text, we need to check if this looks like a TLV structure
+        var totalSize = initialResponse.count
+        if initialResponse.count >= 3 {
+            // Try to parse as TLV to get the actual data size
+            do {
+                let (length, headerSize) = try parseBERLength(data: initialResponse, offset: 1)
+                let possibleTotalSize = 1 + headerSize + length // tag + length + value
+                
+                // Only use TLV size if it's reasonable and larger than what we got
+                if possibleTotalSize > initialResponse.count && possibleTotalSize < 65536 {
+                    totalSize = possibleTotalSize
+                }
+            } catch {
+                // Not a valid TLV structure, stick with what we received
+                totalSize = initialResponse.count
+            }
+        }
+        
+        // If we have all the data or it's small enough, return what we have
+        if totalSize <= initialResponse.count || totalSize <= Self.maxAPDUResponseLength {
+            return initialResponse
+        }
+        
+        // Read remaining chunks
+        var allData = initialResponse
+        var currentOffset = initialResponse.count
+        
+        while currentOffset < totalSize {
+            let remainingBytes = totalSize - currentOffset
+            let chunkSize = min(remainingBytes, Self.maxAPDUResponseLength)
+            
+            // Calculate P1, P2 for offset-based reading
+            // Offset encoding: P1 = (offset >> 8) & 0x7F, P2 = offset & 0xFF
+            let offsetP1 = UInt8((currentOffset >> 8) & 0x7F)
+            let offsetP2 = UInt8(currentOffset & 0xFF)
+            
+            let chunkCommand = NFCISO7816APDU(
+                instructionClass: 0x00,
+                instructionCode: Command.readBinary,
+                p1Parameter: offsetP1,
+                p2Parameter: offsetP2,
+                data: Data(),
+                expectedResponseLength: chunkSize
+            )
+            
+            let (chunkData, chunkSW1, chunkSW2) = try await tag.sendCommand(apdu: chunkCommand)
+            try checkStatusWord(sw1: chunkSW1, sw2: chunkSW2)
+            
+            allData.append(chunkData)
+            currentOffset += chunkData.count
+            
+            // Safety check to prevent infinite loops
+            if chunkData.isEmpty {
+                break
+            }
+        }
+        
+        return allData
     }
     
     // 暗号化・復号化処理
