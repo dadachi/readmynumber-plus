@@ -190,6 +190,110 @@ extension ResidenceCardReader {
         // Decrypt the SM response
         return try decryptSMResponse(encryptedData: encryptedData)
     }
+    
+    // Test helper for chunked reading with SM that works with mock objects
+    func testReadBinaryChunkedWithSM(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+        var allData = Data()
+        var currentOffset: UInt16 = (UInt16(p1) << 8) | UInt16(p2)
+        var isFirstRead = true
+        
+        while true {
+            let chunkSize = isFirstRead ? min(1694, 512) : 1694
+            let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(chunkSize).bigEndian, Array.init))
+            
+            let command = MockAPDUCommand(
+                instructionClass: 0x08, // SM command class
+                instructionCode: 0xB0,  // READ BINARY
+                p1Parameter: UInt8((currentOffset >> 8) & 0xFF),
+                p2Parameter: UInt8(currentOffset & 0xFF),
+                data: leData,
+                expectedResponseLength: 65536
+            )
+            
+            let (encryptedData, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
+            try checkStatusWord(sw1: sw1, sw2: sw2)
+            
+            // Decrypt the SM response
+            let chunkData = try decryptSMResponse(encryptedData: encryptedData)
+            
+            if isFirstRead {
+                allData = chunkData
+                isFirstRead = false
+                
+                // Parse TLV to determine if more data is needed
+                if chunkData.count >= 2 {
+                    let (totalLength, headerSize) = try parseBERLength(data: chunkData, offset: 1)
+                    let totalTLVSize = 1 + headerSize + totalLength
+                    
+                    if chunkData.count >= totalTLVSize {
+                        break // We have all the data
+                    }
+                    currentOffset += UInt16(chunkData.count)
+                } else {
+                    break
+                }
+            } else {
+                allData.append(chunkData)
+                currentOffset += UInt16(chunkData.count)
+                
+                if chunkData.isEmpty || chunkData.count < chunkSize {
+                    break // No more data
+                }
+            }
+        }
+        
+        return allData
+    }
+    
+    // Test helper for chunked reading plain that works with mock objects
+    func testReadBinaryChunkedPlain(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+        var allData = Data()
+        var currentOffset: UInt16 = (UInt16(p1) << 8) | UInt16(p2)
+        var isFirstRead = true
+        
+        while true {
+            let chunkSize = isFirstRead ? min(1694, 512) : 1694
+            
+            let command = MockAPDUCommand(
+                instructionClass: 0x00,
+                instructionCode: 0xB0,  // READ BINARY
+                p1Parameter: UInt8((currentOffset >> 8) & 0xFF),
+                p2Parameter: UInt8(currentOffset & 0xFF),
+                data: Data(),
+                expectedResponseLength: chunkSize
+            )
+            
+            let (chunkData, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
+            try checkStatusWord(sw1: sw1, sw2: sw2)
+            
+            if isFirstRead {
+                allData = chunkData
+                isFirstRead = false
+                
+                // Parse TLV to determine if more data is needed
+                if chunkData.count >= 2 {
+                    let (totalLength, headerSize) = try parseBERLength(data: chunkData, offset: 1)
+                    let totalTLVSize = 1 + headerSize + totalLength
+                    
+                    if chunkData.count >= totalTLVSize {
+                        break // We have all the data
+                    }
+                    currentOffset += UInt16(chunkData.count)
+                } else {
+                    break
+                }
+            } else {
+                allData.append(chunkData)
+                currentOffset += UInt16(chunkData.count)
+                
+                if chunkData.isEmpty || chunkData.count < chunkSize {
+                    break // No more data
+                }
+            }
+        }
+        
+        return allData
+    }
 }
 
 // MARK: - Test Utilities

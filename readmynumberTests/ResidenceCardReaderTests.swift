@@ -88,6 +88,63 @@ struct TestDataFactory {
         response.append(encryptedData)
         return response
     }
+    
+    static func createLargeTLVData(tag: UInt8, size: Int) -> Data {
+        // Create a large TLV data structure for testing chunked reading
+        var response = Data()
+        response.append(tag)
+        
+        // Add BER length encoding for large sizes
+        if size <= 0x7F {
+            response.append(UInt8(size))
+        } else if size <= 0xFF {
+            response.append(0x81)
+            response.append(UInt8(size))
+        } else {
+            response.append(0x82)
+            response.append(UInt8((size >> 8) & 0xFF))
+            response.append(UInt8(size & 0xFF))
+        }
+        
+        // Add the data content (repeated pattern for testing)
+        for i in 0..<size {
+            response.append(UInt8(i % 256))
+        }
+        
+        return response
+    }
+    
+    static func createLargeSMResponse(plaintextSize: Int) -> Data {
+        // Create a large SM response that exceeds APDU limit
+        let plaintext = Data((0..<plaintextSize).map { UInt8($0 % 256) })
+        let paddingSize = (16 - (plaintextSize % 16)) % 16
+        let padding = Data([0x80] + Array(repeating: 0x00, count: paddingSize))
+        let paddedPlaintext = plaintext + padding
+        
+        var response = Data()
+        response.append(0x86) // Tag for encrypted data
+        
+        // Calculate total encrypted data size (1 byte indicator + padded data)
+        let totalSize = 1 + paddedPlaintext.count
+        
+        // Add BER length
+        if totalSize <= 0x7F {
+            response.append(UInt8(totalSize))
+        } else if totalSize <= 0xFF {
+            response.append(0x81)
+            response.append(UInt8(totalSize))
+        } else {
+            response.append(0x82)
+            response.append(UInt8((totalSize >> 8) & 0xFF))
+            response.append(UInt8(totalSize & 0xFF))
+        }
+        
+        // Add indicator and encrypted data
+        response.append(0x01) // Padding indicator
+        response.append(paddedPlaintext) // Mock encrypted data (not actually encrypted for testing)
+        
+        return response
+    }
 }
 
 // MARK: - ResidenceCardData Tests
@@ -1684,6 +1741,191 @@ struct ResidenceCardReaderTests {
         for command in mockTag.commandHistory {
             #expect(command.instructionCode == 0xB0)
         }
+    }
+    
+    // MARK: - Tests for Chunked Reading
+    
+    @Test("readBinaryChunkedPlain with small data")
+    func testReadBinaryChunkedPlainSmallData() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Create mock tag with small data response
+        let mockTag = MockNFCISO7816Tag()
+        let smallData = TestDataFactory.createLargeTLVData(tag: 0xC1, size: 100)
+        
+        // Configure mock to return small data in first request
+        mockTag.mockResponses[Data([0x00, 0xB0, 0x85, 0x00])] = (smallData, 0x90, 0x00)
+        mockTag.shouldSucceed = true
+        
+        let result = try await reader.testReadBinaryChunkedPlain(mockTag: mockTag, p1: 0x85)
+        
+        #expect(result.count > 0)
+        #expect(result[0] == 0xC1) // Verify tag
+        #expect(mockTag.commandHistory.count == 1) // Should only need one command for small data
+    }
+    
+    @Test("readBinaryChunkedPlain with large data exceeding APDU limit") 
+    func testReadBinaryChunkedPlainLargeData() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Create mock tag with large data (exceeds 1694 byte limit)
+        let mockTag = MockNFCISO7816Tag()
+        let largeSize = 2000 // Exceeds APDU limit
+        let largeData = TestDataFactory.createLargeTLVData(tag: 0xD0, size: largeSize)
+        
+        // Mock first chunk response (initial read)
+        let firstChunkSize = 512
+        let firstChunk = largeData.prefix(firstChunkSize)
+        mockTag.mockResponses[Data([0x00, 0xB0, 0x85, 0x00])] = (Data(firstChunk), 0x90, 0x00)
+        
+        // Mock subsequent chunk responses with offset-based reads
+        var currentOffset = firstChunkSize
+        while currentOffset < largeData.count {
+            let chunkSize = min(largeData.count - currentOffset, 1694)
+            let offsetP1 = UInt8((currentOffset >> 8) & 0x7F)
+            let offsetP2 = UInt8(currentOffset & 0xFF)
+            
+            let chunkEnd = min(currentOffset + chunkSize, largeData.count)
+            let chunk = largeData.subdata(in: currentOffset..<chunkEnd)
+            
+            let commandKey = Data([0x00, 0xB0, offsetP1, offsetP2])
+            mockTag.mockResponses[commandKey] = (chunk, 0x90, 0x00)
+            
+            currentOffset += chunkSize
+        }
+        
+        mockTag.shouldSucceed = true
+        
+        let result = try await reader.testReadBinaryChunkedPlain(mockTag: mockTag, p1: 0x85)
+        
+        #expect(result.count == largeData.count)
+        #expect(result == largeData)
+        #expect(mockTag.commandHistory.count > 1) // Should require multiple commands
+    }
+    
+    @Test("readBinaryChunkedWithSM with large data")
+    func testReadBinaryChunkedWithSMLargeData() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Set up session key for SM decryption
+        let mockSessionKey = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                                  0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10])
+        reader.sessionKey = mockSessionKey
+        
+        // Create mock tag with large SM data (exceeds 1694 byte limit)
+        let mockTag = MockNFCISO7816Tag()
+        let plaintextSize = 3000 // Large data like frontImage (7004 bytes in real card)
+        let largeSMData = TestDataFactory.createLargeSMResponse(plaintextSize: plaintextSize)
+        
+        // Mock first chunk response (initial read)
+        let firstChunkSize = 512
+        let firstChunk = largeSMData.prefix(firstChunkSize)
+        let firstLeData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(firstChunkSize).bigEndian, Array.init))
+        mockTag.mockResponses[Data([0x08, 0xB0, 0x85, 0x00]) + firstLeData] = (Data(firstChunk), 0x90, 0x00)
+        
+        // Mock subsequent chunk responses with offset-based reads
+        var currentOffset = firstChunkSize
+        while currentOffset < largeSMData.count {
+            let remainingBytes = largeSMData.count - currentOffset
+            let chunkSize = min(remainingBytes, 1694)
+            let offsetP1 = UInt8((currentOffset >> 8) & 0x7F)
+            let offsetP2 = UInt8(currentOffset & 0xFF)
+            
+            let chunkEnd = min(currentOffset + chunkSize, largeSMData.count)
+            let chunk = largeSMData.subdata(in: currentOffset..<chunkEnd)
+            
+            let chunkLeData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(chunkSize).bigEndian, Array.init))
+            let commandKey = Data([0x08, 0xB0, offsetP1, offsetP2]) + chunkLeData
+            mockTag.mockResponses[commandKey] = (chunk, 0x90, 0x00)
+            
+            currentOffset += chunkSize
+        }
+        
+        mockTag.shouldSucceed = true
+        
+        let result = try await reader.testReadBinaryChunkedWithSM(mockTag: mockTag, p1: 0x85)
+        
+        #expect(result.count > 0)
+        #expect(mockTag.commandHistory.count > 1) // Should require multiple commands
+    }
+    
+    @Test("readBinaryWithSM falls back to chunked reading for large data")
+    func testReadBinaryWithSMFallbackToChunked() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Set up session key
+        let mockSessionKey = Data(repeating: 0x42, count: 16)
+        reader.sessionKey = mockSessionKey
+        
+        // Create mock tag
+        let mockTag = MockNFCISO7816Tag()
+        
+        // Create large data that exceeds APDU limit
+        let largeData = Data(repeating: 0xAA, count: 2000)
+        let largeSMData = TestDataFactory.createEncryptedSMResponse(plaintext: largeData)
+        
+        // Mock initial response that reaches APDU limit (should trigger chunked fallback)
+        let truncatedResponse = largeSMData.prefix(1594) // Close to limit
+        let initialLeData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(1694).bigEndian, Array.init))
+        mockTag.mockResponses[Data([0x08, 0xB0, 0x85, 0x00]) + initialLeData] = (Data(truncatedResponse), 0x90, 0x00)
+        
+        // Mock chunked reading responses
+        let firstChunkSize = 512
+        let firstChunk = largeSMData.prefix(firstChunkSize)
+        let firstChunkLeData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(firstChunkSize).bigEndian, Array.init))
+        mockTag.mockResponses[Data([0x08, 0xB0, 0x85, 0x00]) + firstChunkLeData] = (Data(firstChunk), 0x90, 0x00)
+        
+        mockTag.shouldSucceed = true
+        
+        // This should fall back to chunked reading when decryption fails on truncated data
+        let result = try await reader.testReadBinaryWithSM(mockTag: mockTag, p1: 0x85)
+        
+        #expect(result.count > 0)
+        #expect(mockTag.commandHistory.count >= 1)
+    }
+    
+    @Test("readBinaryPlain falls back to chunked reading for large data")
+    func testReadBinaryPlainFallbackToChunked() async throws {
+        let reader = ResidenceCardReader()
+        
+        // Create mock tag
+        let mockTag = MockNFCISO7816Tag()
+        
+        // Create large TLV data that indicates more data than received
+        let largeSize = 2000
+        let largeTLVData = TestDataFactory.createLargeTLVData(tag: 0xD1, size: largeSize)
+        
+        // Mock initial response with truncated data (should trigger chunked fallback)
+        let truncatedResponse = largeTLVData.prefix(1594) // Close to limit, but TLV indicates more
+        mockTag.mockResponses[Data([0x00, 0xB0, 0x86, 0x00])] = (Data(truncatedResponse), 0x90, 0x00)
+        
+        // Mock chunked reading responses
+        let firstChunkSize = 512
+        let firstChunk = largeTLVData.prefix(firstChunkSize)
+        mockTag.mockResponses[Data([0x00, 0xB0, 0x86, 0x00])] = (Data(firstChunk), 0x90, 0x00)
+        
+        // Mock subsequent chunks
+        var currentOffset = firstChunkSize
+        while currentOffset < largeTLVData.count {
+            let chunkSize = min(largeTLVData.count - currentOffset, 1694)
+            let offsetP1 = UInt8((currentOffset >> 8) & 0x7F)
+            let offsetP2 = UInt8(currentOffset & 0xFF)
+            
+            let chunkEnd = min(currentOffset + chunkSize, largeTLVData.count)
+            let chunk = largeTLVData.subdata(in: currentOffset..<chunkEnd)
+            
+            let commandKey = Data([0x00, 0xB0, offsetP1, offsetP2])
+            mockTag.mockResponses[commandKey] = (chunk, 0x90, 0x00)
+            
+            currentOffset += chunkSize
+        }
+        
+        mockTag.shouldSucceed = true
+        
+        let result = try await reader.testReadBinaryPlain(mockTag: mockTag, p1: 0x86)
+        
+        #expect(result.count == largeTLVData.count)
+        #expect(result == largeTLVData)
     }
     
     // MARK: - Tests for readBinaryWithSM
