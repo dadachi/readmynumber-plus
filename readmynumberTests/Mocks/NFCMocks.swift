@@ -269,8 +269,10 @@ extension ResidenceCardReader {
         let (encryptedData, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
         try checkStatusWord(sw1: sw1, sw2: sw2)
         
-        // Simulate SM decryption
-        return try decryptSMResponse(encryptedData: encryptedData)
+        // Simulate SM decryption without calling real decryptSMResponse
+        // For testing purposes, just return mock decrypted data
+        let offset = (UInt16(p1) << 8) | UInt16(p2)
+        return Data(repeating: UInt8(offset & 0xFF), count: 100) // Return 100 bytes of mock data
     }
 }
 
