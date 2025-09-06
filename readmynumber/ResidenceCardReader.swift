@@ -360,59 +360,21 @@ class ResidenceCardReader: NSObject, ObservableObject {
     
     // バイナリ読み出し（平文、チャンク対応）
     internal func readBinaryChunkedPlain(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        // First, read a small chunk to determine the actual data size from TLV structure
-        let initialChunkSize = min(Self.maxAPDUResponseLength, 512)
+        var allData = Data()
+        var currentOffset: UInt16 = (UInt16(p1) << 8) | UInt16(p2)
         
-        let initialCommand = NFCISO7816APDU(
-            instructionClass: 0x00,
-            instructionCode: Command.readBinary,
-            p1Parameter: p1,
-            p2Parameter: p2,
-            data: Data(),
-            expectedResponseLength: initialChunkSize
-        )
-        
-        let (initialResponse, sw1, sw2) = try await tag.sendCommand(apdu: initialCommand)
-        try checkStatusWord(sw1: sw1, sw2: sw2)
-        
-        // Parse TLV to determine total data size
-        // For plain text, we need to check if this looks like a TLV structure
-        var totalSize = initialResponse.count
-        if initialResponse.count >= 3 {
-            // Try to parse as TLV to get the actual data size
-            do {
-                let (length, headerSize) = try parseBERLength(data: initialResponse, offset: 1)
-                let possibleTotalSize = 1 + headerSize + length // tag + length + value
-                
-                // Only use TLV size if it's reasonable and larger than what we got
-                if possibleTotalSize > initialResponse.count && possibleTotalSize < 65536 {
-                    totalSize = possibleTotalSize
-                }
-            } catch {
-                // Not a valid TLV structure, stick with what we received
-                totalSize = initialResponse.count
-            }
-        }
-        
-        // If we have all the data or it's small enough, return what we have
-        if totalSize <= initialResponse.count || totalSize <= Self.maxAPDUResponseLength {
-            return initialResponse
-        }
-        
-        // Read remaining chunks
-        var allData = initialResponse
-        var currentOffset = initialResponse.count
-        
-        while currentOffset < totalSize {
-            let remainingBytes = totalSize - currentOffset
-            let chunkSize = min(remainingBytes, Self.maxAPDUResponseLength)
+        // Read the entire file content until EOF
+        // Files can contain multiple TLV structures, so we must read everything
+        while true {
+            // Calculate chunk size - use full APDU limit for efficiency
+            let chunkSize = Self.maxAPDUResponseLength
             
             // Calculate P1, P2 for offset-based reading
             // Offset encoding: P1 = (offset >> 8) & 0x7F, P2 = offset & 0xFF
             let offsetP1 = UInt8((currentOffset >> 8) & 0x7F)
             let offsetP2 = UInt8(currentOffset & 0xFF)
             
-            let chunkCommand = NFCISO7816APDU(
+            let command = NFCISO7816APDU(
                 instructionClass: 0x00,
                 instructionCode: Command.readBinary,
                 p1Parameter: offsetP1,
@@ -421,14 +383,40 @@ class ResidenceCardReader: NSObject, ObservableObject {
                 expectedResponseLength: chunkSize
             )
             
-            let (chunkData, chunkSW1, chunkSW2) = try await tag.sendCommand(apdu: chunkCommand)
-            try checkStatusWord(sw1: chunkSW1, sw2: chunkSW2)
+            let (chunkData, sw1, sw2) = try await tag.sendCommand(apdu: command)
+            
+            // Check for EOF condition (6282 = EOF warning, 6B00 = wrong offset/EOF)
+            if sw1 == 0x62 && sw2 == 0x82 {
+                // EOF warning - may have partial data
+                if !chunkData.isEmpty {
+                    allData.append(chunkData)
+                }
+                break
+            } else if sw1 == 0x6B && sw2 == 0x00 {
+                // Wrong offset - we've reached EOF
+                break
+            } else {
+                // Normal response - check status
+                try checkStatusWord(sw1: sw1, sw2: sw2)
+            }
             
             allData.append(chunkData)
-            currentOffset += chunkData.count
+            currentOffset += UInt16(chunkData.count)
+            
+            // If we got less than requested, we've reached EOF
+            if chunkData.count < chunkSize {
+                break
+            }
             
             // Safety check to prevent infinite loops
             if chunkData.isEmpty {
+                break
+            }
+            
+            // Safety check for unreasonably large files
+            if currentOffset > 32768 {
+                // Most residence card files are under 32KB
+                // Image files are the largest at ~7KB
                 break
             }
         }
