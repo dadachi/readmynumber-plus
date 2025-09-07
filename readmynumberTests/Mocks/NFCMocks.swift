@@ -191,67 +191,6 @@ extension ResidenceCardReader {
         return try decryptSMResponse(encryptedData: encryptedData)
     }
     
-    // Test wrapper for chunked reading that simulates the internal chunked logic
-    func testReadBinaryChunkedPlainWrapper(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        // Simulate the chunked reading logic with mock objects
-        var allData = Data()
-        var currentOffset: UInt16 = (UInt16(p1) << 8) | UInt16(p2)
-        var isFirstRead = true
-        let maxChunkSize = 1694 // ResidenceCardReader.maxAPDUResponseLength
-        
-        while true {
-            let chunkSize = isFirstRead ? min(maxChunkSize, 512) : maxChunkSize
-            
-            let command = MockAPDUCommand(
-                instructionClass: 0x00,
-                instructionCode: 0xB0,
-                p1Parameter: UInt8((currentOffset >> 8) & 0xFF),
-                p2Parameter: UInt8(currentOffset & 0xFF),
-                data: Data(),
-                expectedResponseLength: chunkSize
-            )
-            
-            let (chunkData, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
-            try checkStatusWord(sw1: sw1, sw2: sw2)
-            
-            if isFirstRead {
-                allData = chunkData
-                isFirstRead = false
-                
-                // Check if we need more data by parsing TLV structure (simple simulation)
-                if chunkData.count >= 3 {
-                    let tag = chunkData[0]
-                    if chunkData[1] == 0x82 && chunkData.count >= 4 { // Long form BER
-                        let lengthBytes = Int(chunkData[2]) * 256 + Int(chunkData[3])
-                        let totalExpected = 1 + 3 + lengthBytes // tag + length bytes + data
-                        
-                        if totalExpected > chunkData.count {
-                            currentOffset += UInt16(chunkData.count)
-                            continue // Need more data
-                        }
-                    } else if chunkData[1] <= 0x7F { // Short form BER
-                        let totalExpected = 1 + 1 + Int(chunkData[1])
-                        
-                        if totalExpected > chunkData.count {
-                            currentOffset += UInt16(chunkData.count)
-                            continue // Need more data
-                        }
-                    }
-                }
-                break // We have all the data
-            } else {
-                allData.append(chunkData)
-                currentOffset += UInt16(chunkData.count)
-                
-                if chunkData.isEmpty || chunkData.count < chunkSize {
-                    break // No more data
-                }
-            }
-        }
-        
-        return allData
-    }
-    
     // Test wrapper for SM chunked reading
     func testReadBinaryChunkedWithSMWrapper(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
         // For SM, we simulate reading encrypted data and decrypting it
