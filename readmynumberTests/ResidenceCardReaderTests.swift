@@ -1793,9 +1793,9 @@ struct ResidenceCardReaderTests {
         #expect(result == multiTLVData, "Should return all TLV tags concatenated")
     }
     
-    @Test("readBinaryChunkedWithSM with large data")
-    func testReadBinaryChunkedWithSMLargeData() async throws {
-        // Test SM reading with mock data
+    @Test("readBinaryWithSM with encrypted data")
+    func testReadBinaryWithSMEncryptedData() async throws {
+        // Test SM reading with mock encrypted data
         let reader = ResidenceCardReader()
         
         // Set up session key for SM decryption
@@ -1819,8 +1819,8 @@ struct ResidenceCardReaderTests {
         #expect(result.count > 0, "Should return decrypted data")
     }
     
-    @Test("readBinaryWithSM falls back to chunked reading for large data")
-    func testReadBinaryWithSMFallbackToChunked() async throws {
+    @Test("readBinaryWithSM handles different encrypted data sizes")
+    func testReadBinaryWithSMDifferentSizes() async throws {
         let reader = ResidenceCardReader()
         
         // Set up session key
@@ -1842,14 +1842,14 @@ struct ResidenceCardReaderTests {
         #expect(result.count > 0, "Should return decrypted data")
     }
     
-    @Test("readBinaryPlain falls back to chunked reading for large data")
-    func testReadBinaryPlainFallbackToChunked() async throws {
+    @Test("readBinaryPlain handles different data sizes")
+    func testReadBinaryPlainDifferentSizes() async throws {
         let reader = ResidenceCardReader()
         
         // Create mock tag
         let mockTag = MockNFCISO7816Tag()
         
-        // Create test data that would trigger chunked reading
+        // Create test data of different sizes
         let testData = TestDataFactory.createLargeTLVData(tag: 0xD1, size: 100)
         mockTag.mockResponses[Data()] = (testData, 0x90, 0x00)
         mockTag.shouldSucceed = true

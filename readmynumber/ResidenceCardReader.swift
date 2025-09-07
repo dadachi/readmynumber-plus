@@ -213,7 +213,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
     
     // バイナリ読み出し（SMあり）
     internal func readBinaryWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        // Try reading with APDU limit first
+        // Read entire file content with maximum response length
+        // All residence card files fit within 1693 bytes, so no chunking needed
         let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(Self.maxAPDUResponseLength).bigEndian, Array.init))
         
         let command = NFCISO7816APDU(
@@ -228,95 +229,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
         let (encryptedData, sw1, sw2) = try await tag.sendCommand(apdu: command)
         try checkStatusWord(sw1: sw1, sw2: sw2)
         
-        // Try to decrypt the response to see if we have complete data
-        do {
-            let decryptedData = try decryptSMResponse(encryptedData: encryptedData)
-            
-            // Check if the data appears complete by examining the TLV structure
-            // If the response seems truncated, fall back to chunked reading
-            if encryptedData.count >= Self.maxAPDUResponseLength - 100 { // Allow for some overhead
-                // Response might be truncated, try chunked reading
-                return try await readBinaryChunkedWithSM(tag: tag, p1: p1, p2: p2)
-            }
-            
-            return decryptedData
-        } catch {
-            // If decryption fails, it might be due to incomplete data
-            // Try chunked reading as fallback
-            return try await readBinaryChunkedWithSM(tag: tag, p1: p1, p2: p2)
-        }
-    }
-    
-    // バイナリ読み出し（SMあり、チャンク対応）
-    internal func readBinaryChunkedWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        // First, read a small chunk to determine the actual data size from TLV structure
-        let initialChunkSize = min(Self.maxAPDUResponseLength, 512)
-        let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(initialChunkSize).bigEndian, Array.init))
-        
-        let initialCommand = NFCISO7816APDU(
-            instructionClass: 0x08,
-            instructionCode: Command.readBinary,
-            p1Parameter: p1,
-            p2Parameter: p2,
-            data: leData,
-            expectedResponseLength: initialChunkSize
-        )
-        
-        let (initialResponse, sw1, sw2) = try await tag.sendCommand(apdu: initialCommand)
-        try checkStatusWord(sw1: sw1, sw2: sw2)
-        
-        // Parse TLV to determine total data size
-        guard initialResponse.count >= 3,
-              initialResponse[0] == 0x86 else {
-            throw CardReaderError.invalidResponse
-        }
-        
-        let (totalLength, tlvHeaderSize) = try parseBERLength(data: initialResponse, offset: 1)
-        let totalTLVSize = 1 + tlvHeaderSize + totalLength // tag + length + value
-        
-        // If the total data fits in what we already read, return it
-        if totalTLVSize <= initialResponse.count {
-            return try decryptSMResponse(encryptedData: initialResponse)
-        }
-        
-        // Calculate how many additional chunks we need
-        var allData = initialResponse
-        var currentOffset = initialResponse.count
-        
-        while currentOffset < totalTLVSize {
-            let remainingBytes = totalTLVSize - currentOffset
-            let chunkSize = min(remainingBytes, Self.maxAPDUResponseLength)
-            
-            // Calculate P1, P2 for offset-based reading
-            // Offset encoding: P1 = (offset >> 8) & 0x7F, P2 = offset & 0xFF
-            let offsetP1 = UInt8((currentOffset >> 8) & 0x7F)
-            let offsetP2 = UInt8(currentOffset & 0xFF)
-            
-            let chunkLeData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(chunkSize).bigEndian, Array.init))
-            
-            let chunkCommand = NFCISO7816APDU(
-                instructionClass: 0x08,
-                instructionCode: Command.readBinary,
-                p1Parameter: offsetP1,
-                p2Parameter: offsetP2,
-                data: chunkLeData,
-                expectedResponseLength: chunkSize
-            )
-            
-            let (chunkData, chunkSW1, chunkSW2) = try await tag.sendCommand(apdu: chunkCommand)
-            try checkStatusWord(sw1: chunkSW1, sw2: chunkSW2)
-            
-            allData.append(chunkData)
-            currentOffset += chunkData.count
-            
-            // Safety check to prevent infinite loops
-            if chunkData.isEmpty {
-                break
-            }
-        }
-        
-        // Decrypt the complete reassembled data
-        return try decryptSMResponse(encryptedData: allData)
+        // Decrypt and return the complete response
+        return try decryptSMResponse(encryptedData: encryptedData)
     }
     
     // バイナリ読み出し（平文）
