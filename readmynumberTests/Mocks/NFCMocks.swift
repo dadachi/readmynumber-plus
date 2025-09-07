@@ -190,6 +190,29 @@ extension ResidenceCardReader {
         // Decrypt the SM response
         return try decryptSMResponse(encryptedData: encryptedData)
     }
+
+    // Test wrapper for SM chunked reading
+    func testReadBinaryChunkedWithSMWrapper(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+        // For SM, we simulate reading encrypted data and decrypting it
+        let leData = Data([0x96, 0x02, 0x00, 0x00])
+        
+        let command = MockAPDUCommand(
+            instructionClass: 0x08,
+            instructionCode: 0xB0,
+            p1Parameter: p1,
+            p2Parameter: p2,
+            data: leData,
+            expectedResponseLength: 65536
+        )
+        
+        let (encryptedData, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
+        try checkStatusWord(sw1: sw1, sw2: sw2)
+        
+        // Simulate SM decryption without calling real decryptSMResponse
+        // For testing purposes, just return mock decrypted data
+        let offset = (UInt16(p1) << 8) | UInt16(p2)
+        return Data(repeating: UInt8(offset & 0xFF), count: 100) // Return 100 bytes of mock data
+    }
 }
 
 // MARK: - Test Utilities
