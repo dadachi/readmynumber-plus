@@ -1768,28 +1768,29 @@ struct ResidenceCardReaderTests {
         #expect(result == smallData, "Should return the complete data")
     }
     
-    @Test("readBinaryChunkedPlain with large data exceeding APDU limit") 
-    func testReadBinaryChunkedPlainLargeData() async throws {
-        // This test verifies the chunked reading behavior for large data
-        // Since we can't directly call the internal chunked methods with mock objects,
-        // we test the behavior through the test helpers
+    @Test("readBinaryPlain with multiple TLV tags in a single file") 
+    func testReadBinaryPlainMultipleTLVTags() async throws {
+        // This test verifies that readBinaryPlain correctly reads files with multiple TLV tags
+        // (e.g., DF2/EF01 with D2+D3+D4 tags, DF3/EF01 with DA+DB tags)
         
         let reader = ResidenceCardReader()
         let mockTag = MockNFCISO7816Tag()
         
-        // For this test, we'll simulate what happens when data is large
-        // The test helper will handle the chunked reading simulation
-        let largeData = TestDataFactory.createLargeTLVData(tag: 0xD0, size: 500)
+        // Create test data with multiple TLV structures (simulating DF2/EF01)
+        let d2Tag = TestDataFactory.createLargeTLVData(tag: 0xD2, size: 8)   // Date
+        let d3Tag = TestDataFactory.createLargeTLVData(tag: 0xD3, size: 6)   // City code
+        let d4Tag = TestDataFactory.createLargeTLVData(tag: 0xD4, size: 320) // Address
+        let multiTLVData = d2Tag + d3Tag + d4Tag
         
         // Mock the response - keyed by empty data for READ BINARY
-        mockTag.mockResponses[Data()] = (largeData, 0x90, 0x00)
+        mockTag.mockResponses[Data()] = (multiTLVData, 0x90, 0x00)
         mockTag.shouldSucceed = true
         
         // Call the test helper
         let result = try await reader.testReadBinaryPlain(mockTag: mockTag, p1: 0x85)
         
-        // Verify we got the data
-        #expect(result == largeData, "Should return the complete data")
+        // Verify we got all TLV tags
+        #expect(result == multiTLVData, "Should return all TLV tags concatenated")
     }
     
     @Test("readBinaryChunkedWithSM with large data")

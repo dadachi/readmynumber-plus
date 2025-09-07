@@ -321,7 +321,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
     
     // バイナリ読み出し（平文）
     internal func readBinaryPlain(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        // Try reading with APDU limit first
+        // Read entire file content with maximum response length
+        // All residence card files fit within 1693 bytes, so no chunking needed
         let command = NFCISO7816APDU(
             instructionClass: 0x00,
             instructionCode: Command.readBinary,
@@ -334,94 +335,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
         let (data, sw1, sw2) = try await tag.sendCommand(apdu: command)
         try checkStatusWord(sw1: sw1, sw2: sw2)
         
-        // Check if the response might be truncated
-        // If we received close to the maximum response length, the data might be larger
-        if data.count >= Self.maxAPDUResponseLength - 100 { // Allow for some overhead
-            // Try to determine if there's more data by checking TLV structure
-            if data.count >= 3 {
-                do {
-                    let (length, headerSize) = try parseBERLength(data: data, offset: 1)
-                    let expectedTotalSize = 1 + headerSize + length
-                    
-                    if expectedTotalSize > data.count {
-                        // Data is larger than what we received, use chunked reading
-                        return try await readBinaryChunkedPlain(tag: tag, p1: p1, p2: p2)
-                    }
-                } catch {
-                    // If TLV parsing fails, the data might still be truncated
-                    // For safety, use chunked reading if we got a full response
-                    return try await readBinaryChunkedPlain(tag: tag, p1: p1, p2: p2)
-                }
-            }
-        }
-        
         return data
-    }
-    
-    // バイナリ読み出し（平文、チャンク対応）
-    internal func readBinaryChunkedPlain(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        var allData = Data()
-        var currentOffset: UInt16 = (UInt16(p1) << 8) | UInt16(p2)
-        
-        // Read the entire file content until EOF
-        // Files can contain multiple TLV structures, so we must read everything
-        while true {
-            // Calculate chunk size - use full APDU limit for efficiency
-            let chunkSize = Self.maxAPDUResponseLength
-            
-            // Calculate P1, P2 for offset-based reading
-            // Offset encoding: P1 = (offset >> 8) & 0x7F, P2 = offset & 0xFF
-            let offsetP1 = UInt8((currentOffset >> 8) & 0x7F)
-            let offsetP2 = UInt8(currentOffset & 0xFF)
-            
-            let command = NFCISO7816APDU(
-                instructionClass: 0x00,
-                instructionCode: Command.readBinary,
-                p1Parameter: offsetP1,
-                p2Parameter: offsetP2,
-                data: Data(),
-                expectedResponseLength: chunkSize
-            )
-            
-            let (chunkData, sw1, sw2) = try await tag.sendCommand(apdu: command)
-            
-            // Check for EOF condition (6282 = EOF warning, 6B00 = wrong offset/EOF)
-            if sw1 == 0x62 && sw2 == 0x82 {
-                // EOF warning - may have partial data
-                if !chunkData.isEmpty {
-                    allData.append(chunkData)
-                }
-                break
-            } else if sw1 == 0x6B && sw2 == 0x00 {
-                // Wrong offset - we've reached EOF
-                break
-            } else {
-                // Normal response - check status
-                try checkStatusWord(sw1: sw1, sw2: sw2)
-            }
-            
-            allData.append(chunkData)
-            currentOffset += UInt16(chunkData.count)
-            
-            // If we got less than requested, we've reached EOF
-            if chunkData.count < chunkSize {
-                break
-            }
-            
-            // Safety check to prevent infinite loops
-            if chunkData.isEmpty {
-                break
-            }
-            
-            // Safety check for unreasonably large files
-            if currentOffset > 32768 {
-                // Most residence card files are under 32KB
-                // Image files are the largest at ~7KB
-                break
-            }
-        }
-        
-        return allData
     }
     
     // 暗号化・復号化処理
