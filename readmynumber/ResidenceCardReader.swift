@@ -39,6 +39,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
   private var sessionManager: NFCSessionManager
   private var threadDispatcher: ThreadDispatcher
   private var signatureVerifier: SignatureVerifier
+  internal var tdesCryptography: TDESCryptography
   
   // MARK: - Initialization
   
@@ -47,6 +48,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     self.sessionManager = NFCSessionManagerImpl()
     self.threadDispatcher = SystemThreadDispatcher()
     self.signatureVerifier = ResidenceCardSignatureVerifier()
+    self.tdesCryptography = TDESCryptography()
     super.init()
   }
   
@@ -54,11 +56,13 @@ class ResidenceCardReader: NSObject, ObservableObject {
   init(
     sessionManager: NFCSessionManager,
     threadDispatcher: ThreadDispatcher,
-    signatureVerifier: SignatureVerifier
+    signatureVerifier: SignatureVerifier,
+    tdesCryptography: TDESCryptography = TDESCryptography()
   ) {
     self.sessionManager = sessionManager
     self.threadDispatcher = threadDispatcher
     self.signatureVerifier = signatureVerifier
+    self.tdesCryptography = tdesCryptography
     super.init()
   }
   
@@ -73,7 +77,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
   func setDependencies(
     sessionManager: NFCSessionManager? = nil,
     threadDispatcher: ThreadDispatcher? = nil,
-    signatureVerifier: SignatureVerifier? = nil
+    signatureVerifier: SignatureVerifier? = nil,
+    tdesCryptography: TDESCryptography? = nil
   ) {
     if let sessionManager = sessionManager {
       self.sessionManager = sessionManager
@@ -83,6 +88,9 @@ class ResidenceCardReader: NSObject, ObservableObject {
     }
     if let signatureVerifier = signatureVerifier {
       self.signatureVerifier = signatureVerifier
+    }
+    if let tdesCryptography = tdesCryptography {
+      self.tdesCryptography = tdesCryptography
     }
   }
   
@@ -311,7 +319,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     let paddedData = cardNumberData + Data([0x80, 0x00, 0x00, 0x00])
     
     // TDES 2key CBC暗号化
-    return try performTDES(data: paddedData, key: sessionKey, encrypt: true)
+    return try tdesCryptography.performTDES(data: paddedData, key: sessionKey, encrypt: true)
   }
   
   internal func decryptSMResponse(encryptedData: Data) throws -> Data {
@@ -336,7 +344,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     let ciphertext = encryptedData.subdata(in: (nextOffset + 1)..<(nextOffset + length))
     
     // 復号化
-    let decrypted = try performTDES(data: ciphertext, key: sessionKey, encrypt: false)
+    let decrypted = try tdesCryptography.performTDES(data: ciphertext, key: sessionKey, encrypt: false)
     
     // パディング除去
     return try removePadding(data: decrypted)
@@ -717,7 +725,7 @@ extension ResidenceCardReader {
     
     // STEP 4: Triple-DES暗号化
     // CBCモードでPKCS#7パディングを使用（32バイト → 32バイト）
-    let eIFD = try performTDES(data: plaintext, key: kEnc, encrypt: true)
+    let eIFD = try tdesCryptography.performTDES(data: plaintext, key: kEnc, encrypt: true)
     
     // STEP 5: Retail MAC計算（ISO/IEC 9797-1 Algorithm 3）
     // 暗号化データの完全性を保護するため8バイトMACを計算
@@ -726,97 +734,6 @@ extension ResidenceCardReader {
     return (eIFD: eIFD, mIFD: mIFD, rndIFD: rndIFD, kIFD: kIFD)
   }
   
-  /// Triple-DES 暗号化・復号化処理
-  /// 
-  /// 在留カード等仕様書で規定されたTriple-DES（3DES）2-key方式による
-  /// 暗号化または復号化を実行します。
-  /// 
-  /// アルゴリズム仕様:
-  /// - 暗号化アルゴリズム: Triple-DES（3DES）
-  /// - 鍵長: 128ビット（16バイト、2-key方式）
-  /// - 動作モード: CBC（Cipher Block Chaining）
-  /// - パディング: PKCS#7（ISO/IEC 7816-4準拠）
-  /// - 初期化ベクトル: All zeros（0x00 * 8）
-  /// 
-  /// 2-key Triple-DES処理:
-  /// - 暗号化: DES_Encrypt(K1) → DES_Decrypt(K2) → DES_Encrypt(K1)
-  /// - 復号化: DES_Decrypt(K1) → DES_Encrypt(K2) → DES_Decrypt(K1)
-  /// - K1 = key[0..7], K2 = key[8..15]
-  /// 
-  /// セキュリティレベル:
-  /// - 実効鍵長: 112ビット（2-key 3DES）
-  /// - レガシー暗号化方式だが在留カード仕様で必須
-  /// 
-  /// - Parameters:
-  ///   - data: 暗号化または復号化する入力データ
-  ///   - key: 16バイトの暗号化鍵（2-key 3DES用）
-  ///   - encrypt: true=暗号化, false=復号化
-  /// - Returns: 処理されたデータ
-  /// - Throws: CardReaderError.cryptographyError 処理失敗時
-  internal func performTDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
-    guard key.count == 16 else {
-      throw CardReaderError.cryptographyError("Invalid key length: \(key.count), expected 16")
-    }
-    
-    // Convert 2-key (16 bytes) to 3-key (24 bytes) for CommonCrypto
-    // For 2-key 3DES: K1=key[0..7], K2=key[8..15], K3=K1
-    var key3DES = Data()
-    key3DES.append(key)           // K1 and K2 (16 bytes)
-    key3DES.append(key.prefix(8)) // K3 = K1 (8 bytes)
-    
-    // TDES 3-key implementation using CommonCrypto
-    // Allocate enough space for result including padding
-    // For empty data, we still need at least one block
-    let paddedSize = max(kCCBlockSize3DES, ((data.count + kCCBlockSize3DES - 1) / kCCBlockSize3DES) * kCCBlockSize3DES)
-    let bufferSize = paddedSize + kCCBlockSize3DES
-    var result = Data(count: bufferSize)
-    var numBytesProcessed: size_t = 0
-    
-    let operation = encrypt ? CCOperation(kCCEncrypt) : CCOperation(kCCDecrypt)
-    
-    // CommonCrypto APIを使用した3DES処理
-    let status = result.withUnsafeMutableBytes { resultBytes in
-      data.withUnsafeBytes { dataBytes in
-        key3DES.withUnsafeBytes { keyBytes in
-          CCCrypt(operation,
-                  CCAlgorithm(kCCAlgorithm3DES),       // Triple-DES
-                  CCOptions(data.isEmpty || data.count % 8 != 0 ? kCCOptionPKCS7Padding : 0), // 空データまたは8の倍数でない場合はパディング
-                  keyBytes.bindMemory(to: UInt8.self).baseAddress, 
-                  kCCKeySize3DES,                       // 24 bytes for 3DES
-                  nil,                                  // IV = zeros（CBCモード）
-                  dataBytes.bindMemory(to: UInt8.self).baseAddress, 
-                  data.count,                           // data length
-                  resultBytes.bindMemory(to: UInt8.self).baseAddress, 
-                  bufferSize,                           // output buffer size
-                  &numBytesProcessed)
-        }
-      }
-    }
-    
-    guard status == kCCSuccess else {
-      let errorMessage: String
-      switch Int(status) {
-      case Int(kCCParamError):
-        errorMessage = "TDES parameter error"
-      case Int(kCCBufferTooSmall):
-        errorMessage = "TDES buffer too small"
-      case Int(kCCMemoryFailure):
-        errorMessage = "TDES memory failure"
-      case Int(kCCAlignmentError):
-        errorMessage = "TDES alignment error"
-      case Int(kCCDecodeError):
-        errorMessage = "TDES decode error"
-      case Int(kCCUnimplemented):
-        errorMessage = "TDES unimplemented"
-      default:
-        errorMessage = "TDES operation failed with status: \(status)"
-      }
-      throw CardReaderError.cryptographyError(errorMessage)
-    }
-    
-    result.count = numBytesProcessed
-    return result
-  }
   
   /// Retail MAC計算（ISO/IEC 9797-1 Algorithm 3）
   /// 
@@ -1009,7 +926,7 @@ extension ResidenceCardReader {
     
     // STEP 2: 認証データの復号化
     // E.ICCを3DES復号して32バイトの平文認証データを取得
-    let decrypted = try performTDES(data: eICC, key: kEnc, encrypt: false)
+    let decrypted = try tdesCryptography.performTDES(data: eICC, key: kEnc, encrypt: false)
     
     // STEP 3: チャレンジ・レスポンス検証
     // 復号データの先頭8バイトが最初のRND.ICCと一致することを確認
