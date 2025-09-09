@@ -28,7 +28,7 @@ struct ResidenceCardReaderOrchestrationTests {
         
         var completionResult: Result<ResidenceCardData, Error>?
         
-        reader.startReading(cardNumber: "123456789012") { result in
+        reader.startReading(cardNumber: "AB12345678CD") { result in
             completionResult = result
         }
         
@@ -118,7 +118,7 @@ struct ResidenceCardReaderOrchestrationTests {
         
         var completionResult: Result<ResidenceCardData, Error>?
         
-        reader.startReading(cardNumber: "123456789012") { result in
+        reader.startReading(cardNumber: "XY98765432AB") { result in
             completionResult = result
         }
         

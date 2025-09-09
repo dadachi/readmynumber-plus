@@ -1549,6 +1549,137 @@ struct ResidenceCardReaderTests {
         #expect(result.count == 250)
     }
     
+    @Test("SecureMessagingReader readBinaryChunkedWithSM with different chunk sizes")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMDifferentChunkSizes() async throws {
+        let mockExecutor = MockNFCCommandExecutor()
+        let mockReader = MockSecureMessagingReader(commandExecutor: mockExecutor)
+        
+        // Test with different data sizes to simulate various chunking scenarios
+        let testCases: [(Int, String)] = [
+            (50, "Small data - single chunk"),
+            (100, "Exactly one chunk"),
+            (150, "One and a half chunks"),
+            (256, "Multiple full chunks"),
+            (500, "Large data requiring many chunks")
+        ]
+        
+        for (dataSize, description) in testCases {
+            let testData = Data(repeating: 0xCD, count: dataSize)
+            mockReader.mockDecryptedData = testData
+            
+            let result = try await mockReader.readBinaryChunkedWithSM(p1: 0x85, p2: 0x00, maxChunkSize: 100)
+            
+            #expect(result == testData, "Failed for \(description)")
+            #expect(result.count == dataSize, "Wrong size for \(description)")
+        }
+    }
+    
+    @Test("SecureMessagingReader readBinaryChunkedWithSM with TLV data")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMWithTLV() async throws {
+        let mockExecutor = MockNFCCommandExecutor()
+        let mockReader = MockSecureMessagingReader(commandExecutor: mockExecutor)
+        
+        // Create mock TLV-formatted data (simulating real card data structure)
+        var tlvData = Data()
+        tlvData.append(0x5F)  // Tag byte 1
+        tlvData.append(0x2A)  // Tag byte 2
+        tlvData.append(0x82)  // Length indicator (next 2 bytes are length)
+        tlvData.append(0x01)  // Length high byte
+        tlvData.append(0x00)  // Length low byte (256 bytes)
+        tlvData.append(Data(repeating: 0xFF, count: 256))  // Value
+        
+        mockReader.mockDecryptedData = tlvData
+        
+        let result = try await mockReader.readBinaryChunkedWithSM(p1: 0x85, p2: 0x00)
+        
+        #expect(result.count == tlvData.count)
+        #expect(result.starts(with: [0x5F, 0x2A]))  // Verify TLV structure preserved
+    }
+    
+    @Test("SecureMessagingReader readBinaryChunkedWithSM error handling")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMError() async {
+        let mockExecutor = MockNFCCommandExecutor()
+        let mockReader = MockSecureMessagingReader(commandExecutor: mockExecutor)
+        
+        // Configure to throw error
+        mockReader.shouldThrowError = true
+        mockReader.errorToThrow = CardReaderError.invalidResponse
+        
+        do {
+            _ = try await mockReader.readBinaryChunkedWithSM(p1: 0x85, p2: 0x00)
+            #expect(Bool(false), "Should have thrown an error")
+        } catch let error as CardReaderError {
+            #expect(error == .invalidResponse)
+        } catch {
+            #expect(Bool(false), "Wrong error type: \(error)")
+        }
+    }
+    
+    @Test("SecureMessagingReader readBinaryChunkedWithSM with different offsets")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMDifferentOffsets() async throws {
+        let mockExecutor = MockNFCCommandExecutor()
+        let mockReader = MockSecureMessagingReader(commandExecutor: mockExecutor)
+        
+        // Test chunked reading from different file offsets
+        let offsets: [(UInt8, UInt8, String)] = [
+            (0x00, 0x00, "Start of file"),
+            (0x85, 0x00, "Front image offset"),
+            (0x86, 0x00, "Face image offset"),
+            (0x81, 0x00, "Address data offset")
+        ]
+        
+        for (p1, p2, description) in offsets {
+            // Create unique data for each offset
+            let testData = Data(repeating: p1, count: 200)
+            mockReader.mockDecryptedData = testData
+            
+            let result = try await mockReader.readBinaryChunkedWithSM(p1: p1, p2: p2)
+            
+            #expect(result == testData, "Failed for \(description)")
+            #expect(result.count == 200, "Wrong size for \(description)")
+        }
+    }
+    
+    @Test("SecureMessagingReader readBinaryChunkedWithSM with empty data")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMEmptyData() async throws {
+        let mockExecutor = MockNFCCommandExecutor()
+        let mockReader = MockSecureMessagingReader(commandExecutor: mockExecutor)
+        
+        // Test with empty data
+        mockReader.mockDecryptedData = Data()
+        
+        let result = try await mockReader.readBinaryChunkedWithSM(p1: 0x85, p2: 0x00)
+        
+        #expect(result.isEmpty, "Should return empty data")
+        #expect(result.count == 0)
+    }
+    
+    @Test("SecureMessagingReader readBinaryChunkedWithSM boundary conditions")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMBoundaryConditions() async throws {
+        let mockExecutor = MockNFCCommandExecutor()
+        let mockReader = MockSecureMessagingReader(commandExecutor: mockExecutor)
+        
+        // Test boundary conditions
+        let boundaryCases: [(Int, Int, String)] = [
+            (99, 100, "Just under chunk size"),
+            (100, 100, "Exactly chunk size"),
+            (101, 100, "Just over chunk size"),
+            (199, 100, "Just under two chunks"),
+            (200, 100, "Exactly two chunks"),
+            (201, 100, "Just over two chunks")
+        ]
+        
+        for (dataSize, chunkSize, description) in boundaryCases {
+            let testData = Data(repeating: 0xEE, count: dataSize)
+            mockReader.mockDecryptedData = testData
+            
+            let result = try await mockReader.readBinaryChunkedWithSM(p1: 0x85, p2: 0x00, maxChunkSize: chunkSize)
+            
+            #expect(result == testData, "Failed for \(description)")
+            #expect(result.count == dataSize, "Wrong size for \(description)")
+        }
+    }
+    
     @Test("SecureMessagingReader with missing session key")
     func testSecureMessagingReaderMissingSessionKey() async {
         let mockExecutor = MockNFCCommandExecutor()
@@ -3958,5 +4089,136 @@ struct SignatureVerificationTests {
         }
         
         return nil
+    }
+    
+    // MARK: - SecureMessagingReader Tests (Real Implementation)
+    
+    @Test("SecureMessagingReader readBinaryChunkedWithSM success")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMSuccess() async throws {
+        let mockExecutor = MockNFCCommandExecutor()
+        let reader = SecureMessagingReader(commandExecutor: mockExecutor, sessionKey: nil)
+        
+        // Create mock TLV response with small data size that fits in one chunk
+        let mockPlainData = Data([0x5F, 0x01, 0x00, 0x10]) + Data(repeating: 0xAA, count: 16) // 16 bytes of data
+        // For no session key, the SM response should contain the plain data directly after tag/length
+        let mockSMResponse = Data([0x86, UInt8(mockPlainData.count)]) + mockPlainData
+        
+        mockExecutor.configureMockResponse(for: 0xB0, p1: 0x00, p2: 0x00, response: mockSMResponse)
+        
+        let result = try await reader.readBinaryChunkedWithSM(p1: 0x00, p2: 0x00)
+        
+        #expect(result == mockPlainData)
+        #expect(mockExecutor.commandHistory.count == 1)
+        
+        // Verify command structure
+        let command = mockExecutor.commandHistory[0]
+        #expect(command.instructionClass == 0x08)
+        #expect(command.instructionCode == 0xB0)
+        #expect(command.p1Parameter == 0x00)
+        #expect(command.p2Parameter == 0x00)
+        #expect(command.data == Data([0x96, 0x02, 0x00, 0x00]))
+    }
+    
+    @Test("SecureMessagingReader readBinaryChunkedWithSM with chunking")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMWithChunking() async throws {
+        let mockExecutor = MockNFCCommandExecutor()
+        let reader = SecureMessagingReader(commandExecutor: mockExecutor, sessionKey: nil)
+        
+        // Create initial response with TLV indicating data that fits in single response
+        let initialTLVHeader = Data([0x5F, 0x01, 0x00, 0x40]) // 64 bytes expected
+        let initialData = Data(repeating: 0xAA, count: 64) // All 64 bytes in response
+        let initialResponse = initialTLVHeader + initialData
+        let mockSMResponse = Data([0x86, UInt8(initialResponse.count)]) + initialResponse
+        
+        // Configure initial response
+        mockExecutor.configureMockResponse(for: 0xB0, p1: 0x00, p2: 0x00, response: mockSMResponse)
+        
+        // Since all data fits in initial response, no chunking will occur
+        let result = try await reader.readBinaryChunkedWithSM(p1: 0x00, p2: 0x00, maxChunkSize: 100)
+        
+        // Should have made only one command since data fits
+        #expect(mockExecutor.commandHistory.count == 1)
+        
+        // Result should match our expected data
+        #expect(result == initialResponse)
+        #expect(result.count >= 4)
+        #expect(result[0] == 0x5F)
+        #expect(result[1] == 0x01)
+        #expect(result[2] == 0x00)
+        #expect(result[3] == 0x40)
+    }
+    
+    @Test("SecureMessagingReader readBinaryChunkedWithSM with different offsets")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMWithDifferentOffsets() async throws {
+        let mockExecutor = MockNFCCommandExecutor()
+        let reader = SecureMessagingReader(commandExecutor: mockExecutor, sessionKey: nil)
+        
+        // Test with non-zero offset
+        let mockPlainData = Data([0x5F, 0x01, 0x00, 0x20]) + Data(repeating: 0xCC, count: 32)
+        let mockSMResponse = Data([0x86, UInt8(mockPlainData.count)]) + mockPlainData
+        
+        mockExecutor.configureMockResponse(for: 0xB0, p1: 0x01, p2: 0x50, response: mockSMResponse)
+        
+        let result = try await reader.readBinaryChunkedWithSM(p1: 0x01, p2: 0x50) // Offset 0x0150
+        
+        #expect(result == mockPlainData)
+        #expect(mockExecutor.commandHistory.count == 1)
+        
+        let command = mockExecutor.commandHistory[0]
+        #expect(command.p1Parameter == 0x01)
+        #expect(command.p2Parameter == 0x50)
+    }
+    
+    @Test("SecureMessagingReader readBinaryChunkedWithSM error handling")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMError() async throws {
+        let mockExecutor = MockNFCCommandExecutor()
+        let reader = SecureMessagingReader(commandExecutor: mockExecutor, sessionKey: nil)
+        
+        // Configure mock to return error
+        mockExecutor.shouldSucceed = false
+        mockExecutor.errorSW1 = 0x6A
+        mockExecutor.errorSW2 = 0x82
+        
+        await #expect(throws: CardReaderError.self) {
+            _ = try await reader.readBinaryChunkedWithSM(p1: 0x00, p2: 0x00)
+        }
+    }
+    
+    @Test("SecureMessagingReader readBinaryChunkedWithSM invalid response format")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMInvalidResponse() async throws {
+        let mockExecutor = MockNFCCommandExecutor()
+        let reader = SecureMessagingReader(commandExecutor: mockExecutor, sessionKey: nil)
+        
+        // Return response that's too short (less than 4 bytes)
+        let shortData = Data([0x5F, 0x01])
+        let mockSMResponse = Data([0x86, UInt8(shortData.count)]) + shortData
+        
+        mockExecutor.configureMockResponse(for: 0xB0, p1: 0x00, p2: 0x00, response: mockSMResponse)
+        
+        await #expect(throws: CardReaderError.invalidResponse) {
+            _ = try await reader.readBinaryChunkedWithSM(p1: 0x00, p2: 0x00)
+        }
+    }
+    
+    @Test("SecureMessagingReader readBinaryChunkedWithSM with session key")
+    func testSecureMessagingReaderReadBinaryChunkedWithSMWithSessionKey() async throws {
+        let mockExecutor = MockNFCCommandExecutor()
+        let sessionKey = Data(repeating: 0x42, count: 16)
+        let reader = SecureMessagingReader(commandExecutor: mockExecutor, sessionKey: sessionKey)
+        
+        // Test that the session key decryption path works by checking we get a result
+        // Create data that doesn't require padding removal (no 0x01 at start)
+        let plainData = Data([0x5F, 0x01, 0x00, 0x04]) + Data(repeating: 0xDD, count: 4) // 4 bytes of data, 8 bytes total
+        
+        // Create SM response where the "encrypted" data is exactly the plain data
+        // The performDecryption method will just return this as-is since it doesn't start with 0x01
+        let mockSMResponse = Data([0x86, UInt8(plainData.count)]) + plainData
+        
+        mockExecutor.configureMockResponse(for: 0xB0, p1: 0x00, p2: 0x00, response: mockSMResponse)
+        
+        let result = try await reader.readBinaryChunkedWithSM(p1: 0x00, p2: 0x00)
+        
+        // Should get the exact plain data since no padding was removed
+        #expect(result == plainData)
     }
 }
