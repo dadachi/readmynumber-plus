@@ -417,41 +417,9 @@ struct ResidenceCardDetailView: View {
     
     // 画像変換処理
     private func convertImages() {
-        // TIFFからJPEGへ変換
-        // まずUIImageとして直接読み込みを試みる
-        if let tiffImage = UIImage(data: cardData.frontImage) {
-            frontImageJPEG = tiffImage
-            print("Successfully loaded front image as UIImage")
-        } else if cardData.frontImage.count > 100 {
-            // CGImageSourceを使用してTIFFを読み込む
-            if let imageSource = CGImageSourceCreateWithData(cardData.frontImage as CFData, nil),
-               let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
-                frontImageJPEG = UIImage(cgImage: cgImage)
-                print("Successfully loaded front image via CGImageSource")
-            } else {
-                print("Failed to load front image, data size: \(cardData.frontImage.count)")
-            }
-        } else {
-            print("Front image data too small or invalid: \(cardData.frontImage.count) bytes")
-        }
-        
-        // JPEG2000からJPEGへ変換
-        // まずUIImageとして直接読み込みを試みる
-        if let jp2Image = UIImage(data: cardData.faceImage) {
-            faceImageJPEG = jp2Image
-            print("Successfully loaded face image as UIImage")
-        } else if cardData.faceImage.count > 100 {
-            // CGImageSourceを使用してJPEG2000を読み込む
-            if let imageSource = CGImageSourceCreateWithData(cardData.faceImage as CFData, nil),
-               let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
-                faceImageJPEG = UIImage(cgImage: cgImage)
-                print("Successfully loaded face image via CGImageSource")
-            } else {
-                print("Failed to load face image, data size: \(cardData.faceImage.count)")
-            }
-        } else {
-            print("Face image data too small or invalid: \(cardData.faceImage.count) bytes")
-        }
+        let convertedImages = ImageConverter.convertResidenceCardImages(cardData: cardData)
+        frontImageJPEG = convertedImages.front
+        faceImageJPEG = convertedImages.face
     }
     
     // 画像エクスポート処理
