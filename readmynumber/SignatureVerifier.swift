@@ -2,6 +2,56 @@ import Foundation
 import CryptoKit
 import Security
 
+// MARK: - Signature Verifier Protocol
+
+/// Protocol for residence card signature verification
+protocol SignatureVerifier {
+    /// Verify the digital signature of residence card data
+    /// - Parameters:
+    ///   - signatureData: The signature data from DF3/EF01
+    ///   - frontImageData: The front image data from DF1/EF01
+    ///   - faceImageData: The face image data from DF1/EF02
+    /// - Returns: Verification result
+    func verifySignature(
+        signatureData: Data,
+        frontImageData: Data,
+        faceImageData: Data
+    ) -> ResidenceCardSignatureVerifier.VerificationResult
+}
+
+// MARK: - Mock Signature Verifier
+
+/// Mock implementation for testing
+class MockSignatureVerifier: SignatureVerifier {
+    var shouldReturnValid = true
+    var mockError: ResidenceCardSignatureVerifier.VerificationError?
+    var verificationCalls: [(signatureData: Data, frontImageData: Data, faceImageData: Data)] = []
+    
+    func verifySignature(
+        signatureData: Data,
+        frontImageData: Data,
+        faceImageData: Data
+    ) -> ResidenceCardSignatureVerifier.VerificationResult {
+        verificationCalls.append((signatureData, frontImageData, faceImageData))
+        
+        if shouldReturnValid {
+            return ResidenceCardSignatureVerifier.VerificationResult(isValid: true, error: nil, details: nil)
+        } else {
+            return ResidenceCardSignatureVerifier.VerificationResult(
+                isValid: false,
+                error: mockError ?? .invalidCertificate,
+                details: nil
+            )
+        }
+    }
+    
+    func reset() {
+        shouldReturnValid = true
+        mockError = nil
+        verificationCalls.removeAll()
+    }
+}
+
 // MARK: - Residence Card Signature Verifier
 // Implementation of section 3.4.3.1 (署名検証方法) from 在留カード等仕様書
 //
@@ -42,7 +92,7 @@ import Security
 // 8. READ BINARY (00 B0 xx xx Le) - Read signature data in blocks
 //
 // The APDU responses contain the TLV-structured data that this verifier processes.
-public class ResidenceCardSignatureVerifier {
+public class ResidenceCardSignatureVerifier: SignatureVerifier {
     
     // MARK: - Types
     public struct VerificationResult {

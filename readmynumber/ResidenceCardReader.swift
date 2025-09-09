@@ -29,20 +29,61 @@ class ResidenceCardReader: NSObject, ObservableObject {
   private static let maxAPDUResponseLength: Int = 1694
   
   // MARK: - Properties
-  private var session: NFCTagReaderSession?
   private var cardNumber: String = ""
   internal var sessionKey: Data? // Made internal for testing
   internal var readCompletion: ((Result<ResidenceCardData, Error>) -> Void)? // Made internal for testing
   @Published var isReadingInProgress: Bool = false
   
-  // Command executor for testability
+  // Dependency injection for testability
   private var commandExecutor: NFCCommandExecutor?
+  private var sessionManager: NFCSessionManager
+  private var threadDispatcher: ThreadDispatcher
+  private var signatureVerifier: SignatureVerifier
+  
+  // MARK: - Initialization
+  
+  /// Initialize with default implementations
+  override init() {
+    self.sessionManager = NFCSessionManagerImpl()
+    self.threadDispatcher = SystemThreadDispatcher()
+    self.signatureVerifier = ResidenceCardSignatureVerifier()
+    super.init()
+  }
+  
+  /// Initialize with custom dependencies for testing
+  init(
+    sessionManager: NFCSessionManager,
+    threadDispatcher: ThreadDispatcher,
+    signatureVerifier: SignatureVerifier
+  ) {
+    self.sessionManager = sessionManager
+    self.threadDispatcher = threadDispatcher
+    self.signatureVerifier = signatureVerifier
+    super.init()
+  }
   
   // MARK: - Public Methods
   
   /// Set a custom command executor for testing
   func setCommandExecutor(_ executor: NFCCommandExecutor) {
     self.commandExecutor = executor
+  }
+  
+  /// Set dependencies for testing
+  func setDependencies(
+    sessionManager: NFCSessionManager? = nil,
+    threadDispatcher: ThreadDispatcher? = nil,
+    signatureVerifier: SignatureVerifier? = nil
+  ) {
+    if let sessionManager = sessionManager {
+      self.sessionManager = sessionManager
+    }
+    if let threadDispatcher = threadDispatcher {
+      self.threadDispatcher = threadDispatcher
+    }
+    if let signatureVerifier = signatureVerifier {
+      self.signatureVerifier = signatureVerifier
+    }
   }
   
   func startReading(cardNumber: String, completion: @escaping (Result<ResidenceCardData, Error>) -> Void) {
@@ -64,18 +105,20 @@ class ResidenceCardReader: NSObject, ObservableObject {
     }
     
     // Check if we're in test environment (no real NFC or simulator)
-    guard NFCTagReaderSession.readingAvailable else {
+    guard sessionManager.isReadingAvailable else {
       completion(.failure(CardReaderError.nfcNotAvailable))
       return
     }
     
-    DispatchQueue.main.async {
+    threadDispatcher.dispatchToMain {
       self.isReadingInProgress = true
     }
     
-    session = NFCTagReaderSession(pollingOption: .iso14443, delegate: self)
-    session?.alertMessage = "在留カードをiPhoneに近づけてください"
-    session?.begin()
+    sessionManager.startSession(
+      pollingOption: .iso14443,
+      delegate: self,
+      alertMessage: "在留カードをiPhoneに近づけてください"
+    )
   }
   
   // MARK: - Private Methods
@@ -314,7 +357,7 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
   }
   
   func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
-    DispatchQueue.main.async {
+    threadDispatcher.dispatchToMain {
       self.isReadingInProgress = false
     }
     readCompletion?(.failure(error))
@@ -323,27 +366,27 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
   func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
     guard let tag = tags.first,
           case .iso7816(let iso7816Tag) = tag else {
-      session.invalidate(errorMessage: "対応していないカードです")
+      sessionManager.invalidate(errorMessage: "対応していないカードです")
       return
     }
     
     Task {
       do {
-        try await session.connect(to: tag)
+        try await sessionManager.connect(to: tag)
         
         // カード読み取り処理
         let cardData = try await readCard(tag: iso7816Tag)
         
-        await MainActor.run {
-          session.invalidate()
+        await threadDispatcher.dispatchToMainActor {
+          self.sessionManager.invalidate()
           self.isReadingInProgress = false
-          readCompletion?(.success(cardData))
+          self.readCompletion?(.success(cardData))
         }
       } catch {
-        await MainActor.run {
-          session.invalidate(errorMessage: "読み取りに失敗しました")
+        await threadDispatcher.dispatchToMainActor {
+          self.sessionManager.invalidate(errorMessage: "読み取りに失敗しました")
           self.isReadingInProgress = false
-          readCompletion?(.failure(error))
+          self.readCompletion?(.failure(error))
         }
       }
     }
@@ -388,14 +431,13 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
     let signature = try await readBinaryPlain(tag: tag, p1: 0x82)
     
     // 7. 署名検証 (3.4.3.1 署名検証方法)
-    let verifier = ResidenceCardSignatureVerifier()
-    let verificationResult = verifier.verifySignature(
+    let verificationResult = signatureVerifier.verifySignature(
       signatureData: signature,
       frontImageData: frontImage,
       faceImageData: faceImage
     )
     
-    var cardData = ResidenceCardData(
+    let cardData = ResidenceCardData(
       commonData: commonData,
       cardType: cardType,
       frontImage: frontImage,
