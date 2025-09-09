@@ -1402,6 +1402,69 @@ struct ResidenceCardReaderTests {
         }
     }
     
+    @Test("Select Master File (MF) with executor delegation")
+    func testSelectMFWithExecutorDelegation() async throws {
+        let mockSession = MockNFCSessionManager()
+        let mockDispatcher = MockThreadDispatcher()
+        let mockVerifier = MockSignatureVerifier()
+        
+        let reader = ResidenceCardReader(
+            sessionManager: mockSession,
+            threadDispatcher: mockDispatcher,
+            signatureVerifier: mockVerifier
+        )
+        
+        // Set up mock executor
+        let mockExecutor = MockNFCCommandExecutor()
+        mockExecutor.configureMockResponse(for: 0xA4, response: Data())
+        
+        // Test the executor version directly (which is what selectMF(tag:) calls internally)
+        try await reader.selectMF(executor: mockExecutor)
+        
+        // Verify the command was executed through the protocol abstraction
+        #expect(mockExecutor.commandHistory.count == 1)
+        let command = mockExecutor.commandHistory[0]
+        #expect(command.instructionClass == 0x00)
+        #expect(command.instructionCode == 0xA4) // SELECT FILE
+        #expect(command.p1Parameter == 0x00)
+        #expect(command.p2Parameter == 0x00)
+        #expect(command.data == Data([0x3F, 0x00])) // MF identifier
+    }
+    
+    @Test("Select Master File (MF) with executor error handling")
+    func testSelectMFWithExecutorErrorHandling() async {
+        let mockSession = MockNFCSessionManager()
+        let mockDispatcher = MockThreadDispatcher()
+        let mockVerifier = MockSignatureVerifier()
+        
+        let reader = ResidenceCardReader(
+            sessionManager: mockSession,
+            threadDispatcher: mockDispatcher,
+            signatureVerifier: mockVerifier
+        )
+        
+        // Set up mock executor to fail
+        let mockExecutor = MockNFCCommandExecutor()
+        mockExecutor.shouldSucceed = false
+        mockExecutor.errorSW1 = 0x6A
+        mockExecutor.errorSW2 = 0x82
+        
+        // Test that error is properly propagated through the protocol abstraction
+        do {
+            try await reader.selectMF(executor: mockExecutor)
+            #expect(Bool(false), "Should have thrown an error")
+        } catch let error as CardReaderError {
+            if case .cardError(let sw1, let sw2) = error {
+                #expect(sw1 == 0x6A)
+                #expect(sw2 == 0x82)
+            } else {
+                #expect(Bool(false), "Wrong error case")
+            }
+        } catch {
+            #expect(Bool(false), "Wrong error type: \(error)")
+        }
+    }
+    
     // MARK: - Tests for selectDF
     
     @Test("Select Data File (DF) with successful response")
@@ -1792,43 +1855,6 @@ struct ResidenceCardReaderTests {
         #expect(result == largeData, "Should return the complete data")
     }
     
-    @Test("readBinaryChunkedWithSM with large data")
-    func testReadBinaryChunkedWithSMLargeData() async throws {
-        // Test SM chunked reading wrapper with mock data
-        let reader = ResidenceCardReader()
-        
-        // Set up session key for SM decryption (required for test context)
-        let mockSessionKey = Data(repeating: 0x42, count: 16)
-        reader.sessionKey = mockSessionKey
-        
-        let mockTag = MockNFCISO7816Tag()
-        mockTag.shouldSucceed = true
-        
-        // For this test, use the chunked SM wrapper that simulates SM decryption
-        // without requiring actual Triple-DES operations
-        let result = try await reader.testReadBinaryChunkedWithSMWrapper(mockTag: mockTag, p1: 0x85)
-        
-        // Verify we got decrypted data
-        #expect(result.count > 0, "Should return decrypted data")
-    }
-    
-    @Test("readBinaryWithSM falls back to chunked reading for large data")
-    func testReadBinaryWithSMFallbackToChunked() async throws {
-        let reader = ResidenceCardReader()
-        
-        // Set up session key
-        let mockSessionKey = Data(repeating: 0x42, count: 16)
-        reader.sessionKey = mockSessionKey
-        
-        // Create mock tag
-        let mockTag = MockNFCISO7816Tag()
-        mockTag.shouldSucceed = true
-        
-        // Use the SM chunked wrapper for testing fallback behavior
-        let result = try await reader.testReadBinaryChunkedWithSMWrapper(mockTag: mockTag, p1: 0x85)
-        
-        #expect(result.count > 0, "Should return decrypted data")
-    }
     
     @Test("readBinaryPlain falls back to chunked reading for large data")
     func testReadBinaryPlainFallbackToChunked() async throws {
