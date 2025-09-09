@@ -35,7 +35,16 @@ class ResidenceCardReader: NSObject, ObservableObject {
   internal var readCompletion: ((Result<ResidenceCardData, Error>) -> Void)? // Made internal for testing
   @Published var isReadingInProgress: Bool = false
   
+  // Command executor for testability
+  private var commandExecutor: NFCCommandExecutor?
+  
   // MARK: - Public Methods
+  
+  /// Set a custom command executor for testing
+  func setCommandExecutor(_ executor: NFCCommandExecutor) {
+    self.commandExecutor = executor
+  }
+  
   func startReading(cardNumber: String, completion: @escaping (Result<ResidenceCardData, Error>) -> Void) {
     self.readCompletion = completion
     
@@ -73,6 +82,11 @@ class ResidenceCardReader: NSObject, ObservableObject {
   
   // MFの選択
   internal func selectMF(tag: NFCISO7816Tag) async throws {
+    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
+    try await selectMF(executor: executor)
+  }
+  
+  internal func selectMF(executor: NFCCommandExecutor) async throws {
     let command = NFCISO7816APDU(
       instructionClass: 0x00,
       instructionCode: Command.selectFile,
@@ -82,12 +96,17 @@ class ResidenceCardReader: NSObject, ObservableObject {
       expectedResponseLength: -1
     )
     
-    let (_, sw1, sw2) = try await tag.sendCommand(apdu: command)
+    let (_, sw1, sw2) = try await executor.sendCommand(apdu: command)
     try checkStatusWord(sw1: sw1, sw2: sw2)
   }
   
   // DFの選択
   internal func selectDF(tag: NFCISO7816Tag, aid: Data) async throws {
+    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
+    try await selectDF(executor: executor, aid: aid)
+  }
+  
+  internal func selectDF(executor: NFCCommandExecutor, aid: Data) async throws {
     let command = NFCISO7816APDU(
       instructionClass: 0x00,
       instructionCode: Command.selectFile,
@@ -97,7 +116,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
       expectedResponseLength: -1
     )
     
-    let (_, sw1, sw2) = try await tag.sendCommand(apdu: command)
+    let (_, sw1, sw2) = try await executor.sendCommand(apdu: command)
     try checkStatusWord(sw1: sw1, sw2: sw2)
   }
   
@@ -122,6 +141,11 @@ class ResidenceCardReader: NSObject, ObservableObject {
   /// - ISO/IEC 7816-4 セキュアメッセージング
   /// - FIPS 46-3 Triple-DES暗号化標準
   internal func performAuthentication(tag: NFCISO7816Tag) async throws {
+    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
+    try await performAuthentication(executor: executor)
+  }
+  
+  internal func performAuthentication(executor: NFCCommandExecutor) async throws {
     // STEP 1: GET CHALLENGE - ICCチャレンジ取得
     // カードから8バイトのランダムな乱数（RND.ICC）を取得します。
     // この乱数は認証プロセスでリプレイ攻撃を防ぐために使用されます。
@@ -135,7 +159,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
       expectedResponseLength: 8              // RND.ICC: 8バイトの乱数
     )
     
-    let (rndICC, sw1, sw2) = try await tag.sendCommand(apdu: challengeCommand)
+    let (rndICC, sw1, sw2) = try await executor.sendCommand(apdu: challengeCommand)
     try checkStatusWord(sw1: sw1, sw2: sw2)
     
     // STEP 2: 認証鍵生成とセッション鍵交換データ準備
@@ -162,7 +186,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
       expectedResponseLength: 40                    // E.ICC + M.ICC
     )
     
-    let (response, sw1Auth, sw2Auth) = try await tag.sendCommand(apdu: mutualAuthCommand)
+    let (response, sw1Auth, sw2Auth) = try await executor.sendCommand(apdu: mutualAuthCommand)
     try checkStatusWord(sw1: sw1Auth, sw2: sw2Auth)
     
     // STEP 4: カード認証データの検証とセッション鍵生成
@@ -205,7 +229,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
       expectedResponseLength: -1
     )
     
-    let (_, sw1Verify, sw2Verify) = try await tag.sendCommand(apdu: verifyCommand)
+    let (_, sw1Verify, sw2Verify) = try await executor.sendCommand(apdu: verifyCommand)
     try checkStatusWord(sw1: sw1Verify, sw2: sw2Verify)
     
     // 認証完了 - セッション鍵によるセキュアメッセージング通信が確立されました
@@ -213,129 +237,24 @@ class ResidenceCardReader: NSObject, ObservableObject {
   
   // バイナリ読み出し（SMあり）
   internal func readBinaryWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-    // Try reading with APDU limit first
-    let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(Self.maxAPDUResponseLength).bigEndian, Array.init))
-    
-    let command = NFCISO7816APDU(
-      instructionClass: 0x08, // SMコマンド
-      instructionCode: Command.readBinary,
-      p1Parameter: p1,
-      p2Parameter: p2,
-      data: leData,
-      expectedResponseLength: Self.maxAPDUResponseLength
-    )
-    
-    let (encryptedData, sw1, sw2) = try await tag.sendCommand(apdu: command)
-    try checkStatusWord(sw1: sw1, sw2: sw2)
-    
-    // Try to decrypt the response to see if we have complete data
-    do {
-      let decryptedData = try decryptSMResponse(encryptedData: encryptedData)
-      
-      // Check if the data appears complete by examining the TLV structure
-      // If the response seems truncated, fall back to chunked reading
-      if encryptedData.count >= Self.maxAPDUResponseLength - 100 { // Allow for some overhead
-        // Response might be truncated, try chunked reading
-        return try await readBinaryChunkedWithSM(tag: tag, p1: p1, p2: p2)
-      }
-      
-      return decryptedData
-    } catch {
-      // If decryption fails, it might be due to incomplete data
-      // Try chunked reading as fallback
-      return try await readBinaryChunkedWithSM(tag: tag, p1: p1, p2: p2)
-    }
+    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
+    let smReader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
+    return try await smReader.readBinaryWithSM(p1: p1, p2: p2)
   }
   
   // バイナリ読み出し（SMあり、チャンク対応）
   internal func readBinaryChunkedWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-    // First, read a small chunk to determine the actual data size from TLV structure
-    let initialChunkSize = min(Self.maxAPDUResponseLength, 512)
-    let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(initialChunkSize).bigEndian, Array.init))
-    
-    let initialCommand = NFCISO7816APDU(
-      instructionClass: 0x08,
-      instructionCode: Command.readBinary,
-      p1Parameter: p1,
-      p2Parameter: p2,
-      data: leData,
-      expectedResponseLength: initialChunkSize
-    )
-    
-    let (initialResponse, sw1, sw2) = try await tag.sendCommand(apdu: initialCommand)
-    try checkStatusWord(sw1: sw1, sw2: sw2)
-    
-    // Parse TLV to determine total data size
-    guard initialResponse.count >= 3,
-          initialResponse[0] == 0x86 else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    let (totalLength, tlvHeaderSize) = try parseBERLength(data: initialResponse, offset: 1)
-    let totalTLVSize = 1 + tlvHeaderSize + totalLength // tag + length + value
-    
-    // If the total data fits in what we already read, return it
-    if totalTLVSize <= initialResponse.count {
-      return try decryptSMResponse(encryptedData: initialResponse)
-    }
-    
-    // Calculate how many additional chunks we need
-    var allData = initialResponse
-    var currentOffset = initialResponse.count
-    
-    while currentOffset < totalTLVSize {
-      let remainingBytes = totalTLVSize - currentOffset
-      let chunkSize = min(remainingBytes, Self.maxAPDUResponseLength)
-      
-      // Calculate P1, P2 for offset-based reading
-      // Offset encoding: P1 = (offset >> 8) & 0x7F, P2 = offset & 0xFF
-      let offsetP1 = UInt8((currentOffset >> 8) & 0x7F)
-      let offsetP2 = UInt8(currentOffset & 0xFF)
-      
-      let chunkLeData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(chunkSize).bigEndian, Array.init))
-      
-      let chunkCommand = NFCISO7816APDU(
-        instructionClass: 0x08,
-        instructionCode: Command.readBinary,
-        p1Parameter: offsetP1,
-        p2Parameter: offsetP2,
-        data: chunkLeData,
-        expectedResponseLength: chunkSize
-      )
-      
-      let (chunkData, chunkSW1, chunkSW2) = try await tag.sendCommand(apdu: chunkCommand)
-      try checkStatusWord(sw1: chunkSW1, sw2: chunkSW2)
-      
-      allData.append(chunkData)
-      currentOffset += chunkData.count
-      
-      // Safety check to prevent infinite loops
-      if chunkData.isEmpty {
-        break
-      }
-    }
-    
-    // Decrypt the complete reassembled data
-    return try decryptSMResponse(encryptedData: allData)
+    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
+    let smReader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
+    return try await smReader.readBinaryChunkedWithSM(p1: p1, p2: p2)
   }
+  
   
   // バイナリ読み出し（平文）
   internal func readBinaryPlain(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-    // Read entire file content with maximum response length
-    // All residence card files fit within 1693 bytes, so no chunking needed
-    let command = NFCISO7816APDU(
-      instructionClass: 0x00,
-      instructionCode: Command.readBinary,
-      p1Parameter: p1,
-      p2Parameter: p2,
-      data: Data(),
-      expectedResponseLength: Self.maxAPDUResponseLength
-    )
-    
-    let (data, sw1, sw2) = try await tag.sendCommand(apdu: command)
-    try checkStatusWord(sw1: sw1, sw2: sw2)
-    
-    return data
+    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
+    let plainReader = PlainBinaryReader(commandExecutor: executor)
+    return try await plainReader.readBinaryPlain(p1: p1, p2: p2)
   }
   
   // 暗号化・復号化処理
