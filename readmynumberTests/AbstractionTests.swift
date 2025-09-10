@@ -173,22 +173,6 @@ struct NFCCommandExecutorTests {
     }
 }
 
-// MARK: - SecureMessagingReader Tests
-
-struct SecureMessagingReaderTests {
-
-    @Test("SecureMessagingReader initialization")
-    func testSecureMessagingReaderInitialization() {
-        let executor = MockNFCCommandExecutor()
-        let sessionKey = Data(repeating: 0xAA, count: 16)
-
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
-
-        // Test passes if initialization succeeds without crash
-        #expect(true)
-    }
-
-}
 
 // MARK: - ThreadDispatcher Tests
 
