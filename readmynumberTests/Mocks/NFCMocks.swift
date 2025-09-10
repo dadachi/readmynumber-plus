@@ -153,43 +153,6 @@ extension ResidenceCardReader {
         let (_, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
         try checkStatusWord(sw1: sw1, sw2: sw2)
     }
-    
-    // Test helper for readBinaryPlain that works with mock objects
-    func testReadBinaryPlain(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        let command = MockAPDUCommand(
-            instructionClass: 0x00,
-            instructionCode: 0xB0,  // READ BINARY
-            p1Parameter: p1,
-            p2Parameter: p2,
-            data: Data(),
-            expectedResponseLength: 65536
-        )
-        
-        let (data, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
-        try checkStatusWord(sw1: sw1, sw2: sw2)
-        
-        return data
-    }
-    
-    // Test helper for readBinaryWithSM that works with mock objects
-    func testReadBinaryWithSM(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        let leData = Data([0x96, 0x02, 0x00, 0x00])
-        
-        let command = MockAPDUCommand(
-            instructionClass: 0x08, // SM command class
-            instructionCode: 0xB0,  // READ BINARY
-            p1Parameter: p1,
-            p2Parameter: p2,
-            data: leData,
-            expectedResponseLength: 65536
-        )
-        
-        let (encryptedData, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
-        try checkStatusWord(sw1: sw1, sw2: sw2)
-        
-        // Decrypt the SM response
-        return try decryptSMResponse(encryptedData: encryptedData)
-    }
 }
 
 // MARK: - Test Utilities
