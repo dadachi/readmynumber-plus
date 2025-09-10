@@ -12,7 +12,6 @@ import CoreNFC
 class PlainBinaryReader {
     
     private let commandExecutor: NFCCommandExecutor
-    private static let maxAPDUResponseLength: Int = 1693
 
     /// Initialize with an NFC command executor
     /// - Parameter commandExecutor: The executor for sending NFC commands
@@ -27,14 +26,14 @@ class PlainBinaryReader {
     /// - Returns: Plain binary data
     func readBinaryPlain(p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
         // Read entire file content with maximum response length
-        // All residence card files fit within 1693 bytes, so no chunking needed
+        // All residence card files fit within maxAPDUResponseLength bytes, so no chunking needed
         let command = NFCISO7816APDU(
             instructionClass: 0x00,
             instructionCode: 0xB0, // READ BINARY
             p1Parameter: p1,
             p2Parameter: p2,
             data: Data(),
-            expectedResponseLength: Self.maxAPDUResponseLength
+            expectedResponseLength: maxAPDUResponseLength
         )
         
         let (data, sw1, sw2) = try await commandExecutor.sendCommand(apdu: command)

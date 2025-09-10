@@ -9,13 +9,15 @@ import Foundation
 import CoreNFC
 import CryptoKit
 
+/// Maximum APDU response length for NFC card operations
+let maxAPDUResponseLength: Int = 1693
+
 /// Handles Secure Messaging READ BINARY operations for residence cards
 class SecureMessagingReader {
 
     private let commandExecutor: NFCCommandExecutor
     private let sessionKey: Data?
     private let tdesCryptography: TDESCryptography
-    private static let maxAPDUResponseLength: Int = 1693
 
     /// Initialize with an NFC command executor and optional session key
     /// - Parameters:
@@ -34,7 +36,7 @@ class SecureMessagingReader {
     ///   - p2: Parameter 2 (offset low byte)
     /// - Returns: All decrypted data combined
     func readBinaryWithSM(p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-      let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(Self.maxAPDUResponseLength).bigEndian, Array.init))
+      let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(maxAPDUResponseLength).bigEndian, Array.init))
 
         let command = NFCISO7816APDU(
             instructionClass: 0x08, // SM command class
@@ -48,7 +50,7 @@ class SecureMessagingReader {
       let (encryptedData, sw1, sw2) = try await commandExecutor.sendCommand(apdu: command)
       try checkStatusWord(sw1: sw1, sw2: sw2)
 
-      if encryptedData.count >= Self.maxAPDUResponseLength - 100 { // Allow for some overhead
+      if encryptedData.count >= maxAPDUResponseLength - 100 { // Allow for some overhead
         // Response might be truncated, try chunked reading
         return try await readBinaryChunkedWithSM(p1: p1, p2: p2)
       }
@@ -60,7 +62,7 @@ class SecureMessagingReader {
   // バイナリ読み出し（SMあり、チャンク対応）
   internal func readBinaryChunkedWithSM(p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
     // First, read a small chunk to determine the actual data size from TLV structure
-    let initialChunkSize = min(Self.maxAPDUResponseLength, 512)
+    let initialChunkSize = min(maxAPDUResponseLength, 512)
     let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(initialChunkSize).bigEndian, Array.init))
 
     let initialCommand = NFCISO7816APDU(
@@ -95,7 +97,7 @@ class SecureMessagingReader {
 
     while currentOffset < totalTLVSize {
       let remainingBytes = totalTLVSize - currentOffset
-      let chunkSize = min(remainingBytes, Self.maxAPDUResponseLength)
+      let chunkSize = min(remainingBytes, maxAPDUResponseLength)
 
       // Calculate P1, P2 for offset-based reading
       // Offset encoding: P1 = (offset >> 8) & 0x7F, P2 = offset & 0xFF

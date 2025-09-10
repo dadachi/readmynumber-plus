@@ -26,7 +26,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
   // MARK: - APDU Response Limits
   // iOS NFC APDU response limitation remains active as of 2025
   // Reference: https://developer.apple.com/forums/thread/120496
-  private static let maxAPDUResponseLength: Int = 1694
+  // Using global maxAPDUResponseLength constant (1693 bytes)
   
   // MARK: - Properties
   private var cardNumber: String = ""
