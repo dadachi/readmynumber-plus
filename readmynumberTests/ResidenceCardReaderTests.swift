@@ -145,6 +145,29 @@ struct TestDataFactory {
         
         return response
     }
+    
+    static func createValidAddressData() -> Data {
+        // TLV structure for address data
+        var data = Data()
+        data.append(0xDF) // Tag
+        data.append(0x21) // Length indicator
+        data.append(contentsOf: "東京都新宿区西新宿１－１－１".utf8) // Sample address
+        return data
+    }
+    
+    static func createValidSignatureData() -> Data {
+        // TLV structure for signature data with check code and certificate
+        var data = Data()
+        data.append(0x30) // SEQUENCE tag
+        data.append(0x82) // Length indicator (2 bytes follow)
+        data.append(0x01) // Length high byte
+        data.append(0x00) // Length low byte (256 bytes total)
+        
+        // Add mock ASN.1 signature structure
+        data.append(contentsOf: (0..<252).map { UInt8($0 % 256) }) // Mock signature data
+        
+        return data
+    }
 }
 
 // MARK: - ResidenceCardData Tests
@@ -2871,6 +2894,115 @@ struct ResidenceCardReaderTests {
 //        }
 //    }
     
+    @Test("readCard individual operations without authentication")
+    func testReadCardOperations() async throws {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        let sessionKey = Data(repeating: 0xAA, count: 16)
+        
+        // Set up the reader with mock executor and session key
+        reader.setCommandExecutor(executor)
+        reader.sessionKey = sessionKey
+        
+        // Configure mock responses for all operations readCard performs
+        
+        // 1. MF selection (p1=0x00, p2=0x00 for MF)
+        executor.configureMockResponse(for: 0xA4, p1: 0x00, p2: 0x00, response: Data())
+        
+        // 2. Common data and card type reading  
+        let commonData = TestDataFactory.createValidCommonData()
+        let cardType = Data([0x31]) // Residence card type
+        executor.configureMockResponse(for: 0xB0, p1: 0x8B, p2: 0x00, response: commonData)
+        executor.configureMockResponse(for: 0xB0, p1: 0x8A, p2: 0x00, response: cardType)
+        
+        // 3. DF1 selection and image reading (skipping authentication)
+        executor.configureMockResponse(for: 0xA4, p1: 0x04, p2: 0x0C, response: Data())
+        let frontImagePlain = Data([0xFF, 0xD8, 0xFF, 0xE0]) // Small JPEG header
+        let faceImagePlain = Data([0xFF, 0xD8, 0xFF, 0xE1]) // Small JPEG header
+        let frontImageSM = try MockTestUtils.createSingleChunkTestData(plaintext: frontImagePlain, sessionKey: sessionKey)
+        let faceImageSM = try MockTestUtils.createSingleChunkTestData(plaintext: faceImagePlain, sessionKey: sessionKey)
+        executor.configureMockResponse(for: 0xB0, p1: 0x85, p2: 0x00, response: frontImageSM)
+        executor.configureMockResponse(for: 0xB0, p1: 0x86, p2: 0x00, response: faceImageSM)
+        
+        // 4. DF2 selection and address reading
+        executor.configureMockResponse(for: 0xA4, p1: 0x04, p2: 0x0C, response: Data())
+        let address = TestDataFactory.createValidAddressData()
+        executor.configureMockResponse(for: 0xB0, p1: 0x81, p2: 0x00, response: address)
+        
+        // Additional residence card fields
+        let comprehensivePermission = Data([0x01, 0x02, 0x03])
+        let individualPermission = Data([0x04, 0x05, 0x06])
+        let extensionApplication = Data([0x07, 0x08, 0x09])
+        executor.configureMockResponse(for: 0xB0, p1: 0x82, p2: 0x00, response: comprehensivePermission)
+        executor.configureMockResponse(for: 0xB0, p1: 0x83, p2: 0x00, response: individualPermission)
+        executor.configureMockResponse(for: 0xB0, p1: 0x84, p2: 0x00, response: extensionApplication)
+        
+        // 5. DF3 selection and signature reading
+        executor.configureMockResponse(for: 0xA4, p1: 0x04, p2: 0x0C, response: Data())
+        let signature = TestDataFactory.createValidSignatureData()
+
+        // Since it overlaps with comprehensivePermission, p2 is set to 0x01
+        executor.configureMockResponse(for: 0xB0, p1: 0x82, p2: 0x01, response: signature)
+
+        // Test individual operations (skipping authentication)
+        
+        // Test MF selection
+        try await reader.selectMF(executor: executor)
+        
+        // Test reading common data and card type
+        let resultCommonData = try await reader.readBinaryPlain(executor: executor, p1: 0x8B)
+        let resultCardType = try await reader.readBinaryPlain(executor: executor, p1: 0x8A)
+        
+        // Test DF1 selection and image reading
+        let aidDF1 = Data([0xD3, 0x92, 0xF0, 0x00, 0x4F, 0x02, 0x00, 0x00, 
+                           0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        try await reader.selectDF(executor: executor, aid: aidDF1)
+        let resultFrontImage = try await reader.readBinaryWithSM(executor: executor, p1: 0x85)
+        let resultFaceImage = try await reader.readBinaryWithSM(executor: executor, p1: 0x86)
+        
+        // Test DF2 selection and address reading
+        let aidDF2 = Data([0xD3, 0x92, 0xF0, 0x00, 0x4F, 0x03, 0x00, 0x00, 
+                           0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        try await reader.selectDF(executor: executor, aid: aidDF2)
+        let resultAddress = try await reader.readBinaryPlain(executor: executor, p1: 0x81)
+        let resultComprehensive = try await reader.readBinaryPlain(executor: executor, p1: 0x82)
+        let resultIndividual = try await reader.readBinaryPlain(executor: executor, p1: 0x83)
+        let resultExtension = try await reader.readBinaryPlain(executor: executor, p1: 0x84)
+        
+        // Test DF3 selection and signature reading
+        let aidDF3 = Data([0xD3, 0x92, 0xF0, 0x00, 0x4F, 0x04, 0x00, 0x00, 
+                           0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        try await reader.selectDF(executor: executor, aid: aidDF3)
+        // Since it overlaps with comprehensivePermission, p2 is set to 0x01
+        let resultSignature = try await reader.readBinaryPlain(executor: executor, p1: 0x82, p2: 0x01)
+
+        // Verify the results from individual operations
+        #expect(resultCommonData == commonData)
+        #expect(resultCardType == cardType)
+        #expect(resultFrontImage == frontImagePlain) // Should be decrypted plain data
+        #expect(resultFaceImage == faceImagePlain)   // Should be decrypted plain data  
+        #expect(resultAddress == address)
+        #expect(resultSignature == signature)
+        
+        // Verify additional residence card data
+        #expect(resultComprehensive == comprehensivePermission)
+        #expect(resultIndividual == individualPermission)
+        #expect(resultExtension == extensionApplication)
+        
+        // Verify all operations were called
+        #expect(executor.commandHistory.count > 0)
+        
+        // Check that MF selection was called (0xA4 with p1=0x00, p2=0x00 for MF)
+        let mfSelectCommands = executor.commandHistory.filter { 
+            $0.instructionCode == 0xA4 && $0.p1Parameter == 0x00 && $0.p2Parameter == 0x00
+        }
+        #expect(!mfSelectCommands.isEmpty)
+        
+        // Check that READ BINARY commands were called for data reading
+        let readCommands = executor.commandHistory.filter { $0.instructionCode == 0xB0 }
+        #expect(!readCommands.isEmpty)
+    }
+    
 }
 
 // MARK: - ResidenceCardDataManager Tests
@@ -3657,6 +3789,7 @@ struct FrontImageLoadingTests {
         let testImage = UIGraphicsGetImageFromCurrentImageContext() ?? UIImage()
         return testImage.jpegData(compressionQuality: 0.9) ?? Data()
     }
+    
 }
 
 // MARK: - Signature Verification Tests
