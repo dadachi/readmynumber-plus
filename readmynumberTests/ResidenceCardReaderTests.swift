@@ -4514,4 +4514,129 @@ struct PerformAuthenticationLinesTests {
         let result3 = cardData.parseTLV(data: testData, tag: 0xC2)
         #expect(result3 == nil) // Not reached due to break on unsupported encoding
     }
+    
+    @Test("readCard operations with large images (1694+ bytes)")
+    func testReadCardOperationsWithLargeImages() async throws {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        let sessionKey = Data(repeating: 0xAA, count: 16)
+        
+        // Set up the reader with mock executor and session key
+        reader.setCommandExecutor(executor)
+        reader.sessionKey = sessionKey
+        
+        // Configure mock responses for all operations readCard performs
+        
+        // 1. MF selection (p1=0x00, p2=0x00 for MF)
+        executor.configureMockResponse(for: 0xA4, p1: 0x00, p2: 0x00, response: Data())
+        
+        // 2. Common data and card type reading  
+        let commonData = TestDataFactory.createValidCommonData()
+        let cardType = Data([0x31]) // Residence card type
+        executor.configureMockResponse(for: 0xB0, p1: 0x8B, p2: 0x00, response: commonData)
+        executor.configureMockResponse(for: 0xB0, p1: 0x8A, p2: 0x00, response: cardType)
+        
+        // 3. DF1 selection and LARGE image reading (1694+ bytes)
+        executor.configureMockResponse(for: 0xA4, p1: 0x04, p2: 0x0C, response: Data())
+        
+        // Create large image data (1694 bytes for frontImage, 1700 bytes for faceImage)
+        // Large enough to test the 1694+ requirement but not so large as to cause memory issues
+        var frontImagePlain = Data([0xFF, 0xD8, 0xFF, 0xE0]) // JPEG header
+        frontImagePlain.append(Data(repeating: 0xAB, count: 1690)) // Total: 1694 bytes
+        
+        var faceImagePlain = Data([0xFF, 0xD8, 0xFF, 0xE1]) // JPEG header
+        faceImagePlain.append(Data(repeating: 0xCD, count: 1696)) // Total: 1700 bytes
+        
+        // For large data, use single chunk secure messaging (simpler approach)
+        // The large size tests the 1694+ byte requirement without complex chunking
+        let frontImageSM = try MockTestUtils.createSingleChunkTestData(plaintext: frontImagePlain, sessionKey: sessionKey)
+        let faceImageSM = try MockTestUtils.createSingleChunkTestData(plaintext: faceImagePlain, sessionKey: sessionKey)
+        
+        // Configure responses for large images with secure messaging
+        executor.configureMockResponse(for: 0xB0, p1: 0x85, p2: 0x00, response: frontImageSM)
+        executor.configureMockResponse(for: 0xB0, p1: 0x86, p2: 0x00, response: faceImageSM)
+        
+        // 4. DF2 selection and address reading
+        executor.configureMockResponse(for: 0xA4, p1: 0x04, p2: 0x0C, response: Data())
+        let address = TestDataFactory.createValidAddress()
+        executor.configureMockResponse(for: 0xB0, p1: 0x81, p2: 0x00, response: address)
+        
+        // Additional residence card fields
+        let comprehensivePermission = Data([0x01, 0x02, 0x03])
+        let individualPermission = Data([0x04, 0x05, 0x06])
+        let extensionApplication = Data([0x07, 0x08, 0x09])
+        executor.configureMockResponse(for: 0xB0, p1: 0x82, p2: 0x00, response: comprehensivePermission)
+        executor.configureMockResponse(for: 0xB0, p1: 0x83, p2: 0x00, response: individualPermission)
+        executor.configureMockResponse(for: 0xB0, p1: 0x84, p2: 0x00, response: extensionApplication)
+        
+        // 5. DF3 selection and signature reading
+        executor.configureMockResponse(for: 0xA4, p1: 0x04, p2: 0x0C, response: Data())
+        let signature = Data(repeating: 0xFF, count: 256) // Mock signature data
+        executor.configureMockResponse(for: 0xB0, p1: 0x82, p2: 0x01, response: signature)
+        
+        // Test individual operations
+        
+        // Test MF selection
+        try await reader.selectMF(executor: executor)
+        
+        // Test reading common data and card type
+        let resultCommonData = try await reader.readBinaryPlain(executor: executor, p1: 0x8B)
+        let resultCardType = try await reader.readBinaryPlain(executor: executor, p1: 0x8A)
+        
+        // Test DF1 selection and LARGE image reading
+        let aidDF1 = Data([0xD3, 0x92, 0xF0, 0x00, 0x4F, 0x02, 0x00, 0x00, 
+                           0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        try await reader.selectDF(executor: executor, aid: aidDF1)
+        
+        // Read large images with Secure Messaging
+        let resultFrontImage = try await reader.readBinaryWithSM(executor: executor, p1: 0x85)
+        let resultFaceImage = try await reader.readBinaryWithSM(executor: executor, p1: 0x86)
+        
+        // Test DF2 selection and address reading
+        let aidDF2 = Data([0xD3, 0x92, 0xF0, 0x00, 0x4F, 0x03, 0x00, 0x00, 
+                           0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        try await reader.selectDF(executor: executor, aid: aidDF2)
+        let resultAddress = try await reader.readBinaryPlain(executor: executor, p1: 0x81)
+        let resultComprehensive = try await reader.readBinaryPlain(executor: executor, p1: 0x82)
+        let resultIndividual = try await reader.readBinaryPlain(executor: executor, p1: 0x83)
+        let resultExtension = try await reader.readBinaryPlain(executor: executor, p1: 0x84)
+        
+        // Test DF3 selection and signature reading
+        let aidDF3 = Data([0xD3, 0x92, 0xF0, 0x00, 0x4F, 0x04, 0x00, 0x00, 
+                           0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        try await reader.selectDF(executor: executor, aid: aidDF3)
+        let resultSignature = try await reader.readBinaryPlain(executor: executor, p1: 0x82, p2: 0x01)
+        
+        // Verify the results from individual operations
+        #expect(resultCommonData == commonData)
+        #expect(resultCardType == cardType)
+        
+        // Verify LARGE images were properly read and decrypted
+        #expect(resultFrontImage.count == 1694) // Should be decrypted to exact size
+        #expect(resultFrontImage.prefix(4) == Data([0xFF, 0xD8, 0xFF, 0xE0])) // JPEG header preserved
+        #expect(resultFaceImage.count == 1700) // Should be decrypted to exact size
+        #expect(resultFaceImage.prefix(4) == Data([0xFF, 0xD8, 0xFF, 0xE1])) // JPEG header preserved
+        
+        #expect(resultAddress == address)
+        #expect(resultSignature == signature)
+        
+        // Verify additional residence card data
+        #expect(resultComprehensive == comprehensivePermission)
+        #expect(resultIndividual == individualPermission)
+        #expect(resultExtension == extensionApplication)
+        
+        // Verify that READ BINARY commands were used for all card operations
+        let readBinaryCommands = executor.commandHistory.filter { $0.instructionCode == 0xB0 }
+        #expect(readBinaryCommands.count >= 8) // Should have reads for all card fields
+        
+        // Verify that front and face image reads were called
+        let frontImageReads = readBinaryCommands.filter { $0.p1Parameter == 0x85 }
+        let faceImageReads = readBinaryCommands.filter { $0.p1Parameter == 0x86 }
+        #expect(frontImageReads.count >= 1) // At least one read for front image
+        #expect(faceImageReads.count >= 1) // At least one read for face image
+        
+        // Verify that large images were handled successfully despite their size
+        #expect(frontImageReads.first != nil) // Front image read command was executed
+        #expect(faceImageReads.first != nil) // Face image read command was executed
+    }
 }
