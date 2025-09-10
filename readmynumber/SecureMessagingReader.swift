@@ -82,7 +82,7 @@ class SecureMessagingReader {
     }
 
     let (totalLength, tlvHeaderSize) = try parseBERLength(data: initialResponse, offset: 1)
-    let totalTLVSize = 1 + tlvHeaderSize + totalLength // tag + length + value
+    let totalTLVSize = tlvHeaderSize + totalLength
 
     // If the total data fits in what we already read, return it
     if totalTLVSize <= initialResponse.count {
