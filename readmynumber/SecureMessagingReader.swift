@@ -11,7 +11,7 @@ import CryptoKit
 
 /// Handles Secure Messaging READ BINARY operations for residence cards
 class SecureMessagingReader {
-    
+
     private let commandExecutor: NFCCommandExecutor
     private let sessionKey: Data?
     private let tdesCryptography: TDESCryptography
@@ -27,30 +27,6 @@ class SecureMessagingReader {
         self.sessionKey = sessionKey
         self.tdesCryptography = tdesCryptography
     }
-    
-    /// Read binary data with Secure Messaging
-    /// - Parameters:
-    ///   - p1: Parameter 1 (offset high byte)
-    ///   - p2: Parameter 2 (offset low byte)
-    /// - Returns: Decrypted data
-//    func readBinaryWithSM(p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-//        let leData = Data([0x96, 0x02, 0x00, 0x00])
-//        
-//        let command = NFCISO7816APDU(
-//            instructionClass: 0x08, // SM command class
-//            instructionCode: 0xB0,  // READ BINARY
-//            p1Parameter: p1,
-//            p2Parameter: p2,
-//            data: leData,
-//            expectedResponseLength: 65536
-//        )
-//        
-//        let (encryptedData, sw1, sw2) = try await commandExecutor.sendCommand(apdu: command)
-//        try checkStatusWord(sw1: sw1, sw2: sw2)
-//        
-//        // Decrypt the SM response
-//        return try decryptSMResponse(encryptedData: encryptedData)
-//    }
     
     /// Read binary data in chunks with Secure Messaging
     /// - Parameters:
@@ -69,56 +45,6 @@ class SecureMessagingReader {
             expectedResponseLength: 65536
         )
         
-//        let (initialResponse, sw1, sw2) = try await commandExecutor.sendCommand(apdu: initialCommand)
-//        try checkStatusWord(sw1: sw1, sw2: sw2)
-//        
-//        // Decrypt initial response
-//        let decryptedData = try decryptSMResponse(encryptedData: initialResponse)
-//        
-//        // Check if we got the full expected size
-//        guard decryptedData.count >= 4 else {
-//            throw CardReaderError.invalidResponse
-//        }
-//        
-//        // Parse TLV to get expected data size
-//        let dataSize = Int(decryptedData[2]) << 8 | Int(decryptedData[3])
-//        
-//        // If initial response contains all data, return it
-//        if decryptedData.count >= dataSize + 4 {
-//            return decryptedData
-//        }
-//        
-//        // Need to read more chunks
-//        var allData = decryptedData
-//        var currentOffset = decryptedData.count
-//        
-//        while currentOffset < dataSize + 4 {
-//            let remainingBytes = (dataSize + 4) - currentOffset
-//            let chunkSize = min(remainingBytes, maxChunkSize)
-//            
-//            // Calculate offset parameters
-//            let offsetHigh = UInt8((currentOffset >> 8) & 0xFF)
-//            let offsetLow = UInt8(currentOffset & 0xFF)
-//            
-//            let chunkCommand = NFCISO7816APDU(
-//                instructionClass: 0x08, // SM command class
-//                instructionCode: 0xB0,  // READ BINARY
-//                p1Parameter: offsetHigh,
-//                p2Parameter: offsetLow,
-//                data: leData,
-//                expectedResponseLength: 65536
-//            )
-//            
-//            let (chunkData, chunkSW1, chunkSW2) = try await commandExecutor.sendCommand(apdu: chunkCommand)
-//            try checkStatusWord(sw1: chunkSW1, sw2: chunkSW2)
-//            
-//            let decryptedChunk = try decryptSMResponse(encryptedData: chunkData)
-//            allData.append(decryptedChunk)
-//            currentOffset += decryptedChunk.count
-//        }
-//        
-//        return allData
-
       let (encryptedData, sw1, sw2) = try await commandExecutor.sendCommand(apdu: command)
       try checkStatusWord(sw1: sw1, sw2: sw2)
 
@@ -143,7 +69,7 @@ class SecureMessagingReader {
       p1Parameter: p1,
       p2Parameter: p2,
       data: leData,
-      expectedResponseLength: initialChunkSize
+      expectedResponseLength: 65536
     )
 
     let (initialResponse, sw1, sw2) = try await commandExecutor.sendCommand(apdu: initialCommand)
