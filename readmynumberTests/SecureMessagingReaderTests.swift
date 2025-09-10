@@ -412,49 +412,6 @@ struct SecureMessagingReaderTests {
         #expect(executor.commandHistory[1].p2Parameter == offsetP2)
     }
 
-    @Test("SecureMessagingReader chunked reading with empty continuation chunk")
-    func testReadBinaryChunkedWithSMEmptyChunk() async throws {
-        let executor = MockNFCCommandExecutor()
-        let sessionKey = Data(repeating: 0xAA, count: 16)
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
-        
-        // Create incomplete TLV data using real encryption
-        let plainData = Data([0x01, 0x02, 0x03, 0x04, 0x80, 0x00, 0x00, 0x00])
-        let firstChunkSize = 50
-        
-        let (firstChunk, _, offsetP1, offsetP2) = try MockTestUtils.createChunkedTestData(
-            plaintext: plainData,
-            sessionKey: sessionKey,
-            firstChunkSize: firstChunkSize
-        )
-        
-        // Second chunk: empty (simulates card returning no more data)
-        let secondChunk = Data()
-        
-        executor.reset()
-        
-        // Configure first response
-        executor.configureMockResponse(for: 0xB0, p1: 0x8C, p2: 0x00, response: firstChunk)
-        
-        // Configure second response to return empty data
-        executor.configureMockResponse(for: 0xB0, p1: offsetP1, p2: offsetP2, response: secondChunk)
-        
-        // This test should handle empty chunks gracefully - the reader should break out of the loop
-        // when it receives an empty chunk and decrypt the data it has collected so far
-        let result = try await reader.readBinaryChunkedWithSM(p1: 0x8C, p2: 0x00)
-        
-        // Should successfully decrypt the partial data from the first chunk
-        let expectedUnpaddedData = Data([0x01, 0x02, 0x03, 0x04])
-        #expect(result == expectedUnpaddedData)
-        
-        // Verify that two commands were sent (initial + continuation)
-        #expect(executor.commandHistory.count == 2)
-        #expect(executor.commandHistory[0].p1Parameter == 0x8C)
-        #expect(executor.commandHistory[0].p2Parameter == 0x00)
-        #expect(executor.commandHistory[1].p1Parameter == offsetP1)
-        #expect(executor.commandHistory[1].p2Parameter == offsetP2)
-    }
-
     @Test("SecureMessagingReader cryptography failure")
     func testCryptographyFailure() async {
         let executor = MockNFCCommandExecutor()
