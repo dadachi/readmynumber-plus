@@ -2397,6 +2397,205 @@ struct ResidenceCardReaderTests {
         #expect(executor.commandHistory[1].instructionCode == 0x82)
     }
     
+    @Test("readBinaryPlain successful operation")
+    func testReadBinaryPlainSuccess() async throws {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        
+        // Configure successful response with mock data
+        let expectedData = Data([0xCA, 0xFE, 0xBA, 0xBE, 0xDE, 0xAD, 0xBE, 0xEF])
+        executor.configureMockResponse(for: 0xB0, p1: 0x85, p2: 0x00, response: expectedData)
+        
+        // Execute readBinaryPlain
+        let result = try await reader.readBinaryPlain(executor: executor, p1: 0x85)
+        
+        // Verify result
+        #expect(result == expectedData)
+        
+        // Verify command was executed correctly
+        #expect(executor.commandHistory.count == 1)
+        let command = executor.commandHistory[0]
+        #expect(command.instructionClass == 0x00)
+        #expect(command.instructionCode == 0xB0) // READ BINARY
+        #expect(command.p1Parameter == 0x85)
+        #expect(command.p2Parameter == 0x00) // Default value
+        #expect(command.data?.isEmpty ?? true)
+        #expect(command.expectedResponseLength == maxAPDUResponseLength)
+    }
+    
+    @Test("readBinaryPlain with custom P2 parameter")
+    func testReadBinaryPlainCustomP2() async throws {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        
+        // Configure successful response
+        let expectedData = Data([0x01, 0x02, 0x03, 0x04])
+        executor.configureMockResponse(for: 0xB0, p1: 0x81, p2: 0x05, response: expectedData)
+        
+        // Execute readBinaryPlain with custom P2
+        let result = try await reader.readBinaryPlain(executor: executor, p1: 0x81, p2: 0x05)
+        
+        // Verify result
+        #expect(result == expectedData)
+        
+        // Verify command parameters
+        #expect(executor.commandHistory.count == 1)
+        let command = executor.commandHistory[0]
+        #expect(command.instructionClass == 0x00)
+        #expect(command.instructionCode == 0xB0)
+        #expect(command.p1Parameter == 0x81)
+        #expect(command.p2Parameter == 0x05) // Custom value
+        #expect(command.expectedResponseLength == maxAPDUResponseLength)
+    }
+    
+    @Test("readBinaryPlain card error handling")
+    func testReadBinaryPlainCardError() async {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        
+        // Configure executor to fail when no mock response is found
+        executor.shouldSucceed = false
+        executor.errorSW1 = 0x63
+        executor.errorSW2 = 0x00
+        
+        do {
+            _ = try await reader.readBinaryPlain(executor: executor, p1: 0x86)
+            #expect(Bool(false), "Should have thrown an error")
+        } catch let error as CardReaderError {
+            if case .cardError(let sw1, let sw2) = error {
+                #expect(sw1 == 0x63)
+                #expect(sw2 == 0x00)
+            } else {
+                #expect(Bool(false), "Wrong error type: \(error)")
+            }
+        } catch {
+            #expect(Bool(false), "Unexpected error type: \(error)")
+        }
+        
+        // Verify command was attempted
+        #expect(executor.commandHistory.count == 1)
+        #expect(executor.commandHistory[0].instructionCode == 0xB0)
+    }
+    
+    @Test("readBinaryPlain command delegation verification")
+    func testReadBinaryPlainDelegation() async throws {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        
+        // Configure response for different file selections
+        executor.configureMockResponse(for: 0xB0, p1: 0x8A, p2: 0x00, response: Data([0x8A])) // Card type
+        executor.configureMockResponse(for: 0xB0, p1: 0x8B, p2: 0x00, response: Data([0x8B])) // Common data
+        executor.configureMockResponse(for: 0xB0, p1: 0x81, p2: 0x00, response: Data([0x81])) // Address
+        
+        // Test multiple different file reads
+        let cardType = try await reader.readBinaryPlain(executor: executor, p1: 0x8A)
+        let commonData = try await reader.readBinaryPlain(executor: executor, p1: 0x8B)
+        let address = try await reader.readBinaryPlain(executor: executor, p1: 0x81)
+        
+        // Verify results match expected file selections
+        #expect(cardType == Data([0x8A]))
+        #expect(commonData == Data([0x8B]))
+        #expect(address == Data([0x81]))
+        
+        // Verify command history
+        #expect(executor.commandHistory.count == 3)
+        #expect(executor.commandHistory[0].p1Parameter == 0x8A)
+        #expect(executor.commandHistory[1].p1Parameter == 0x8B)
+        #expect(executor.commandHistory[2].p1Parameter == 0x81)
+        
+        // All should be READ BINARY commands
+        for command in executor.commandHistory {
+            #expect(command.instructionClass == 0x00)
+            #expect(command.instructionCode == 0xB0)
+            #expect(command.expectedResponseLength == maxAPDUResponseLength)
+        }
+    }
+    
+    @Test("readBinaryPlain empty response handling")
+    func testReadBinaryPlainEmptyResponse() async throws {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        
+        // Configure empty but successful response
+        executor.configureMockResponse(for: 0xB0, p1: 0x85, p2: 0x00, response: Data())
+        
+        // Execute readBinaryPlain
+        let result = try await reader.readBinaryPlain(executor: executor, p1: 0x87)
+        
+        // Verify empty result is handled correctly
+        #expect(result.isEmpty)
+        
+        // Verify command was executed
+        #expect(executor.commandHistory.count == 1)
+        #expect(executor.commandHistory[0].instructionCode == 0xB0)
+        #expect(executor.commandHistory[0].p1Parameter == 0x87)
+    }
+    
+    @Test("readBinaryPlain large data response")
+    func testReadBinaryPlainLargeData() async throws {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        
+        // Create large data response (close to APDU limit)
+        let largeData = Data(repeating: 0x42, count: 1500)
+        executor.configureMockResponse(for: 0xB0, p1: 0x85, p2: 0x00, response: largeData)
+        
+        // Execute readBinaryPlain
+        let result = try await reader.readBinaryPlain(executor: executor, p1: 0x85)
+        
+        // Verify large data is handled correctly
+        #expect(result == largeData)
+        #expect(result.count == 1500)
+        
+        // Verify command parameters for large response
+        #expect(executor.commandHistory.count == 1)
+        let command = executor.commandHistory[0]
+        #expect(command.expectedResponseLength == maxAPDUResponseLength)
+    }
+    
+    @Test("readBinaryPlain different file selections")
+    func testReadBinaryPlainFileSelections() async throws {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        
+        // Test common residence card file selections with realistic data
+        struct FileTest {
+            let p1: UInt8
+            let name: String
+            let expectedData: Data
+        }
+        
+        let fileTests = [
+            FileTest(p1: 0x8A, name: "Card Type", expectedData: Data([0xC1, 0x01, 0x31])), // TLV for card type "1"
+            FileTest(p1: 0x8B, name: "Common Data", expectedData: Data(repeating: 0x8B, count: 100)),
+            FileTest(p1: 0x81, name: "Address", expectedData: Data([0x81, 0x50] + Array(repeating: 0x41, count: 80))), // Address data
+            FileTest(p1: 0x82, name: "Comprehensive Permission", expectedData: Data([0x82, 0x10] + Array(repeating: 0x50, count: 16))),
+            FileTest(p1: 0x83, name: "Individual Permission", expectedData: Data([0x83, 0x20] + Array(repeating: 0x49, count: 32))),
+            FileTest(p1: 0x84, name: "Extension Application", expectedData: Data([0x84, 0x08] + Array(repeating: 0x45, count: 8)))
+        ]
+        
+        // Configure responses for each file
+        for fileTest in fileTests {
+            executor.configureMockResponse(for: 0xB0, p1: fileTest.p1, p2: 0x00, response: fileTest.expectedData)
+        }
+        
+        // Test each file read
+        for fileTest in fileTests {
+            let result = try await reader.readBinaryPlain(executor: executor, p1: fileTest.p1)
+            #expect(result == fileTest.expectedData, "Failed for \(fileTest.name)")
+        }
+        
+        // Verify all commands were executed
+        #expect(executor.commandHistory.count == fileTests.count)
+        
+        // Verify each command had correct parameters
+        for (index, fileTest) in fileTests.enumerated() {
+            let command = executor.commandHistory[index]
+            #expect(command.p1Parameter == fileTest.p1, "Wrong P1 for \(fileTest.name)")
+            #expect(command.instructionCode == 0xB0, "Wrong instruction for \(fileTest.name)")
+        }
+    }
+    
 }
 
 // MARK: - ResidenceCardDataManager Tests
