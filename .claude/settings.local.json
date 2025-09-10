@@ -20,7 +20,8 @@
       "Bash(xcrun swift test:*)",
       "Bash(timeout:*)",
       "Read(//Users/adachi/Library/Developer/Xcode/DerivedData/**)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",

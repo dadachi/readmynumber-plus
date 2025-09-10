@@ -2263,6 +2263,140 @@ struct ResidenceCardReaderTests {
         #expect(result.count == 8) // Ensures numBytesProcessed was used correctly
     }
     
+    @Test("performAuthentication basic flow")
+    func testPerformAuthentication() async {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        
+        // Test card number for authentication
+        reader.cardNumber = "AB1234567890"
+        
+        // Mock GET CHALLENGE response (8 bytes RND.ICC)
+        let rndICC = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
+        executor.configureMockResponse(for: 0x84, response: rndICC)
+        
+        // Execute authentication - expect it to fail at cryptographic validation
+        // The MUTUAL AUTHENTICATE will return empty Data() by default, which fails MAC verification
+        do {
+            try await reader.performAuthentication(executor: executor)
+            #expect(Bool(false), "Should have thrown an error")
+        } catch let error as CardReaderError {
+            if case .cryptographyError(let message) = error {
+                // MAC verification fails with empty default response
+                #expect(message == "MAC verification failed")
+            } else {
+                #expect(Bool(false), "Wrong error type: \(error)")
+            }
+        } catch {
+            #expect(Bool(false), "Unexpected error type: \(error)")
+        }
+        
+        // Verify command sequence
+        #expect(executor.commandHistory.count == 2)
+        #expect(executor.commandHistory[0].instructionCode == 0x84) // GET CHALLENGE
+        #expect(executor.commandHistory[1].instructionCode == 0x82) // MUTUAL AUTHENTICATE
+    }
+    
+    @Test("performAuthentication GET CHALLENGE failure")
+    func testPerformAuthenticationGetChallengeFailure() async {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        reader.cardNumber = "AB1234567890"
+        
+        // Configure GET CHALLENGE to fail
+        executor.shouldSucceed = false
+        executor.errorSW1 = 0x6A
+        executor.errorSW2 = 0x82
+        
+        do {
+            try await reader.performAuthentication(executor: executor)
+            #expect(Bool(false), "Should have thrown an error")
+        } catch let error as CardReaderError {
+            if case .cardError(let sw1, let sw2) = error {
+                #expect(sw1 == 0x6A)
+                #expect(sw2 == 0x82)
+            } else {
+                #expect(Bool(false), "Wrong error type: \(error)")
+            }
+        } catch {
+            #expect(Bool(false), "Unexpected error type: \(error)")
+        }
+        
+        // Verify only GET CHALLENGE was attempted
+        #expect(executor.commandHistory.count == 1)
+        #expect(executor.commandHistory[0].instructionCode == 0x84)
+    }
+    
+    @Test("performAuthentication MUTUAL AUTHENTICATE failure")
+    func testPerformAuthenticationMutualAuthenticateFailure() async {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        reader.cardNumber = "AB1234567890"
+        
+        // STEP 1: Mock successful GET CHALLENGE
+        let rndICC = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
+        executor.configureMockResponse(for: 0x84, response: rndICC)
+        
+        // STEP 3: Configure MUTUAL AUTHENTICATE to fail
+        executor.configureMockResponse(for: 0x82, response: Data(), sw1: 0x63, sw2: 0x00)
+        
+        do {
+            try await reader.performAuthentication(executor: executor)
+            #expect(Bool(false), "Should have thrown an error")
+        } catch let error as CardReaderError {
+            if case .cardError(let sw1, let sw2) = error {
+                #expect(sw1 == 0x63)
+                #expect(sw2 == 0x00)
+            } else {
+                #expect(Bool(false), "Wrong error type: \(error)")
+            }
+        } catch {
+            #expect(Bool(false), "Unexpected error type: \(error)")
+        }
+        
+        // Verify GET CHALLENGE and MUTUAL AUTHENTICATE were attempted
+        #expect(executor.commandHistory.count == 2)
+        #expect(executor.commandHistory[0].instructionCode == 0x84)
+        #expect(executor.commandHistory[1].instructionCode == 0x82)
+    }
+    
+    @Test("performAuthentication cryptographic validation failure")
+    func testPerformAuthenticationCryptographicFailure() async {
+        let executor = MockNFCCommandExecutor()
+        let reader = ResidenceCardReader()
+        reader.cardNumber = "AB1234567890"
+        
+        // Mock successful GET CHALLENGE
+        let rndICC = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
+        executor.configureMockResponse(for: 0x84, response: rndICC)
+        
+        // Mock MUTUAL AUTHENTICATE with invalid cryptographic data
+        // This will cause MAC verification or decryption validation to fail in verifyAndExtractKICC
+        let eICC = Data(repeating: 0xAB, count: 32)  // Invalid encrypted data
+        let mICC = Data(repeating: 0xCD, count: 8)   // Invalid MAC
+        let mutualAuthResponse = eICC + mICC
+        executor.configureMockResponse(for: 0x82, response: mutualAuthResponse)
+        
+        do {
+            try await reader.performAuthentication(executor: executor)
+            #expect(Bool(false), "Should have thrown a cryptography error")
+        } catch let error as CardReaderError {
+            if case .cryptographyError(let message) = error {
+                // Should fail at MAC verification step
+                #expect(message == "MAC verification failed")
+            } else {
+                #expect(Bool(false), "Wrong error type: \(error)")
+            }
+        } catch {
+            #expect(Bool(false), "Unexpected error type: \(error)")
+        }
+        
+        // Verify GET CHALLENGE and MUTUAL AUTHENTICATE were attempted
+        #expect(executor.commandHistory.count == 2)
+        #expect(executor.commandHistory[0].instructionCode == 0x84)
+        #expect(executor.commandHistory[1].instructionCode == 0x82)
+    }
+    
 }
 
 // MARK: - ResidenceCardDataManager Tests

@@ -29,7 +29,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
   // Using global maxAPDUResponseLength constant (1693 bytes)
   
   // MARK: - Properties
-  private var cardNumber: String = ""
+  internal var cardNumber: String = "" // Made internal for testing
   internal var sessionKey: Data? // Made internal for testing
   internal var readCompletion: ((Result<ResidenceCardData, Error>) -> Void)? // Made internal for testing
   @Published var isReadingInProgress: Bool = false
@@ -132,11 +132,6 @@ class ResidenceCardReader: NSObject, ObservableObject {
   // MARK: - Private Methods
   
   // MFの選択
-  internal func selectMF(tag: NFCISO7816Tag) async throws {
-    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
-    try await selectMF(executor: executor)
-  }
-  
   internal func selectMF(executor: NFCCommandExecutor) async throws {
     let command = NFCISO7816APDU(
       instructionClass: 0x00,
@@ -152,11 +147,6 @@ class ResidenceCardReader: NSObject, ObservableObject {
   }
   
   // DFの選択
-  internal func selectDF(tag: NFCISO7816Tag, aid: Data) async throws {
-    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
-    try await selectDF(executor: executor, aid: aid)
-  }
-  
   internal func selectDF(executor: NFCCommandExecutor, aid: Data) async throws {
     let command = NFCISO7816APDU(
       instructionClass: 0x00,
@@ -191,11 +181,6 @@ class ResidenceCardReader: NSObject, ObservableObject {
   /// - 在留カード等仕様書 3.5.2 認証シーケンス
   /// - ISO/IEC 7816-4 セキュアメッセージング
   /// - FIPS 46-3 Triple-DES暗号化標準
-  internal func performAuthentication(tag: NFCISO7816Tag) async throws {
-    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
-    try await performAuthentication(executor: executor)
-  }
-  
   internal func performAuthentication(executor: NFCCommandExecutor) async throws {
     // STEP 1: GET CHALLENGE - ICCチャレンジ取得
     // カードから8バイトのランダムな乱数（RND.ICC）を取得します。
@@ -287,27 +272,17 @@ class ResidenceCardReader: NSObject, ObservableObject {
   }
   
   // バイナリ読み出し（SMあり）
-  internal func readBinaryWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
+  internal func readBinaryWithSM(executor: NFCCommandExecutor, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
     let smReader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
     return try await smReader.readBinaryWithSM(p1: p1, p2: p2)
   }
-  
-  // バイナリ読み出し（SMあり、チャンク対応）
-  internal func readBinaryChunkedWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
-    let smReader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
-    return try await smReader.readBinaryChunkedWithSM(p1: p1, p2: p2)
-  }
-  
-  
+
   // バイナリ読み出し（平文）
-  internal func readBinaryPlain(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-    let executor = commandExecutor ?? NFCCommandExecutorImpl(tag: tag)
+  internal func readBinaryPlain(executor: NFCCommandExecutor, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
     let plainReader = PlainBinaryReader(commandExecutor: executor)
     return try await plainReader.readBinaryPlain(p1: p1, p2: p2)
   }
-  
+
   // 暗号化・復号化処理
   internal func encryptCardNumber(cardNumber: String, sessionKey: Data) throws -> Data {
     guard let cardNumberData = cardNumber.data(using: .ascii),
@@ -423,31 +398,31 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
   
   internal func readCard(tag: NFCISO7816Tag) async throws -> ResidenceCardData {
     // 1. MF選択
-    try await selectMF(tag: tag)
-    
+    try await selectMF(executor: commandExecutor!)
+
     // 2. 共通データ要素とカード種別の読み取り
-    let commonData = try await readBinaryPlain(tag: tag, p1: 0x8B)
-    let cardType = try await readBinaryPlain(tag: tag, p1: 0x8A)
-    
+    let commonData = try await readBinaryPlain(executor: commandExecutor!, p1: 0x8B)
+    let cardType = try await readBinaryPlain(executor: commandExecutor!, p1: 0x8A)
+
     // 3. 認証処理
-    try await performAuthentication(tag: tag)
-    
+    try await performAuthentication(executor: commandExecutor!)
+
     // 4. DF1選択と券面情報読み取り
-    try await selectDF(tag: tag, aid: AID.df1)
-    let frontImage = try await readBinaryWithSM(tag: tag, p1: 0x85)
-    let faceImage = try await readBinaryWithSM(tag: tag, p1: 0x86)
-    
+    try await selectDF(executor: commandExecutor!, aid: AID.df1)
+    let frontImage = try await readBinaryWithSM(executor: commandExecutor!, p1: 0x85)
+    let faceImage = try await readBinaryWithSM(executor: commandExecutor!, p1: 0x86)
+
     // 5. DF2選択と裏面情報読み取り
-    try await selectDF(tag: tag, aid: AID.df2)
-    let address = try await readBinaryPlain(tag: tag, p1: 0x81)
-    
+    try await selectDF(executor: commandExecutor!, aid: AID.df2)
+    let address = try await readBinaryPlain(executor: commandExecutor!, p1: 0x81)
+
     // 在留カードの場合は追加フィールドを読み取り
     var additionalData: ResidenceCardData.AdditionalData?
     if isResidenceCard(cardType: cardType) {
-      let comprehensivePermission = try await readBinaryPlain(tag: tag, p1: 0x82)
-      let individualPermission = try await readBinaryPlain(tag: tag, p1: 0x83)
-      let extensionApplication = try await readBinaryPlain(tag: tag, p1: 0x84)
-      
+      let comprehensivePermission = try await readBinaryPlain(executor: commandExecutor!, p1: 0x82)
+      let individualPermission = try await readBinaryPlain(executor: commandExecutor!, p1: 0x83)
+      let extensionApplication = try await readBinaryPlain(executor: commandExecutor!, p1: 0x84)
+
       additionalData = ResidenceCardData.AdditionalData(
         comprehensivePermission: comprehensivePermission,
         individualPermission: individualPermission,
@@ -456,9 +431,9 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
     }
     
     // 6. DF3選択と電子署名読み取り
-    try await selectDF(tag: tag, aid: AID.df3)
-    let signature = try await readBinaryPlain(tag: tag, p1: 0x82)
-    
+    try await selectDF(executor: commandExecutor!, aid: AID.df3)
+    let signature = try await readBinaryPlain(executor: commandExecutor!, p1: 0x82)
+
     // 7. 署名検証 (3.4.3.1 署名検証方法)
     let verificationResult = signatureVerifier.verifySignature(
       signatureData: signature,
