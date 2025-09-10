@@ -335,7 +335,7 @@ struct SecureMessagingReaderTests {
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
         
         // Create small single chunk test data using MockTestUtils with real encryption
-        let plainData = Data([0x01, 0x02, 0x03, 0x04, 0x80]) // Small data with ISO7816-4 padding
+        let plainData = Data([0x01, 0x02, 0x03, 0x04, 0x80, 0x00, 0x00, 0x00]) // Small data with ISO7816-4 padding
         let singleChunkData = try MockTestUtils.createSingleChunkTestData(plaintext: plainData, sessionKey: sessionKey)
         
         executor.reset()
@@ -366,7 +366,7 @@ struct SecureMessagingReaderTests {
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
         
         // Create chunked test data using MockTestUtils with real encryption
-        let plainData = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]) // Larger data with padding
+        let plainData = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x80, 0x00, 0x00, 0x00]) // Larger data with padding
         let firstChunkSize = 300
         
         let (firstChunk, secondChunk, offsetP1, offsetP2) = try MockTestUtils.createChunkedTestData(
