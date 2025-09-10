@@ -4431,4 +4431,87 @@ struct PerformAuthenticationLinesTests {
         // The fact that MUTUAL AUTHENTICATE was called with proper data confirms 
         // that the authentication process reached at least line 225 (before lines 237-270)
     }
+    
+    @Test("parseTLV handles unsupported length encoding (lines 1020-1021)")
+    func testParseTLVUnsupportedLengthEncoding() {
+        let cardData = ResidenceCardData(
+            commonData: Data(),
+            cardType: Data(),
+            frontImage: Data(),
+            faceImage: Data(),
+            address: Data(),
+            additionalData: nil,
+            signature: Data(),
+            signatureVerificationResult: nil
+        )
+        
+        // Test with unsupported length encoding 0x83 (should trigger lines 1020-1021)
+        let testDataWith0x83 = Data([
+            0xC0, 0x83, 0x01, 0x00, 0x05,  // Tag C0, length encoding 0x83 (unsupported)
+            0xAA, 0xBB, 0xCC, 0xDD, 0xEE   // 5 bytes of data
+        ])
+        
+        let result1 = cardData.parseTLV(data: testDataWith0x83, tag: 0xC0)
+        #expect(result1 == nil) // Should return nil due to unsupported length encoding
+        
+        // Test with unsupported length encoding 0x84 (should trigger lines 1020-1021)
+        let testDataWith0x84 = Data([
+            0xC1, 0x84, 0x00, 0x00, 0x00, 0x03,  // Tag C1, length encoding 0x84 (unsupported)
+            0xFF, 0xEE, 0xDD                        // 3 bytes of data
+        ])
+        
+        let result2 = cardData.parseTLV(data: testDataWith0x84, tag: 0xC1)
+        #expect(result2 == nil) // Should return nil due to unsupported length encoding
+        
+        // Test with unsupported length encoding 0x85
+        let testDataWith0x85 = Data([
+            0xC2, 0x85, 0x00, 0x00, 0x00, 0x00, 0x02,  // Tag C2, length encoding 0x85 (unsupported)
+            0x12, 0x34                                   // 2 bytes of data
+        ])
+        
+        let result3 = cardData.parseTLV(data: testDataWith0x85, tag: 0xC2)
+        #expect(result3 == nil) // Should return nil due to unsupported length encoding
+    }
+    
+    @Test("parseTLV unsupported encoding with multiple TLV structures")
+    func testParseTLVUnsupportedEncodingWithMultipleTLV() {
+        let cardData = ResidenceCardData(
+            commonData: Data(),
+            cardType: Data(),
+            frontImage: Data(),
+            faceImage: Data(),
+            address: Data(),
+            additionalData: nil,
+            signature: Data(),
+            signatureVerificationResult: nil
+        )
+        
+        // Test data with valid TLV followed by unsupported length encoding
+        // This tests that when the parser encounters unsupported encoding, it breaks (lines 1020-1021)
+        // and doesn't continue parsing, even if there might be valid data after
+        let testData = Data([
+            // First TLV: Valid short form
+            0xC0, 0x04,                     // Tag C0, length 4
+            0x01, 0x02, 0x03, 0x04,        // 4 bytes of data
+            
+            // Second TLV: Unsupported length encoding (should trigger break)
+            0xC1, 0x83, 0x00, 0x02,        // Tag C1, unsupported length encoding 0x83
+            0xAA, 0xBB,                    // 2 bytes of data
+            
+            // Third TLV: Valid short form (should not be reached due to break)
+            0xC2, 0x02,                    // Tag C2, length 2  
+            0xFF, 0xEE                     // 2 bytes of data
+        ])
+        
+        // Should find the first tag (before the unsupported encoding)
+        let result1 = cardData.parseTLV(data: testData, tag: 0xC0)
+        #expect(result1 == Data([0x01, 0x02, 0x03, 0x04]))
+        
+        // Should NOT find tags after the unsupported encoding due to break
+        let result2 = cardData.parseTLV(data: testData, tag: 0xC1)
+        #expect(result2 == nil) // Unsupported length encoding causes break
+        
+        let result3 = cardData.parseTLV(data: testData, tag: 0xC2)
+        #expect(result3 == nil) // Not reached due to break on unsupported encoding
+    }
 }
