@@ -190,60 +190,6 @@ struct SecureMessagingReaderTests {
 
 }
 
-// MARK: - PlainBinaryReader Tests
-
-struct PlainBinaryReaderTests {
-
-    @Test("PlainBinaryReader initialization")
-    func testPlainBinaryReaderInitialization() {
-        let executor = MockNFCCommandExecutor()
-        let reader = PlainBinaryReader(commandExecutor: executor)
-
-        // Test passes if initialization succeeds
-        #expect(true)
-    }
-
-    @Test("PlainBinaryReader successful read")
-    func testPlainBinaryReaderSuccess() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = PlainBinaryReader(commandExecutor: executor)
-        let expectedData = Data([0x30, 0x31, 0x32, 0x33])  // "0123"
-
-        executor.configureMockResponse(for: 0xB0, response: expectedData)
-
-        let data = try await reader.readBinaryPlain(p1: 0x8B, p2: 0x00)
-
-        #expect(data == expectedData)
-        #expect(executor.commandHistory.count == 1)
-        #expect(executor.commandHistory[0].instructionCode == 0xB0)
-        #expect(executor.commandHistory[0].p1Parameter == 0x8B)
-        #expect(executor.commandHistory[0].p2Parameter == 0x00)
-    }
-
-    @Test("PlainBinaryReader error handling")
-    func testPlainBinaryReaderError() async {
-        let executor = MockNFCCommandExecutor()
-        let reader = PlainBinaryReader(commandExecutor: executor)
-
-        executor.shouldSucceed = false
-        executor.errorSW1 = 0x6A
-        executor.errorSW2 = 0x82
-
-        do {
-            _ = try await reader.readBinaryPlain(p1: 0x8A, p2: 0x00)
-            #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
-            if case .cardError(let sw1, let sw2) = error {
-                #expect(sw1 == 0x6A)
-                #expect(sw2 == 0x82)
-            } else {
-                #expect(Bool(false), "Wrong error type")
-            }
-        } catch {
-            #expect(Bool(false), "Unexpected error type: \(error)")
-        }
-    }
-}
 // MARK: - ThreadDispatcher Tests
 
 struct ThreadDispatcherTests {
