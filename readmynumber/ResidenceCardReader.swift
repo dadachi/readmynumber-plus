@@ -322,32 +322,53 @@ class ResidenceCardReader: NSObject, ObservableObject {
     return try tdesCryptography.performTDES(data: paddedData, key: sessionKey, encrypt: true)
   }
   
+  /// Decrypt Secure Messaging response
+  /// 
+  /// セキュアメッセージング応答の復号化処理を SecureMessagingReader に委任します。
+  /// テスト用に公開されているメソッドです。
+  /// 
+  /// - Parameter encryptedData: TLV形式の暗号化データ
+  /// - Returns: 復号化されたデータ（パディング除去済み）
+  /// - Throws: CardReaderError セッションキーがない、データ形式が不正、復号化失敗時
   internal func decryptSMResponse(encryptedData: Data) throws -> Data {
-    // セッションキーの存在確認
-    guard let sessionKey = sessionKey else {
-      throw CardReaderError.cryptographyError("Session key not available")
-    }
-    
-    // TLV構造から暗号化データを取り出す
-    guard encryptedData.count > 3,
-          encryptedData[0] == 0x86 else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    let (length, nextOffset) = try parseBERLength(data: encryptedData, offset: 1)
-    guard encryptedData.count >= nextOffset + length,
-          length > 1,
-          encryptedData[nextOffset] == 0x01 else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    let ciphertext = encryptedData.subdata(in: (nextOffset + 1)..<(nextOffset + length))
-    
-    // 復号化
-    let decrypted = try tdesCryptography.performTDES(data: ciphertext, key: sessionKey, encrypt: false)
-    
-    // パディング除去
-    return try removePadding(data: decrypted)
+    let smReader = SecureMessagingReader(
+      commandExecutor: MockNFCCommandExecutor(), // Tests don't need real executor
+      sessionKey: sessionKey,
+      tdesCryptography: tdesCryptography
+    )
+    return try smReader.decryptSMResponse(encryptedData: encryptedData)
+  }
+  
+  // MARK: - Testing Methods (delegated to SecureMessagingReader)
+  
+  /// Parse BER/DER length encoding - delegated to SecureMessagingReader for testing
+  internal func parseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
+    let smReader = SecureMessagingReader(
+      commandExecutor: MockNFCCommandExecutor(),
+      sessionKey: sessionKey,
+      tdesCryptography: tdesCryptography
+    )
+    return try smReader.testParseBERLength(data: data, offset: offset)
+  }
+  
+  /// Remove padding from decrypted data - delegated to SecureMessagingReader for testing
+  internal func removePadding(data: Data) throws -> Data {
+    let smReader = SecureMessagingReader(
+      commandExecutor: MockNFCCommandExecutor(),
+      sessionKey: sessionKey,
+      tdesCryptography: tdesCryptography
+    )
+    return try smReader.testRemovePadding(data: data)
+  }
+  
+  /// Remove PKCS#7 padding from data - delegated to SecureMessagingReader for testing
+  internal func removePKCS7Padding(data: Data) throws -> Data {
+    let smReader = SecureMessagingReader(
+      commandExecutor: MockNFCCommandExecutor(),
+      sessionKey: sessionKey,
+      tdesCryptography: tdesCryptography
+    )
+    return try smReader.testRemovePKCS7Padding(data: data)
   }
   
   // ステータスワードチェック
@@ -947,76 +968,6 @@ extension ResidenceCardReader {
     return decrypted.suffix(16)
   }
   
-  internal func parseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
-    guard offset < data.count else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    let firstByte = data[offset]
-    
-    if firstByte <= 0x7F {
-      return (Int(firstByte), offset + 1)
-    } else if firstByte == 0x81 {
-      guard offset + 1 < data.count else {
-        throw CardReaderError.invalidResponse
-      }
-      return (Int(data[offset + 1]), offset + 2)
-    } else if firstByte == 0x82 {
-      guard offset + 2 < data.count else {
-        throw CardReaderError.invalidResponse
-      }
-      let length = (Int(data[offset + 1]) << 8) | Int(data[offset + 2])
-      return (length, offset + 3)
-    } else {
-      throw CardReaderError.invalidResponse
-    }
-  }
-  
-  internal func removePadding(data: Data) throws -> Data {
-    guard !data.isEmpty else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    // Try ISO/IEC 7816-4 padding first (0x80 format)
-    if let paddingIndex = data.lastIndex(of: 0x80) {
-      // Check that all bytes after 0x80 are 0x00
-      for i in (paddingIndex + 1)..<data.count {
-        guard data[i] == 0x00 else {
-          // Invalid ISO 7816-4 padding - has non-zero bytes after 0x80
-          // Don't fallback to PKCS#7 if 0x80 is present but invalid
-          throw CardReaderError.invalidResponse
-        }
-      }
-      return data.prefix(paddingIndex)
-    }
-    
-    // No 0x80 found, try PKCS#7 padding
-    return try removePKCS7Padding(data: data)
-  }
-  
-  internal func removePKCS7Padding(data: Data) throws -> Data {
-    guard !data.isEmpty else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    // PKCS#7 パディング除去
-    let paddingLength = Int(data.last!)
-    
-    // パディング長が有効範囲内かチェック
-    guard paddingLength > 0 && paddingLength <= kCCBlockSize3DES && paddingLength <= data.count else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    // パディングバイトがすべて同じ値（パディング長）かチェック
-    let paddingStart = data.count - paddingLength
-    for i in paddingStart..<data.count {
-      guard data[i] == paddingLength else {
-        throw CardReaderError.invalidResponse
-      }
-    }
-    
-    return data.prefix(paddingStart)
-  }
   
   internal func isResidenceCard(cardType: Data) -> Bool {
     // カード種別の判定（C1タグの値が"1"なら在留カード）
