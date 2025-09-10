@@ -183,7 +183,7 @@ class SecureMessagingReader {
     ///   - offset: 長さフィールドの開始位置
     /// - Returns: (解析された長さ, 次のフィールドの開始位置)
     /// - Throws: CardReaderError データが不正な場合
-    private func parseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
+    internal func parseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
         guard offset < data.count else {
             throw CardReaderError.invalidResponse
         }
@@ -216,7 +216,7 @@ class SecureMessagingReader {
     /// - Parameter data: パディング付きデータ
     /// - Returns: パディング除去後のデータ
     /// - Throws: CardReaderError パディングが不正な場合
-    private func removePadding(data: Data) throws -> Data {
+    internal func removePadding(data: Data) throws -> Data {
         guard !data.isEmpty else {
             throw CardReaderError.invalidResponse
         }
@@ -245,7 +245,7 @@ class SecureMessagingReader {
     /// - Parameter data: PKCS#7パディング付きデータ
     /// - Returns: パディング除去後のデータ
     /// - Throws: CardReaderError パディングが不正な場合
-    private func removePKCS7Padding(data: Data) throws -> Data {
+    internal func removePKCS7Padding(data: Data) throws -> Data {
         guard !data.isEmpty else {
             throw CardReaderError.invalidResponse
         }
@@ -267,22 +267,5 @@ class SecureMessagingReader {
         }
         
         return data.prefix(paddingStart)
-    }
-    
-    // MARK: - Testing Methods
-    
-    /// Parse BER/DER length encoding - exposed for testing
-    internal func testParseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
-        return try parseBERLength(data: data, offset: offset)
-    }
-    
-    /// Remove padding from decrypted data - exposed for testing
-    internal func testRemovePadding(data: Data) throws -> Data {
-        return try removePadding(data: data)
-    }
-    
-    /// Remove PKCS#7 padding from data - exposed for testing
-    internal func testRemovePKCS7Padding(data: Data) throws -> Data {
-        return try removePKCS7Padding(data: data)
     }
 }

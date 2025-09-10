@@ -348,7 +348,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
       sessionKey: sessionKey,
       tdesCryptography: tdesCryptography
     )
-    return try smReader.testParseBERLength(data: data, offset: offset)
+    return try smReader.parseBERLength(data: data, offset: offset)
   }
   
   /// Remove padding from decrypted data - delegated to SecureMessagingReader for testing
@@ -358,7 +358,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
       sessionKey: sessionKey,
       tdesCryptography: tdesCryptography
     )
-    return try smReader.testRemovePadding(data: data)
+    return try smReader.removePadding(data: data)
   }
   
   /// Remove PKCS#7 padding from data - delegated to SecureMessagingReader for testing
@@ -368,7 +368,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
       sessionKey: sessionKey,
       tdesCryptography: tdesCryptography
     )
-    return try smReader.testRemovePKCS7Padding(data: data)
+    return try smReader.removePKCS7Padding(data: data)
   }
   
   // ステータスワードチェック

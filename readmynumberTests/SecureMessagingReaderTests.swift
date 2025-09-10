@@ -163,19 +163,19 @@ struct SecureMessagingReaderTests {
 
         // Test short form length (≤ 127)
         let shortData = Data([0x7F])
-        let (shortLength, shortNext) = try reader.testParseBERLength(data: shortData, offset: 0)
+        let (shortLength, shortNext) = try reader.parseBERLength(data: shortData, offset: 0)
         #expect(shortLength == 127)
         #expect(shortNext == 1)
 
         // Test long form with 1 byte length
         let longData1 = Data([0x81, 0xFF])
-        let (longLength1, longNext1) = try reader.testParseBERLength(data: longData1, offset: 0)
+        let (longLength1, longNext1) = try reader.parseBERLength(data: longData1, offset: 0)
         #expect(longLength1 == 255)
         #expect(longNext1 == 2)
 
         // Test long form with 2 bytes length  
         let longData2 = Data([0x82, 0x01, 0x00])
-        let (longLength2, longNext2) = try reader.testParseBERLength(data: longData2, offset: 0)
+        let (longLength2, longNext2) = try reader.parseBERLength(data: longData2, offset: 0)
         #expect(longLength2 == 256)
         #expect(longNext2 == 3)
     }
@@ -190,7 +190,7 @@ struct SecureMessagingReaderTests {
         // Test offset out of bounds
         let data = Data([0x81])
         do {
-            _ = try reader.testParseBERLength(data: data, offset: 5)
+            _ = try reader.parseBERLength(data: data, offset: 5)
             #expect(Bool(false), "Should have thrown error for out of bounds offset")
         } catch let error as CardReaderError {
             if case .invalidResponse = error {
@@ -205,7 +205,7 @@ struct SecureMessagingReaderTests {
         // Test incomplete long form
         let incompleteData = Data([0x82, 0x01])
         do {
-            _ = try reader.testParseBERLength(data: incompleteData, offset: 0)
+            _ = try reader.parseBERLength(data: incompleteData, offset: 0)
             #expect(Bool(false), "Should have thrown error for incomplete data")
         } catch let error as CardReaderError {
             if case .invalidResponse = error {
@@ -227,12 +227,12 @@ struct SecureMessagingReaderTests {
 
         // Test valid ISO 7816-4 padding (0x80 followed by zeros)
         let paddedData = Data([0x01, 0x02, 0x03, 0x80, 0x00, 0x00, 0x00, 0x00])
-        let result = try reader.testRemovePadding(data: paddedData)
+        let result = try reader.removePadding(data: paddedData)
         #expect(result == Data([0x01, 0x02, 0x03]))
 
         // Test ISO 7816-4 padding at the end
         let paddedDataEnd = Data([0x01, 0x02, 0x03, 0x04, 0x80])
-        let resultEnd = try reader.testRemovePadding(data: paddedDataEnd)
+        let resultEnd = try reader.removePadding(data: paddedDataEnd)
         #expect(resultEnd == Data([0x01, 0x02, 0x03, 0x04]))
     }
 
@@ -245,12 +245,12 @@ struct SecureMessagingReaderTests {
 
         // Test valid PKCS#7 padding - padding value should be 4 (length), not the actual bytes
         let pkcs7Data = Data([0x01, 0x02, 0x03, 0x04, 0x04, 0x04, 0x04, 0x04])
-        let result = try reader.testRemovePKCS7Padding(data: pkcs7Data)
+        let result = try reader.removePKCS7Padding(data: pkcs7Data)
         #expect(result == Data([0x01, 0x02, 0x03, 0x04]))
 
         // Test single byte PKCS#7 padding
         let singlePaddingData = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x01])
-        let singleResult = try reader.testRemovePKCS7Padding(data: singlePaddingData)
+        let singleResult = try reader.removePKCS7Padding(data: singlePaddingData)
         #expect(singleResult == Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]))
     }
 
@@ -264,7 +264,7 @@ struct SecureMessagingReaderTests {
         // Test invalid ISO 7816-4 padding (has non-zero after 0x80)
         let invalidISO = Data([0x01, 0x02, 0x80, 0xFF, 0x00])
         do {
-            _ = try reader.testRemovePadding(data: invalidISO)
+            _ = try reader.removePadding(data: invalidISO)
             #expect(Bool(false), "Should have thrown error for invalid ISO padding")
         } catch let error as CardReaderError {
             if case .invalidResponse = error {
@@ -279,7 +279,7 @@ struct SecureMessagingReaderTests {
         // Test invalid PKCS#7 padding (inconsistent padding bytes)
         let invalidPKCS7 = Data([0x01, 0x02, 0x03, 0x04, 0x03, 0x03, 0x02])
         do {
-            _ = try reader.testRemovePKCS7Padding(data: invalidPKCS7)
+            _ = try reader.removePKCS7Padding(data: invalidPKCS7)
             #expect(Bool(false), "Should have thrown error for invalid PKCS7 padding")
         } catch let error as CardReaderError {
             if case .invalidResponse = error {
@@ -294,7 +294,7 @@ struct SecureMessagingReaderTests {
         // Test empty data
         let emptyData = Data()
         do {
-            _ = try reader.testRemovePadding(data: emptyData)
+            _ = try reader.removePadding(data: emptyData)
             #expect(Bool(false), "Should have thrown error for empty data")
         } catch let error as CardReaderError {
             if case .invalidResponse = error {
@@ -327,6 +327,10 @@ struct SecureMessagingReaderTests {
         #expect(executor.commandHistory[0].instructionClass == 0x08)
         #expect(executor.commandHistory[0].instructionCode == 0xB0)
     }
+
+
+
+
 
     @Test("SecureMessagingReader cryptography failure")
     func testCryptographyFailure() async {
