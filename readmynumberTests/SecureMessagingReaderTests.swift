@@ -366,8 +366,14 @@ struct SecureMessagingReaderTests {
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
         
         // Create chunked test data using MockTestUtils with real encryption
-        let plainData = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x80, 0x00, 0x00, 0x00]) // Larger data with padding
-        let firstChunkSize = 300
+        // Need > 512 bytes of plaintext to ensure encrypted TLV exceeds initial read
+        var plainData = Data(repeating: 0xAB, count: 520) // 520 bytes of data
+        plainData.append(0x80) // ISO 7816-4 padding marker
+        // Add padding zeros to make it a multiple of 8 for TDES
+        while plainData.count % 8 != 0 {
+            plainData.append(0x00)
+        }
+        let firstChunkSize = 512 // Match the initial chunk size used by readBinaryChunkedWithSM
         
         let (firstChunk, secondChunk, offsetP1, offsetP2) = try MockTestUtils.createChunkedTestData(
             plaintext: plainData,
@@ -387,7 +393,7 @@ struct SecureMessagingReaderTests {
         let result = try await reader.readBinaryChunkedWithSM(p1: 0x8B, p2: 0x00)
         
         // Expect the unpadded result (without the 0x80 and trailing zeros)
-        let expectedUnpaddedData = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
+        let expectedUnpaddedData = Data(repeating: 0xAB, count: 520) // Original data without padding
         #expect(result == expectedUnpaddedData)
         
         // Verify two commands were sent (initial + continuation)
