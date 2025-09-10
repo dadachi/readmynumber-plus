@@ -219,8 +219,29 @@ struct MockTestUtils {
         let realTDES = TDESCryptography()
         let encryptedData = try realTDES.performTDES(data: plaintext, key: sessionKey, encrypt: true)
         
-        // Use short form length encoding for small data
-        let response = Data([0x86, UInt8(encryptedData.count + 1), 0x01]) + encryptedData
+        // Create proper TLV structure: Tag (0x86) + Length + Value (0x01 + encrypted data)
+        let valueData = Data([0x01]) + encryptedData // 0x01 prefix + encrypted data
+        let valueLength = valueData.count
+        
+        var response = Data()
+        response.append(0x86) // Tag for encrypted data
+        
+        // Use appropriate length encoding
+        if valueLength <= 0x7F {
+            // Short form length encoding
+            response.append(UInt8(valueLength))
+        } else if valueLength <= 0xFF {
+            // Long form length encoding with 1 byte
+            response.append(0x81)
+            response.append(UInt8(valueLength))
+        } else {
+            // Long form length encoding with 2 bytes
+            response.append(0x82)
+            response.append(UInt8((valueLength >> 8) & 0xFF))
+            response.append(UInt8(valueLength & 0xFF))
+        }
+        
+        response.append(valueData)
         return response
     }
 }
