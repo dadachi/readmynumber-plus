@@ -328,9 +328,123 @@ struct SecureMessagingReaderTests {
         #expect(executor.commandHistory[0].instructionCode == 0xB0)
     }
 
+    @Test("SecureMessagingReader chunked reading single chunk")
+    func testReadBinaryChunkedWithSMSingleChunk() async throws {
+        let executor = MockNFCCommandExecutor()
+        let sessionKey = Data(repeating: 0xAA, count: 16)
+        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
+        
+        // Create single chunk test data using MockTestUtils with real encryption
+        let plainData = Data([0x01, 0x02, 0x03, 0x04, 0x80, 0x00, 0x00, 0x00]) // Data with ISO7816-4 padding
+        let singleChunkData = try MockTestUtils.createSingleChunkTestData(plaintext: plainData, sessionKey: sessionKey)
+        
+        executor.reset()
+        executor.configureMockResponse(for: 0xB0, p1: 0x8A, p2: 0x00, response: singleChunkData)
+        
+        // Call chunked reading method directly
+        let result = try await reader.readBinaryChunkedWithSM(p1: 0x8A, p2: 0x00)
+        
+        // Expect the unpadded result (without the 0x80 and trailing zeros)
+        let expectedUnpaddedData = Data([0x01, 0x02, 0x03, 0x04])
+        #expect(result == expectedUnpaddedData)
+        
+        // Verify only one command was sent (no chunking needed)
+        #expect(executor.commandHistory.count == 1)
+        #expect(executor.commandHistory[0].instructionClass == 0x08)
+        #expect(executor.commandHistory[0].instructionCode == 0xB0)
+        #expect(executor.commandHistory[0].p1Parameter == 0x8A)
+        #expect(executor.commandHistory[0].p2Parameter == 0x00)
+    }
 
+    @Test("SecureMessagingReader chunked reading multiple chunks")
+    func testReadBinaryChunkedWithSMMultipleChunks() async throws {
+        let executor = MockNFCCommandExecutor()
+        let sessionKey = Data(repeating: 0xAA, count: 16)
+        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
+        
+        // Create chunked test data using MockTestUtils with real encryption
+        let plainData = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]) // Larger data with padding
+        let firstChunkSize = 300
+        
+        let (firstChunk, secondChunk, offsetP1, offsetP2) = try MockTestUtils.createChunkedTestData(
+            plaintext: plainData,
+            sessionKey: sessionKey,
+            firstChunkSize: firstChunkSize
+        )
+        
+        executor.reset()
+        
+        // Configure first response (initial read at offset 0)
+        executor.configureMockResponse(for: 0xB0, p1: 0x8B, p2: 0x00, response: firstChunk)
+        
+        // Configure second response (continuation read at calculated offset)
+        executor.configureMockResponse(for: 0xB0, p1: offsetP1, p2: offsetP2, response: secondChunk)
+        
+        // Call chunked reading method directly
+        let result = try await reader.readBinaryChunkedWithSM(p1: 0x8B, p2: 0x00)
+        
+        // Expect the unpadded result (without the 0x80 and trailing zeros)
+        let expectedUnpaddedData = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
+        #expect(result == expectedUnpaddedData)
+        
+        // Verify two commands were sent (initial + continuation)
+        #expect(executor.commandHistory.count == 2)
+        
+        // Verify first command
+        #expect(executor.commandHistory[0].instructionClass == 0x08)
+        #expect(executor.commandHistory[0].instructionCode == 0xB0)
+        #expect(executor.commandHistory[0].p1Parameter == 0x8B)
+        #expect(executor.commandHistory[0].p2Parameter == 0x00)
+        
+        // Verify second command uses correct offset
+        #expect(executor.commandHistory[1].instructionClass == 0x08)
+        #expect(executor.commandHistory[1].instructionCode == 0xB0)
+        #expect(executor.commandHistory[1].p1Parameter == offsetP1)
+        #expect(executor.commandHistory[1].p2Parameter == offsetP2)
+    }
 
-
+    @Test("SecureMessagingReader chunked reading with empty continuation chunk")
+    func testReadBinaryChunkedWithSMEmptyChunk() async throws {
+        let executor = MockNFCCommandExecutor()
+        let sessionKey = Data(repeating: 0xAA, count: 16)
+        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
+        
+        // Create incomplete TLV data using real encryption
+        let plainData = Data([0x01, 0x02, 0x03, 0x04, 0x80, 0x00, 0x00, 0x00])
+        let firstChunkSize = 50
+        
+        let (firstChunk, _, offsetP1, offsetP2) = try MockTestUtils.createChunkedTestData(
+            plaintext: plainData,
+            sessionKey: sessionKey,
+            firstChunkSize: firstChunkSize
+        )
+        
+        // Second chunk: empty (simulates card returning no more data)
+        let secondChunk = Data()
+        
+        executor.reset()
+        
+        // Configure first response
+        executor.configureMockResponse(for: 0xB0, p1: 0x8C, p2: 0x00, response: firstChunk)
+        
+        // Configure second response to return empty data
+        executor.configureMockResponse(for: 0xB0, p1: offsetP1, p2: offsetP2, response: secondChunk)
+        
+        // This test should handle empty chunks gracefully - the reader should break out of the loop
+        // when it receives an empty chunk and decrypt the data it has collected so far
+        let result = try await reader.readBinaryChunkedWithSM(p1: 0x8C, p2: 0x00)
+        
+        // Should successfully decrypt the partial data from the first chunk
+        let expectedUnpaddedData = Data([0x01, 0x02, 0x03, 0x04])
+        #expect(result == expectedUnpaddedData)
+        
+        // Verify that two commands were sent (initial + continuation)
+        #expect(executor.commandHistory.count == 2)
+        #expect(executor.commandHistory[0].p1Parameter == 0x8C)
+        #expect(executor.commandHistory[0].p2Parameter == 0x00)
+        #expect(executor.commandHistory[1].p1Parameter == offsetP1)
+        #expect(executor.commandHistory[1].p2Parameter == offsetP2)
+    }
 
     @Test("SecureMessagingReader cryptography failure")
     func testCryptographyFailure() async {

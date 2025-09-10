@@ -167,6 +167,62 @@ struct MockTestUtils {
         response.append(plaintext)
         return response
     }
+    
+    static func createRealEncryptedSMResponse(plaintext: Data, sessionKey: Data) throws -> Data {
+        // Create real encrypted secure messaging response using TDES
+        let realTDES = TDESCryptography()
+        let encryptedData = try realTDES.performTDES(data: plaintext, key: sessionKey, encrypt: true)
+        
+        var response = Data()
+        response.append(0x86) // Tag for encrypted data
+        response.append(UInt8(encryptedData.count + 1)) // Length including 0x01 prefix
+        response.append(0x01) // Padding indicator
+        response.append(encryptedData)
+        return response
+    }
+    
+    static func createChunkedTestData(plaintext: Data, sessionKey: Data, firstChunkSize: Int) throws -> (firstChunk: Data, secondChunk: Data, offsetP1: UInt8, offsetP2: UInt8) {
+        // Create real encrypted data
+        let realTDES = TDESCryptography()
+        let encryptedData = try realTDES.performTDES(data: plaintext, key: sessionKey, encrypt: true)
+        
+        // Create TLV structure indicating large total size
+        let totalSize = encryptedData.count + 1 // +1 for the 0x01 prefix
+        let tlvHeader = Data([0x86, 0x82, UInt8((totalSize >> 8) & 0xFF), UInt8(totalSize & 0xFF)])
+        
+        // Calculate how much encrypted data can fit in the first chunk
+        let availableSpaceInFirstChunk = firstChunkSize - tlvHeader.count - 1 // -1 for the 0x01 prefix
+        
+        // Ensure we don't try to read more data than we have
+        let firstPartSize = min(availableSpaceInFirstChunk, encryptedData.count)
+        guard firstPartSize > 0 else {
+            throw CardReaderError.invalidResponse
+        }
+        
+        // First chunk: TLV header + prefix + partial encrypted data
+        let firstPartEncrypted = encryptedData.prefix(firstPartSize)
+        let firstChunk = tlvHeader + Data([0x01]) + firstPartEncrypted
+        
+        // Second chunk: remaining encrypted data (if any)
+        let secondChunk = firstPartSize < encryptedData.count ? 
+            encryptedData.suffix(from: firstPartSize) : Data()
+        
+        // Calculate offset parameters for second chunk
+        let offsetP1 = UInt8((firstChunkSize >> 8) & 0x7F)
+        let offsetP2 = UInt8(firstChunkSize & 0xFF)
+        
+        return (firstChunk, secondChunk, offsetP1, offsetP2)
+    }
+    
+    static func createSingleChunkTestData(plaintext: Data, sessionKey: Data) throws -> Data {
+        // Create small TLV data that fits in a single chunk
+        let realTDES = TDESCryptography()
+        let encryptedData = try realTDES.performTDES(data: plaintext, key: sessionKey, encrypt: true)
+        
+        // Use short form length encoding for small data
+        let response = Data([0x86, UInt8(encryptedData.count + 1), 0x01]) + encryptedData
+        return response
+    }
 }
 
 // MARK: - Test Constants

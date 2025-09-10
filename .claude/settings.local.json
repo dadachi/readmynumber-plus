@@ -18,7 +18,9 @@
       "Bash(timeout 300 xcodebuild:*)",
       "Bash(timeout 60 xcodebuild:*)",
       "Bash(xcrun swift test:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Read(//Users/adachi/Library/Developer/Xcode/DerivedData/**)",
+      "Bash(xargs ls:*)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",
