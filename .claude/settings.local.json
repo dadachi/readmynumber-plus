@@ -18,7 +18,13 @@
       "Bash(timeout 300 xcodebuild:*)",
       "Bash(timeout 60 xcodebuild:*)",
       "Bash(xcrun swift test:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Read(//Users/adachi/Library/Developer/Xcode/DerivedData/**)",
+      "Bash(xargs ls:*)",
+      "Bash(find:*)",
+      "Bash(for test in testReadBinaryWithSMSuccess testReadBinaryWithSMCustomP2 testReadBinaryWithSMSessionKeyPropagation testReadBinaryWithSMChunkedData testReadBinaryWithSMDelegation testReadBinaryWithSMError testReadBinaryWithSMEmptyResponse testReadBinaryWithSMLargeData testReadBinaryWithSMFileSelections)",
+      "Bash(do echo \"Testing $test...\")",
+      "Bash(done)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",

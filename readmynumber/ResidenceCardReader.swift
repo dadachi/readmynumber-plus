@@ -26,16 +26,74 @@ class ResidenceCardReader: NSObject, ObservableObject {
   // MARK: - APDU Response Limits
   // iOS NFC APDU response limitation remains active as of 2025
   // Reference: https://developer.apple.com/forums/thread/120496
-  private static let maxAPDUResponseLength: Int = 1694
+  // Using global maxAPDUResponseLength constant (1693 bytes)
   
   // MARK: - Properties
-  private var session: NFCTagReaderSession?
-  private var cardNumber: String = ""
+  internal var cardNumber: String = "" // Made internal for testing
   internal var sessionKey: Data? // Made internal for testing
   internal var readCompletion: ((Result<ResidenceCardData, Error>) -> Void)? // Made internal for testing
   @Published var isReadingInProgress: Bool = false
   
+  // Dependency injection for testability
+  private var commandExecutor: NFCCommandExecutor?
+  private var sessionManager: NFCSessionManager
+  private var threadDispatcher: ThreadDispatcher
+  private var signatureVerifier: SignatureVerifier
+  internal var tdesCryptography: TDESCryptography
+  
+  // MARK: - Initialization
+  
+  /// Initialize with default implementations
+  override init() {
+    self.sessionManager = NFCSessionManagerImpl()
+    self.threadDispatcher = SystemThreadDispatcher()
+    self.signatureVerifier = ResidenceCardSignatureVerifier()
+    self.tdesCryptography = TDESCryptography()
+    super.init()
+  }
+  
+  /// Initialize with custom dependencies for testing
+  init(
+    sessionManager: NFCSessionManager,
+    threadDispatcher: ThreadDispatcher,
+    signatureVerifier: SignatureVerifier,
+    tdesCryptography: TDESCryptography = TDESCryptography()
+  ) {
+    self.sessionManager = sessionManager
+    self.threadDispatcher = threadDispatcher
+    self.signatureVerifier = signatureVerifier
+    self.tdesCryptography = tdesCryptography
+    super.init()
+  }
+  
   // MARK: - Public Methods
+  
+  /// Set a custom command executor for testing
+  func setCommandExecutor(_ executor: NFCCommandExecutor) {
+    self.commandExecutor = executor
+  }
+  
+  /// Set dependencies for testing
+  func setDependencies(
+    sessionManager: NFCSessionManager? = nil,
+    threadDispatcher: ThreadDispatcher? = nil,
+    signatureVerifier: SignatureVerifier? = nil,
+    tdesCryptography: TDESCryptography? = nil
+  ) {
+    if let sessionManager = sessionManager {
+      self.sessionManager = sessionManager
+    }
+    if let threadDispatcher = threadDispatcher {
+      self.threadDispatcher = threadDispatcher
+    }
+    if let signatureVerifier = signatureVerifier {
+      self.signatureVerifier = signatureVerifier
+    }
+    if let tdesCryptography = tdesCryptography {
+      self.tdesCryptography = tdesCryptography
+    }
+  }
+  
   func startReading(cardNumber: String, completion: @escaping (Result<ResidenceCardData, Error>) -> Void) {
     self.readCompletion = completion
     
@@ -55,24 +113,26 @@ class ResidenceCardReader: NSObject, ObservableObject {
     }
     
     // Check if we're in test environment (no real NFC or simulator)
-    guard NFCTagReaderSession.readingAvailable else {
+    guard sessionManager.isReadingAvailable else {
       completion(.failure(CardReaderError.nfcNotAvailable))
       return
     }
     
-    DispatchQueue.main.async {
+    threadDispatcher.dispatchToMain {
       self.isReadingInProgress = true
     }
     
-    session = NFCTagReaderSession(pollingOption: .iso14443, delegate: self)
-    session?.alertMessage = "在留カードをiPhoneに近づけてください"
-    session?.begin()
+    sessionManager.startSession(
+      pollingOption: .iso14443,
+      delegate: self,
+      alertMessage: "在留カードをiPhoneに近づけてください"
+    )
   }
   
   // MARK: - Private Methods
   
   // MFの選択
-  internal func selectMF(tag: NFCISO7816Tag) async throws {
+  internal func selectMF(executor: NFCCommandExecutor) async throws {
     let command = NFCISO7816APDU(
       instructionClass: 0x00,
       instructionCode: Command.selectFile,
@@ -82,12 +142,12 @@ class ResidenceCardReader: NSObject, ObservableObject {
       expectedResponseLength: -1
     )
     
-    let (_, sw1, sw2) = try await tag.sendCommand(apdu: command)
+    let (_, sw1, sw2) = try await executor.sendCommand(apdu: command)
     try checkStatusWord(sw1: sw1, sw2: sw2)
   }
   
   // DFの選択
-  internal func selectDF(tag: NFCISO7816Tag, aid: Data) async throws {
+  internal func selectDF(executor: NFCCommandExecutor, aid: Data) async throws {
     let command = NFCISO7816APDU(
       instructionClass: 0x00,
       instructionCode: Command.selectFile,
@@ -97,7 +157,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
       expectedResponseLength: -1
     )
     
-    let (_, sw1, sw2) = try await tag.sendCommand(apdu: command)
+    let (_, sw1, sw2) = try await executor.sendCommand(apdu: command)
     try checkStatusWord(sw1: sw1, sw2: sw2)
   }
   
@@ -121,7 +181,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
   /// - 在留カード等仕様書 3.5.2 認証シーケンス
   /// - ISO/IEC 7816-4 セキュアメッセージング
   /// - FIPS 46-3 Triple-DES暗号化標準
-  internal func performAuthentication(tag: NFCISO7816Tag) async throws {
+  internal func performAuthentication(executor: NFCCommandExecutor) async throws {
     // STEP 1: GET CHALLENGE - ICCチャレンジ取得
     // カードから8バイトのランダムな乱数（RND.ICC）を取得します。
     // この乱数は認証プロセスでリプレイ攻撃を防ぐために使用されます。
@@ -135,7 +195,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
       expectedResponseLength: 8              // RND.ICC: 8バイトの乱数
     )
     
-    let (rndICC, sw1, sw2) = try await tag.sendCommand(apdu: challengeCommand)
+    let (rndICC, sw1, sw2) = try await executor.sendCommand(apdu: challengeCommand)
     try checkStatusWord(sw1: sw1, sw2: sw2)
     
     // STEP 2: 認証鍵生成とセッション鍵交換データ準備
@@ -162,7 +222,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
       expectedResponseLength: 40                    // E.ICC + M.ICC
     )
     
-    let (response, sw1Auth, sw2Auth) = try await tag.sendCommand(apdu: mutualAuthCommand)
+    let (response, sw1Auth, sw2Auth) = try await executor.sendCommand(apdu: mutualAuthCommand)
     try checkStatusWord(sw1: sw1Auth, sw2: sw2Auth)
     
     // STEP 4: カード認証データの検証とセッション鍵生成
@@ -205,139 +265,24 @@ class ResidenceCardReader: NSObject, ObservableObject {
       expectedResponseLength: -1
     )
     
-    let (_, sw1Verify, sw2Verify) = try await tag.sendCommand(apdu: verifyCommand)
+    let (_, sw1Verify, sw2Verify) = try await executor.sendCommand(apdu: verifyCommand)
     try checkStatusWord(sw1: sw1Verify, sw2: sw2Verify)
     
     // 認証完了 - セッション鍵によるセキュアメッセージング通信が確立されました
   }
   
   // バイナリ読み出し（SMあり）
-  internal func readBinaryWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-    // Try reading with APDU limit first
-    let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(Self.maxAPDUResponseLength).bigEndian, Array.init))
-    
-    let command = NFCISO7816APDU(
-      instructionClass: 0x08, // SMコマンド
-      instructionCode: Command.readBinary,
-      p1Parameter: p1,
-      p2Parameter: p2,
-      data: leData,
-      expectedResponseLength: Self.maxAPDUResponseLength
-    )
-    
-    let (encryptedData, sw1, sw2) = try await tag.sendCommand(apdu: command)
-    try checkStatusWord(sw1: sw1, sw2: sw2)
-    
-    // Try to decrypt the response to see if we have complete data
-    do {
-      let decryptedData = try decryptSMResponse(encryptedData: encryptedData)
-      
-      // Check if the data appears complete by examining the TLV structure
-      // If the response seems truncated, fall back to chunked reading
-      if encryptedData.count >= Self.maxAPDUResponseLength - 100 { // Allow for some overhead
-        // Response might be truncated, try chunked reading
-        return try await readBinaryChunkedWithSM(tag: tag, p1: p1, p2: p2)
-      }
-      
-      return decryptedData
-    } catch {
-      // If decryption fails, it might be due to incomplete data
-      // Try chunked reading as fallback
-      return try await readBinaryChunkedWithSM(tag: tag, p1: p1, p2: p2)
-    }
+  internal func readBinaryWithSM(executor: NFCCommandExecutor, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+    let smReader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
+    return try await smReader.readBinaryWithSM(p1: p1, p2: p2)
   }
-  
-  // バイナリ読み出し（SMあり、チャンク対応）
-  internal func readBinaryChunkedWithSM(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-    // First, read a small chunk to determine the actual data size from TLV structure
-    let initialChunkSize = min(Self.maxAPDUResponseLength, 512)
-    let leData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(initialChunkSize).bigEndian, Array.init))
-    
-    let initialCommand = NFCISO7816APDU(
-      instructionClass: 0x08,
-      instructionCode: Command.readBinary,
-      p1Parameter: p1,
-      p2Parameter: p2,
-      data: leData,
-      expectedResponseLength: initialChunkSize
-    )
-    
-    let (initialResponse, sw1, sw2) = try await tag.sendCommand(apdu: initialCommand)
-    try checkStatusWord(sw1: sw1, sw2: sw2)
-    
-    // Parse TLV to determine total data size
-    guard initialResponse.count >= 3,
-          initialResponse[0] == 0x86 else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    let (totalLength, tlvHeaderSize) = try parseBERLength(data: initialResponse, offset: 1)
-    let totalTLVSize = 1 + tlvHeaderSize + totalLength // tag + length + value
-    
-    // If the total data fits in what we already read, return it
-    if totalTLVSize <= initialResponse.count {
-      return try decryptSMResponse(encryptedData: initialResponse)
-    }
-    
-    // Calculate how many additional chunks we need
-    var allData = initialResponse
-    var currentOffset = initialResponse.count
-    
-    while currentOffset < totalTLVSize {
-      let remainingBytes = totalTLVSize - currentOffset
-      let chunkSize = min(remainingBytes, Self.maxAPDUResponseLength)
-      
-      // Calculate P1, P2 for offset-based reading
-      // Offset encoding: P1 = (offset >> 8) & 0x7F, P2 = offset & 0xFF
-      let offsetP1 = UInt8((currentOffset >> 8) & 0x7F)
-      let offsetP2 = UInt8(currentOffset & 0xFF)
-      
-      let chunkLeData = Data([0x96, 0x02] + withUnsafeBytes(of: UInt16(chunkSize).bigEndian, Array.init))
-      
-      let chunkCommand = NFCISO7816APDU(
-        instructionClass: 0x08,
-        instructionCode: Command.readBinary,
-        p1Parameter: offsetP1,
-        p2Parameter: offsetP2,
-        data: chunkLeData,
-        expectedResponseLength: chunkSize
-      )
-      
-      let (chunkData, chunkSW1, chunkSW2) = try await tag.sendCommand(apdu: chunkCommand)
-      try checkStatusWord(sw1: chunkSW1, sw2: chunkSW2)
-      
-      allData.append(chunkData)
-      currentOffset += chunkData.count
-      
-      // Safety check to prevent infinite loops
-      if chunkData.isEmpty {
-        break
-      }
-    }
-    
-    // Decrypt the complete reassembled data
-    return try decryptSMResponse(encryptedData: allData)
-  }
-  
+
   // バイナリ読み出し（平文）
-  internal func readBinaryPlain(tag: NFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-    // Read entire file content with maximum response length
-    // All residence card files fit within 1693 bytes, so no chunking needed
-    let command = NFCISO7816APDU(
-      instructionClass: 0x00,
-      instructionCode: Command.readBinary,
-      p1Parameter: p1,
-      p2Parameter: p2,
-      data: Data(),
-      expectedResponseLength: Self.maxAPDUResponseLength
-    )
-    
-    let (data, sw1, sw2) = try await tag.sendCommand(apdu: command)
-    try checkStatusWord(sw1: sw1, sw2: sw2)
-    
-    return data
+  internal func readBinaryPlain(executor: NFCCommandExecutor, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+    let plainReader = PlainBinaryReader(commandExecutor: executor)
+    return try await plainReader.readBinaryPlain(p1: p1, p2: p2)
   }
-  
+
   // 暗号化・復号化処理
   internal func encryptCardNumber(cardNumber: String, sessionKey: Data) throws -> Data {
     guard let cardNumberData = cardNumber.data(using: .ascii),
@@ -349,35 +294,56 @@ class ResidenceCardReader: NSObject, ObservableObject {
     let paddedData = cardNumberData + Data([0x80, 0x00, 0x00, 0x00])
     
     // TDES 2key CBC暗号化
-    return try performTDES(data: paddedData, key: sessionKey, encrypt: true)
+    return try tdesCryptography.performTDES(data: paddedData, key: sessionKey, encrypt: true)
   }
   
+  /// Decrypt Secure Messaging response
+  /// 
+  /// セキュアメッセージング応答の復号化処理を SecureMessagingReader に委任します。
+  /// テスト用に公開されているメソッドです。
+  /// 
+  /// - Parameter encryptedData: TLV形式の暗号化データ
+  /// - Returns: 復号化されたデータ（パディング除去済み）
+  /// - Throws: CardReaderError セッションキーがない、データ形式が不正、復号化失敗時
   internal func decryptSMResponse(encryptedData: Data) throws -> Data {
-    // セッションキーの存在確認
-    guard let sessionKey = sessionKey else {
-      throw CardReaderError.cryptographyError("Session key not available")
-    }
-    
-    // TLV構造から暗号化データを取り出す
-    guard encryptedData.count > 3,
-          encryptedData[0] == 0x86 else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    let (length, nextOffset) = try parseBERLength(data: encryptedData, offset: 1)
-    guard encryptedData.count >= nextOffset + length,
-          length > 1,
-          encryptedData[nextOffset] == 0x01 else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    let ciphertext = encryptedData.subdata(in: (nextOffset + 1)..<(nextOffset + length))
-    
-    // 復号化
-    let decrypted = try performTDES(data: ciphertext, key: sessionKey, encrypt: false)
-    
-    // パディング除去
-    return try removePadding(data: decrypted)
+    let smReader = SecureMessagingReader(
+      commandExecutor: MockNFCCommandExecutor(), // Tests don't need real executor
+      sessionKey: sessionKey,
+      tdesCryptography: tdesCryptography
+    )
+    return try smReader.decryptSMResponse(encryptedData: encryptedData)
+  }
+  
+  // MARK: - Testing Methods (delegated to SecureMessagingReader)
+  
+  /// Parse BER/DER length encoding - delegated to SecureMessagingReader for testing
+  internal func parseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
+    let smReader = SecureMessagingReader(
+      commandExecutor: MockNFCCommandExecutor(),
+      sessionKey: sessionKey,
+      tdesCryptography: tdesCryptography
+    )
+    return try smReader.parseBERLength(data: data, offset: offset)
+  }
+  
+  /// Remove padding from decrypted data - delegated to SecureMessagingReader for testing
+  internal func removePadding(data: Data) throws -> Data {
+    let smReader = SecureMessagingReader(
+      commandExecutor: MockNFCCommandExecutor(),
+      sessionKey: sessionKey,
+      tdesCryptography: tdesCryptography
+    )
+    return try smReader.removePadding(data: data)
+  }
+  
+  /// Remove PKCS#7 padding from data - delegated to SecureMessagingReader for testing
+  internal func removePKCS7Padding(data: Data) throws -> Data {
+    let smReader = SecureMessagingReader(
+      commandExecutor: MockNFCCommandExecutor(),
+      sessionKey: sessionKey,
+      tdesCryptography: tdesCryptography
+    )
+    return try smReader.removePKCS7Padding(data: data)
   }
   
   // ステータスワードチェック
@@ -395,7 +361,7 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
   }
   
   func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
-    DispatchQueue.main.async {
+    threadDispatcher.dispatchToMain {
       self.isReadingInProgress = false
     }
     readCompletion?(.failure(error))
@@ -404,27 +370,27 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
   func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
     guard let tag = tags.first,
           case .iso7816(let iso7816Tag) = tag else {
-      session.invalidate(errorMessage: "対応していないカードです")
+      sessionManager.invalidate(errorMessage: "対応していないカードです")
       return
     }
     
     Task {
       do {
-        try await session.connect(to: tag)
+        try await sessionManager.connect(to: tag)
         
         // カード読み取り処理
         let cardData = try await readCard(tag: iso7816Tag)
         
-        await MainActor.run {
-          session.invalidate()
+        await threadDispatcher.dispatchToMainActor {
+          self.sessionManager.invalidate()
           self.isReadingInProgress = false
-          readCompletion?(.success(cardData))
+          self.readCompletion?(.success(cardData))
         }
       } catch {
-        await MainActor.run {
-          session.invalidate(errorMessage: "読み取りに失敗しました")
+        await threadDispatcher.dispatchToMainActor {
+          self.sessionManager.invalidate(errorMessage: "読み取りに失敗しました")
           self.isReadingInProgress = false
-          readCompletion?(.failure(error))
+          self.readCompletion?(.failure(error))
         }
       }
     }
@@ -432,31 +398,31 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
   
   internal func readCard(tag: NFCISO7816Tag) async throws -> ResidenceCardData {
     // 1. MF選択
-    try await selectMF(tag: tag)
-    
+    try await selectMF(executor: commandExecutor!)
+
     // 2. 共通データ要素とカード種別の読み取り
-    let commonData = try await readBinaryPlain(tag: tag, p1: 0x8B)
-    let cardType = try await readBinaryPlain(tag: tag, p1: 0x8A)
-    
+    let commonData = try await readBinaryPlain(executor: commandExecutor!, p1: 0x8B)
+    let cardType = try await readBinaryPlain(executor: commandExecutor!, p1: 0x8A)
+
     // 3. 認証処理
-    try await performAuthentication(tag: tag)
-    
+    try await performAuthentication(executor: commandExecutor!)
+
     // 4. DF1選択と券面情報読み取り
-    try await selectDF(tag: tag, aid: AID.df1)
-    let frontImage = try await readBinaryWithSM(tag: tag, p1: 0x85)
-    let faceImage = try await readBinaryWithSM(tag: tag, p1: 0x86)
-    
+    try await selectDF(executor: commandExecutor!, aid: AID.df1)
+    let frontImage = try await readBinaryWithSM(executor: commandExecutor!, p1: 0x85)
+    let faceImage = try await readBinaryWithSM(executor: commandExecutor!, p1: 0x86)
+
     // 5. DF2選択と裏面情報読み取り
-    try await selectDF(tag: tag, aid: AID.df2)
-    let address = try await readBinaryPlain(tag: tag, p1: 0x81)
-    
+    try await selectDF(executor: commandExecutor!, aid: AID.df2)
+    let address = try await readBinaryPlain(executor: commandExecutor!, p1: 0x81)
+
     // 在留カードの場合は追加フィールドを読み取り
     var additionalData: ResidenceCardData.AdditionalData?
     if isResidenceCard(cardType: cardType) {
-      let comprehensivePermission = try await readBinaryPlain(tag: tag, p1: 0x82)
-      let individualPermission = try await readBinaryPlain(tag: tag, p1: 0x83)
-      let extensionApplication = try await readBinaryPlain(tag: tag, p1: 0x84)
-      
+      let comprehensivePermission = try await readBinaryPlain(executor: commandExecutor!, p1: 0x82)
+      let individualPermission = try await readBinaryPlain(executor: commandExecutor!, p1: 0x83)
+      let extensionApplication = try await readBinaryPlain(executor: commandExecutor!, p1: 0x84)
+
       additionalData = ResidenceCardData.AdditionalData(
         comprehensivePermission: comprehensivePermission,
         individualPermission: individualPermission,
@@ -465,18 +431,17 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
     }
     
     // 6. DF3選択と電子署名読み取り
-    try await selectDF(tag: tag, aid: AID.df3)
-    let signature = try await readBinaryPlain(tag: tag, p1: 0x82)
-    
+    try await selectDF(executor: commandExecutor!, aid: AID.df3)
+    let signature = try await readBinaryPlain(executor: commandExecutor!, p1: 0x82)
+
     // 7. 署名検証 (3.4.3.1 署名検証方法)
-    let verifier = ResidenceCardSignatureVerifier()
-    let verificationResult = verifier.verifySignature(
+    let verificationResult = signatureVerifier.verifySignature(
       signatureData: signature,
       frontImageData: frontImage,
       faceImageData: faceImage
     )
     
-    var cardData = ResidenceCardData(
+    let cardData = ResidenceCardData(
       commonData: commonData,
       cardType: cardType,
       frontImage: frontImage,
@@ -756,7 +721,7 @@ extension ResidenceCardReader {
     
     // STEP 4: Triple-DES暗号化
     // CBCモードでPKCS#7パディングを使用（32バイト → 32バイト）
-    let eIFD = try performTDES(data: plaintext, key: kEnc, encrypt: true)
+    let eIFD = try tdesCryptography.performTDES(data: plaintext, key: kEnc, encrypt: true)
     
     // STEP 5: Retail MAC計算（ISO/IEC 9797-1 Algorithm 3）
     // 暗号化データの完全性を保護するため8バイトMACを計算
@@ -765,97 +730,6 @@ extension ResidenceCardReader {
     return (eIFD: eIFD, mIFD: mIFD, rndIFD: rndIFD, kIFD: kIFD)
   }
   
-  /// Triple-DES 暗号化・復号化処理
-  /// 
-  /// 在留カード等仕様書で規定されたTriple-DES（3DES）2-key方式による
-  /// 暗号化または復号化を実行します。
-  /// 
-  /// アルゴリズム仕様:
-  /// - 暗号化アルゴリズム: Triple-DES（3DES）
-  /// - 鍵長: 128ビット（16バイト、2-key方式）
-  /// - 動作モード: CBC（Cipher Block Chaining）
-  /// - パディング: PKCS#7（ISO/IEC 7816-4準拠）
-  /// - 初期化ベクトル: All zeros（0x00 * 8）
-  /// 
-  /// 2-key Triple-DES処理:
-  /// - 暗号化: DES_Encrypt(K1) → DES_Decrypt(K2) → DES_Encrypt(K1)
-  /// - 復号化: DES_Decrypt(K1) → DES_Encrypt(K2) → DES_Decrypt(K1)
-  /// - K1 = key[0..7], K2 = key[8..15]
-  /// 
-  /// セキュリティレベル:
-  /// - 実効鍵長: 112ビット（2-key 3DES）
-  /// - レガシー暗号化方式だが在留カード仕様で必須
-  /// 
-  /// - Parameters:
-  ///   - data: 暗号化または復号化する入力データ
-  ///   - key: 16バイトの暗号化鍵（2-key 3DES用）
-  ///   - encrypt: true=暗号化, false=復号化
-  /// - Returns: 処理されたデータ
-  /// - Throws: CardReaderError.cryptographyError 処理失敗時
-  internal func performTDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
-    guard key.count == 16 else {
-      throw CardReaderError.cryptographyError("Invalid key length: \(key.count), expected 16")
-    }
-    
-    // Convert 2-key (16 bytes) to 3-key (24 bytes) for CommonCrypto
-    // For 2-key 3DES: K1=key[0..7], K2=key[8..15], K3=K1
-    var key3DES = Data()
-    key3DES.append(key)           // K1 and K2 (16 bytes)
-    key3DES.append(key.prefix(8)) // K3 = K1 (8 bytes)
-    
-    // TDES 3-key implementation using CommonCrypto
-    // Allocate enough space for result including padding
-    // For empty data, we still need at least one block
-    let paddedSize = max(kCCBlockSize3DES, ((data.count + kCCBlockSize3DES - 1) / kCCBlockSize3DES) * kCCBlockSize3DES)
-    let bufferSize = paddedSize + kCCBlockSize3DES
-    var result = Data(count: bufferSize)
-    var numBytesProcessed: size_t = 0
-    
-    let operation = encrypt ? CCOperation(kCCEncrypt) : CCOperation(kCCDecrypt)
-    
-    // CommonCrypto APIを使用した3DES処理
-    let status = result.withUnsafeMutableBytes { resultBytes in
-      data.withUnsafeBytes { dataBytes in
-        key3DES.withUnsafeBytes { keyBytes in
-          CCCrypt(operation,
-                  CCAlgorithm(kCCAlgorithm3DES),       // Triple-DES
-                  CCOptions(data.isEmpty || data.count % 8 != 0 ? kCCOptionPKCS7Padding : 0), // 空データまたは8の倍数でない場合はパディング
-                  keyBytes.bindMemory(to: UInt8.self).baseAddress, 
-                  kCCKeySize3DES,                       // 24 bytes for 3DES
-                  nil,                                  // IV = zeros（CBCモード）
-                  dataBytes.bindMemory(to: UInt8.self).baseAddress, 
-                  data.count,                           // data length
-                  resultBytes.bindMemory(to: UInt8.self).baseAddress, 
-                  bufferSize,                           // output buffer size
-                  &numBytesProcessed)
-        }
-      }
-    }
-    
-    guard status == kCCSuccess else {
-      let errorMessage: String
-      switch Int(status) {
-      case Int(kCCParamError):
-        errorMessage = "TDES parameter error"
-      case Int(kCCBufferTooSmall):
-        errorMessage = "TDES buffer too small"
-      case Int(kCCMemoryFailure):
-        errorMessage = "TDES memory failure"
-      case Int(kCCAlignmentError):
-        errorMessage = "TDES alignment error"
-      case Int(kCCDecodeError):
-        errorMessage = "TDES decode error"
-      case Int(kCCUnimplemented):
-        errorMessage = "TDES unimplemented"
-      default:
-        errorMessage = "TDES operation failed with status: \(status)"
-      }
-      throw CardReaderError.cryptographyError(errorMessage)
-    }
-    
-    result.count = numBytesProcessed
-    return result
-  }
   
   /// Retail MAC計算（ISO/IEC 9797-1 Algorithm 3）
   /// 
@@ -1048,7 +922,7 @@ extension ResidenceCardReader {
     
     // STEP 2: 認証データの復号化
     // E.ICCを3DES復号して32バイトの平文認証データを取得
-    let decrypted = try performTDES(data: eICC, key: kEnc, encrypt: false)
+    let decrypted = try tdesCryptography.performTDES(data: eICC, key: kEnc, encrypt: false)
     
     // STEP 3: チャレンジ・レスポンス検証
     // 復号データの先頭8バイトが最初のRND.ICCと一致することを確認
@@ -1069,76 +943,6 @@ extension ResidenceCardReader {
     return decrypted.suffix(16)
   }
   
-  internal func parseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
-    guard offset < data.count else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    let firstByte = data[offset]
-    
-    if firstByte <= 0x7F {
-      return (Int(firstByte), offset + 1)
-    } else if firstByte == 0x81 {
-      guard offset + 1 < data.count else {
-        throw CardReaderError.invalidResponse
-      }
-      return (Int(data[offset + 1]), offset + 2)
-    } else if firstByte == 0x82 {
-      guard offset + 2 < data.count else {
-        throw CardReaderError.invalidResponse
-      }
-      let length = (Int(data[offset + 1]) << 8) | Int(data[offset + 2])
-      return (length, offset + 3)
-    } else {
-      throw CardReaderError.invalidResponse
-    }
-  }
-  
-  internal func removePadding(data: Data) throws -> Data {
-    guard !data.isEmpty else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    // Try ISO/IEC 7816-4 padding first (0x80 format)
-    if let paddingIndex = data.lastIndex(of: 0x80) {
-      // Check that all bytes after 0x80 are 0x00
-      for i in (paddingIndex + 1)..<data.count {
-        guard data[i] == 0x00 else {
-          // Invalid ISO 7816-4 padding - has non-zero bytes after 0x80
-          // Don't fallback to PKCS#7 if 0x80 is present but invalid
-          throw CardReaderError.invalidResponse
-        }
-      }
-      return data.prefix(paddingIndex)
-    }
-    
-    // No 0x80 found, try PKCS#7 padding
-    return try removePKCS7Padding(data: data)
-  }
-  
-  internal func removePKCS7Padding(data: Data) throws -> Data {
-    guard !data.isEmpty else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    // PKCS#7 パディング除去
-    let paddingLength = Int(data.last!)
-    
-    // パディング長が有効範囲内かチェック
-    guard paddingLength > 0 && paddingLength <= kCCBlockSize3DES && paddingLength <= data.count else {
-      throw CardReaderError.invalidResponse
-    }
-    
-    // パディングバイトがすべて同じ値（パディング長）かチェック
-    let paddingStart = data.count - paddingLength
-    for i in paddingStart..<data.count {
-      guard data[i] == paddingLength else {
-        throw CardReaderError.invalidResponse
-      }
-    }
-    
-    return data.prefix(paddingStart)
-  }
   
   internal func isResidenceCard(cardType: Data) -> Bool {
     // カード種別の判定（C1タグの値が"1"なら在留カード）

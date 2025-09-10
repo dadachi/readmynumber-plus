@@ -153,66 +153,6 @@ extension ResidenceCardReader {
         let (_, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
         try checkStatusWord(sw1: sw1, sw2: sw2)
     }
-    
-    // Test helper for readBinaryPlain that works with mock objects
-    func testReadBinaryPlain(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        let command = MockAPDUCommand(
-            instructionClass: 0x00,
-            instructionCode: 0xB0,  // READ BINARY
-            p1Parameter: p1,
-            p2Parameter: p2,
-            data: Data(),
-            expectedResponseLength: 65536
-        )
-        
-        let (data, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
-        try checkStatusWord(sw1: sw1, sw2: sw2)
-        
-        return data
-    }
-    
-    // Test helper for readBinaryWithSM that works with mock objects
-    func testReadBinaryWithSM(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        let leData = Data([0x96, 0x02, 0x00, 0x00])
-        
-        let command = MockAPDUCommand(
-            instructionClass: 0x08, // SM command class
-            instructionCode: 0xB0,  // READ BINARY
-            p1Parameter: p1,
-            p2Parameter: p2,
-            data: leData,
-            expectedResponseLength: 65536
-        )
-        
-        let (encryptedData, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
-        try checkStatusWord(sw1: sw1, sw2: sw2)
-        
-        // Decrypt the SM response
-        return try decryptSMResponse(encryptedData: encryptedData)
-    }
-    
-    // Test wrapper for SM chunked reading
-    func testReadBinaryChunkedWithSMWrapper(mockTag: MockNFCISO7816Tag, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        // For SM, we simulate reading encrypted data and decrypting it
-        let leData = Data([0x96, 0x02, 0x00, 0x00])
-        
-        let command = MockAPDUCommand(
-            instructionClass: 0x08,
-            instructionCode: 0xB0,
-            p1Parameter: p1,
-            p2Parameter: p2,
-            data: leData,
-            expectedResponseLength: 65536
-        )
-        
-        let (encryptedData, sw1, sw2) = try await mockTag.sendCommand(apdu: command)
-        try checkStatusWord(sw1: sw1, sw2: sw2)
-        
-        // Simulate SM decryption without calling real decryptSMResponse
-        // For testing purposes, just return mock decrypted data
-        let offset = (UInt16(p1) << 8) | UInt16(p2)
-        return Data(repeating: UInt8(offset & 0xFF), count: 100) // Return 100 bytes of mock data
-    }
 }
 
 // MARK: - Test Utilities
@@ -225,6 +165,83 @@ struct MockTestUtils {
         response.append(UInt8(plaintext.count + 1)) // Length
         response.append(0x01) // Padding indicator
         response.append(plaintext)
+        return response
+    }
+    
+    static func createRealEncryptedSMResponse(plaintext: Data, sessionKey: Data) throws -> Data {
+        // Create real encrypted secure messaging response using TDES
+        let realTDES = TDESCryptography()
+        let encryptedData = try realTDES.performTDES(data: plaintext, key: sessionKey, encrypt: true)
+        
+        var response = Data()
+        response.append(0x86) // Tag for encrypted data
+        response.append(UInt8(encryptedData.count + 1)) // Length including 0x01 prefix
+        response.append(0x01) // Padding indicator
+        response.append(encryptedData)
+        return response
+    }
+    
+    static func createChunkedTestData(plaintext: Data, sessionKey: Data, firstChunkSize: Int) throws -> (firstChunk: Data, secondChunk: Data, offsetP1: UInt8, offsetP2: UInt8) {
+        // Create real encrypted data
+        let realTDES = TDESCryptography()
+        let encryptedData = try realTDES.performTDES(data: plaintext, key: sessionKey, encrypt: true)
+        
+        // Create TLV structure indicating large total size
+        let totalSize = encryptedData.count + 1 // +1 for the 0x01 prefix
+        let tlvHeader = Data([0x86, 0x82, UInt8((totalSize >> 8) & 0xFF), UInt8(totalSize & 0xFF)])
+        
+        // Calculate how much encrypted data can fit in the first chunk
+        let availableSpaceInFirstChunk = firstChunkSize - tlvHeader.count - 1 // -1 for the 0x01 prefix
+        
+        // Ensure we don't try to read more data than we have
+        let firstPartSize = min(availableSpaceInFirstChunk, encryptedData.count)
+        guard firstPartSize > 0 else {
+            throw CardReaderError.invalidResponse
+        }
+        
+        // First chunk: TLV header + prefix + partial encrypted data
+        let firstPartEncrypted = encryptedData.prefix(firstPartSize)
+        let firstChunk = tlvHeader + Data([0x01]) + firstPartEncrypted
+        
+        // Second chunk: remaining encrypted data (if any)
+        let secondChunk = firstPartSize < encryptedData.count ? 
+            encryptedData.suffix(from: firstPartSize) : Data()
+        
+        // Calculate offset parameters for second chunk
+        let offsetP1 = UInt8((firstChunkSize >> 8) & 0x7F)
+        let offsetP2 = UInt8(firstChunkSize & 0xFF)
+        
+        return (firstChunk, secondChunk, offsetP1, offsetP2)
+    }
+    
+    static func createSingleChunkTestData(plaintext: Data, sessionKey: Data) throws -> Data {
+        // Create small TLV data that fits in a single chunk
+        let realTDES = TDESCryptography()
+        let encryptedData = try realTDES.performTDES(data: plaintext, key: sessionKey, encrypt: true)
+        
+        // Create proper TLV structure: Tag (0x86) + Length + Value (0x01 + encrypted data)
+        let valueData = Data([0x01]) + encryptedData // 0x01 prefix + encrypted data
+        let valueLength = valueData.count
+        
+        var response = Data()
+        response.append(0x86) // Tag for encrypted data
+        
+        // Use appropriate length encoding
+        if valueLength <= 0x7F {
+            // Short form length encoding
+            response.append(UInt8(valueLength))
+        } else if valueLength <= 0xFF {
+            // Long form length encoding with 1 byte
+            response.append(0x81)
+            response.append(UInt8(valueLength))
+        } else {
+            // Long form length encoding with 2 bytes
+            response.append(0x82)
+            response.append(UInt8((valueLength >> 8) & 0xFF))
+            response.append(UInt8(valueLength & 0xFF))
+        }
+        
+        response.append(valueData)
         return response
     }
 }
