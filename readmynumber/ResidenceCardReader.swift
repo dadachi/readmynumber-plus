@@ -381,6 +381,10 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
         // カード読み取り処理
         let cardData = try await readCard(tag: iso7816Tag)
         
+        // Log successful card read
+        print("✅ Card read completed successfully")
+        print("   Card data retrieved and logged above")
+        
         await threadDispatcher.dispatchToMainActor {
           self.sessionManager.invalidate()
           self.isReadingInProgress = false
@@ -451,6 +455,55 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
       signature: signature,
       signatureVerificationResult: verificationResult
     )
+    
+    // Log ResidenceCardData to Xcode console
+    print("========== ResidenceCardData Output ==========")
+    print("📋 Common Data: \(commonData.count) bytes")
+    print("   Hex: \(commonData.prefix(50).map { String(format: "%02X", $0) }.joined(separator: " "))\(commonData.count > 50 ? "..." : "")")
+    
+    print("\n🎴 Card Type: \(cardType.count) bytes")
+    if let cardTypeString = parseCardType(from: cardType) {
+      print("   Type: \(cardTypeString) (\(cardTypeString == "1" ? "在留カード" : "特別永住者証明書"))")
+    }
+    print("   Hex: \(cardType.map { String(format: "%02X", $0) }.joined(separator: " "))")
+    
+    print("\n🖼️ Front Image: \(frontImage.count) bytes")
+    print("   Format: \(frontImage.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))")
+    
+    print("\n👤 Face Image: \(faceImage.count) bytes")
+    print("   Format: \(faceImage.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))")
+    
+    print("\n🏠 Address: \(address.count) bytes")
+    print("   Hex (first 50): \(address.prefix(50).map { String(format: "%02X", $0) }.joined(separator: " "))\(address.count > 50 ? "..." : "")")
+    
+    if let additional = additionalData {
+      print("\n📝 Additional Data (在留カード):")
+      print("   Comprehensive Permission: \(additional.comprehensivePermission.count) bytes")
+      print("   Individual Permission: \(additional.individualPermission.count) bytes")
+      print("   Extension Application: \(additional.extensionApplication.count) bytes")
+    } else {
+      print("\n📝 Additional Data: None (特別永住者証明書)")
+    }
+    
+    print("\n✍️ Signature: \(signature.count) bytes")
+    print("   Hex (first 50): \(signature.prefix(50).map { String(format: "%02X", $0) }.joined(separator: " "))\(signature.count > 50 ? "..." : "")")
+    
+    if let verificationResult = cardData.signatureVerificationResult {
+      print("\n🔐 Signature Verification:")
+      print("   Status: \(verificationResult.isValid ? "✅ Valid" : "❌ Invalid")")
+      if let details = verificationResult.details {
+        print("   Details: \(details)")
+      }
+    } else {
+      print("\n🔐 Signature Verification: Not performed")
+    }
+    
+    print("\n📊 Summary:")
+    let totalSize = commonData.count + cardType.count + frontImage.count + faceImage.count + address.count + signature.count
+    print("   Total data size: \(totalSize) bytes")
+    print("   Card Number: \(cardNumber)")
+    print("   Session Key: \(sessionKey?.map { String(format: "%02X", $0) }.joined(separator: " ") ?? "None")")
+    print("===============================================\n")
     
     return cardData
   }
