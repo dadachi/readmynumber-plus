@@ -446,7 +446,7 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
   }
   
   // Helper function to save raw data to a compressed ZIP file
-  private func saveRawDataToZipFile(_ cardData: ResidenceCardData) -> URL? {
+  func saveRawDataToZipFile(_ cardData: ResidenceCardData) -> URL? {
     let fileManager = FileManager.default
     let tempDirectory = fileManager.temporaryDirectory
     
@@ -617,6 +617,81 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
   // Public method to get the last exported file URL for sharing
   func getLastExportedFileURL() -> URL? {
     return lastExportedZipURL
+  }
+  
+  // Create test data with specified sizes for testing share functionality
+  func createTestResidenceCardData() -> ResidenceCardData {
+    // Create test front image data (7000 bytes)
+    // Start with JPEG header and fill with test pattern
+    var frontImageData = Data([0xFF, 0xD8, 0xFF, 0xE0]) // JPEG header
+    frontImageData.append(contentsOf: Array(repeating: 0xAB, count: 7000 - 4))
+    
+    // Create test face image data (3000 bytes) 
+    // Start with JPEG header and fill with test pattern
+    var faceImageData = Data([0xFF, 0xD8, 0xFF, 0xE0]) // JPEG header
+    faceImageData.append(contentsOf: Array(repeating: 0xCD, count: 3000 - 4))
+    
+    // Create test common data (TLV format)
+    let commonData = Data([
+      0xC0, 0x02, 0x31, 0x30, // Version "10"
+      0xC1, 0x01, 0x31,       // Card type "1" (residence card)
+      0xC2, 0x08, 0x32, 0x30, 0x32, 0x34, 0x30, 0x39, 0x31, 0x33 // Date "20240913"
+    ])
+    
+    // Create test card type data
+    let cardTypeData = Data([0xC1, 0x01, 0x31]) // "1" for residence card
+    
+    // Create test address data (TLV format with Japanese text)
+    let addressText = "東京都新宿区西新宿2-8-1"
+    let addressData = Data([0xD4, UInt8(addressText.utf8.count)]) + addressText.data(using: .utf8)!
+    
+    // Create test additional data for residence card
+    let comprehensivePermission = Data([0x12, 0x10]) + "就労制限なし".data(using: .utf8)!
+    let individualPermission = Data([0x13, 0x08]) + "永住者".data(using: .utf8)!
+    let extensionApplication = Data([0x14, 0x06]) + "なし".data(using: .utf8)!
+    
+    let additionalData = ResidenceCardData.AdditionalData(
+      comprehensivePermission: comprehensivePermission,
+      individualPermission: individualPermission,
+      extensionApplication: extensionApplication
+    )
+    
+    // Create test signature data (256 bytes - typical RSA signature size)
+    let signatureData = Data(Array(0..<256).map { UInt8($0) })
+    
+    // Create test verification result
+    let verificationDetails = ResidenceCardSignatureVerifier.VerificationDetails(
+      checkCodeHash: "ABCDEF123456789",
+      calculatedHash: "ABCDEF123456789",
+      certificateSubject: "Test Certificate Subject",
+      certificateIssuer: "Test Certificate Issuer",
+      certificateNotBefore: Date(),
+      certificateNotAfter: Date().addingTimeInterval(365 * 24 * 60 * 60)
+    )
+    
+    let verificationResult = ResidenceCardSignatureVerifier.VerificationResult(
+      isValid: true,
+      error: nil,
+      details: verificationDetails
+    )
+    
+    // Set test card number and session key
+    self.cardNumber = "AB12345678CD"
+    self.sessionKey = Data([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+                           0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10])
+    
+    let testCardData = ResidenceCardData(
+      commonData: commonData,
+      cardType: cardTypeData,
+      frontImage: frontImageData,
+      faceImage: faceImageData,
+      address: addressData,
+      additionalData: additionalData,
+      signature: signatureData,
+      signatureVerificationResult: verificationResult
+    )
+    
+    return testCardData
   }
   
   // Detailed logging function for full hex dump
