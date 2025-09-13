@@ -43,6 +43,7 @@ struct ResidentTabView: View {
     @State private var alertTitle: String = ""
     @State private var alertMessage: String = ""
     @State private var showingSample = false
+    @State private var showingTestDataExportSheet = false
     @StateObject private var residenceCardReader = ResidenceCardReader()
     @StateObject private var dataManager = ResidenceCardDataManager.shared
     @Environment(\.colorScheme) var colorScheme
@@ -79,6 +80,19 @@ struct ResidentTabView: View {
                                     .fontWeight(.bold)
 
                                 Spacer()
+                                
+                                Button(action: shareTestData) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "doc.zipper")
+                                        Text("テストデータ")
+                                    }
+                                    .font(.subheadline)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(6)
+                                }
                                 
                                 Button(action: {
                                     showingSample = true
@@ -170,6 +184,11 @@ struct ResidentTabView: View {
             .sheet(isPresented: $showingSample) {
                 ResidenceCardSampleView()
             }
+            .sheet(isPresented: $showingTestDataExportSheet) {
+                if let fileURL = getTestDataFileURL() {
+                    ShareSheet(activityItems: [fileURL])
+                }
+            }
         }
         .onAppear {
             // 画面表示時にデータをクリア
@@ -204,6 +223,25 @@ struct ResidentTabView: View {
         self.alertTitle = title
         self.alertMessage = message
         self.showAlert = true
+    }
+    
+    // Share test data functionality
+    private func shareTestData() {
+        // Generate test data with specified sizes (front: 7000 bytes, face: 3000 bytes)
+        let testCardData = residenceCardReader.createTestResidenceCardData()
+        
+        // Create the consolidated data file
+        if let _ = residenceCardReader.saveRawDataToZipFile(testCardData) {
+            showingTestDataExportSheet = true
+            showError(title: "テストデータ生成完了", message: "フロント画像: 7000バイト、顔画像: 3000バイトのテストデータを生成しました")
+        } else {
+            showError(title: "エラー", message: "テストデータファイルの作成に失敗しました")
+        }
+    }
+    
+    // Get the test data file URL for sharing
+    private func getTestDataFileURL() -> URL? {
+        return residenceCardReader.getLastExportedFileURL()
     }
 }
 
