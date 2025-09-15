@@ -438,8 +438,8 @@ struct ResidenceCardDetailView: View {
             }
         }
         .sheet(isPresented: $showingRawDataExportSheet) {
-            if let fileURL = getRawDataFileURL() {
-                ShareSheet(activityItems: [fileURL])
+            if let fileURLs = getRawDataFileURL() {
+                ShareSheet(activityItems: fileURLs)
             }
         }
         .alert(isPresented: $showAlert) {
@@ -669,18 +669,18 @@ struct ResidenceCardDetailView: View {
             dataToShare = cardData
         }
         
-        // Generate the consolidated data file
-        if let _ = reader.saveRawDataToZipFile(dataToShare) {
+        // Generate the raw image files
+        if let _ = reader.saveRawImagesToFiles(dataToShare) {
             showingRawDataExportSheet = true
         } else {
             showError(title: "エラー", message: "生データファイルの作成に失敗しました")
         }
     }
     
-    // Get the raw data file URL for sharing
-    private func getRawDataFileURL() -> URL? {
+    // Get the raw image URLs for sharing
+    private func getRawDataFileURL() -> [URL]? {
         let reader = ResidenceCardReader()
-        return reader.getLastExportedFileURL()
+        return reader.getLastExportedImageURLs()
     }
 }
 

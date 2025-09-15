@@ -34,8 +34,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
   internal var readCompletion: ((Result<ResidenceCardData, Error>) -> Void)? // Made internal for testing
   @Published var isReadingInProgress: Bool = false
   
-  // Store the last exported file URL for sharing
-  private var lastExportedZipURL: URL?
+  // Store the last exported image URLs for sharing
+  private var lastExportedImageURLs: [URL]?
   
   // Dependency injection for testability
   private var commandExecutor: NFCCommandExecutor?
@@ -445,8 +445,8 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
     return result
   }
   
-  // Helper function to save raw data to a compressed ZIP file
-  func saveRawDataToZipFile(_ cardData: ResidenceCardData) -> URL? {
+  // Helper function to save raw image files for sharing
+  func saveRawImagesToFiles(_ cardData: ResidenceCardData) -> [URL]? {
     let fileManager = FileManager.default
     let tempDirectory = fileManager.temporaryDirectory
     
@@ -455,168 +455,37 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
     formatter.dateFormat = "yyyyMMdd_HHmmss"
     let timestamp = formatter.string(from: Date())
     
-    // Create a temporary directory for this card read
-    let cardDataDirectory = tempDirectory.appendingPathComponent("ResidenceCard_\(timestamp)")
-    let zipFileURL = tempDirectory.appendingPathComponent("ResidenceCard_\(timestamp).zip")
-    
     do {
-      // Clean up any existing directory/file
-      try? fileManager.removeItem(at: cardDataDirectory)
-      try? fileManager.removeItem(at: zipFileURL)
-      
-      try fileManager.createDirectory(at: cardDataDirectory, withIntermediateDirectories: true, attributes: nil)
-      
-      // Save all data files
-      let frontImageURL = cardDataDirectory.appendingPathComponent("front_image.jpg")
+      // Save raw front image
+      let frontImageURL = tempDirectory.appendingPathComponent("front_image_\(timestamp).jpg")
       try cardData.frontImage.write(to: frontImageURL)
+      print("✅ Saved raw front image: \(frontImageURL.lastPathComponent) (\(cardData.frontImage.count) bytes)")
       
-      let faceImageURL = cardDataDirectory.appendingPathComponent("face_image.jpg")
+      // Save raw face image
+      let faceImageURL = tempDirectory.appendingPathComponent("face_image_\(timestamp).jpg")
       try cardData.faceImage.write(to: faceImageURL)
+      print("✅ Saved raw face image: \(faceImageURL.lastPathComponent) (\(cardData.faceImage.count) bytes)")
       
-      let commonDataURL = cardDataDirectory.appendingPathComponent("common_data.bin")
-      try cardData.commonData.write(to: commonDataURL)
+      // Store the file URLs for sharing
+      let imageFiles = [frontImageURL, faceImageURL]
+      self.lastExportedImageURLs = imageFiles
       
-      let cardTypeURL = cardDataDirectory.appendingPathComponent("card_type.bin")
-      try cardData.cardType.write(to: cardTypeURL)
-      
-      let addressURL = cardDataDirectory.appendingPathComponent("address.bin")
-      try cardData.address.write(to: addressURL)
-      
-      // Save additional data if present
-      if let additional = cardData.additionalData {
-        let comprehensiveURL = cardDataDirectory.appendingPathComponent("comprehensive_permission.bin")
-        try additional.comprehensivePermission.write(to: comprehensiveURL)
-        
-        let individualURL = cardDataDirectory.appendingPathComponent("individual_permission.bin")
-        try additional.individualPermission.write(to: individualURL)
-        
-        let extensionURL = cardDataDirectory.appendingPathComponent("extension_application.bin")
-        try additional.extensionApplication.write(to: extensionURL)
+      print("📦 Raw image files ready for sharing:")
+      for url in imageFiles {
+        print("   - \(url.lastPathComponent)")
       }
       
-      let signatureURL = cardDataDirectory.appendingPathComponent("signature.bin")
-      try cardData.signature.write(to: signatureURL)
-      
-      // Save session key if available
-      if let sessionKey = self.sessionKey {
-        let sessionKeyURL = cardDataDirectory.appendingPathComponent("session_key.bin")
-        try sessionKey.write(to: sessionKeyURL)
-      }
-      
-      // Create hex dumps for text analysis
-      let hexDumpsURL = cardDataDirectory.appendingPathComponent("hex_dumps.txt")
-      var hexDumps = "Residence Card Data Hex Dumps\n"
-      hexDumps += "==============================\n\n"
-      
-      hexDumps += "COMMON DATA (\(cardData.commonData.count) bytes):\n"
-      hexDumps += hexDump(cardData.commonData)
-      hexDumps += "\n"
-      
-      hexDumps += "CARD TYPE (\(cardData.cardType.count) bytes):\n"
-      hexDumps += hexDump(cardData.cardType)
-      hexDumps += "\n"
-      
-      hexDumps += "ADDRESS DATA (\(cardData.address.count) bytes):\n"
-      hexDumps += hexDump(cardData.address)
-      hexDumps += "\n"
-      
-      if let additional = cardData.additionalData {
-        hexDumps += "COMPREHENSIVE PERMISSION (\(additional.comprehensivePermission.count) bytes):\n"
-        hexDumps += hexDump(additional.comprehensivePermission)
-        hexDumps += "\n"
-        
-        hexDumps += "INDIVIDUAL PERMISSION (\(additional.individualPermission.count) bytes):\n"
-        hexDumps += hexDump(additional.individualPermission)
-        hexDumps += "\n"
-        
-        hexDumps += "EXTENSION APPLICATION (\(additional.extensionApplication.count) bytes):\n"
-        hexDumps += hexDump(additional.extensionApplication)
-        hexDumps += "\n"
-      }
-      
-      hexDumps += "SIGNATURE (\(cardData.signature.count) bytes):\n"
-      hexDumps += hexDump(cardData.signature)
-      
-      try hexDumps.write(to: hexDumpsURL, atomically: true, encoding: .utf8)
-      
-      // Create a summary text file
-      let summaryURL = cardDataDirectory.appendingPathComponent("summary.txt")
-      var summary = "Residence Card Data Export\n"
-      summary += "========================\n"
-      summary += "Timestamp: \(timestamp)\n"
-      summary += "Card Number: \(cardNumber)\n"
-      summary += "\nFile Sizes:\n"
-      summary += "- Common Data: \(cardData.commonData.count) bytes\n"
-      summary += "- Card Type: \(cardData.cardType.count) bytes\n"
-      summary += "- Front Image: \(cardData.frontImage.count) bytes\n"
-      summary += "- Face Image: \(cardData.faceImage.count) bytes\n"
-      summary += "- Address: \(cardData.address.count) bytes\n"
-      summary += "- Signature: \(cardData.signature.count) bytes\n"
-      
-      if let additional = cardData.additionalData {
-        summary += "\nAdditional Data (在留カード):\n"
-        summary += "- Comprehensive Permission: \(additional.comprehensivePermission.count) bytes\n"
-        summary += "- Individual Permission: \(additional.individualPermission.count) bytes\n"
-        summary += "- Extension Application: \(additional.extensionApplication.count) bytes\n"
-      }
-      
-      try summary.write(to: summaryURL, atomically: true, encoding: .utf8)
-      
-      // Create ZIP archive using iOS-compatible approach
-      // Since iOS doesn't support Process, we'll create the archive manually
-      // For now, we'll just keep the directory and note that compression would be done differently
-      
-      // Alternative: Store as a single consolidated data file
-      let consolidatedDataURL = tempDirectory.appendingPathComponent("ResidenceCard_\(timestamp).data")
-      var consolidatedData = Data()
-      
-      // Add a simple header to identify sections
-      func appendSection(tag: String, data: Data) {
-        let tagData = tag.data(using: .utf8)!
-        consolidatedData.append(tagData)
-        var length = UInt32(data.count).bigEndian
-        consolidatedData.append(Data(bytes: &length, count: 4))
-        consolidatedData.append(data)
-      }
-      
-      appendSection(tag: "FRONT_IMG", data: cardData.frontImage)
-      appendSection(tag: "FACE_IMG_", data: cardData.faceImage)
-      appendSection(tag: "COMMON___", data: cardData.commonData)
-      appendSection(tag: "CARD_TYPE", data: cardData.cardType)
-      appendSection(tag: "ADDRESS__", data: cardData.address)
-      appendSection(tag: "SIGNATURE", data: cardData.signature)
-      
-      if let additional = cardData.additionalData {
-        appendSection(tag: "COMP_PERM", data: additional.comprehensivePermission)
-        appendSection(tag: "INDV_PERM", data: additional.individualPermission)
-        appendSection(tag: "EXTENSION", data: additional.extensionApplication)
-      }
-      
-      if let sessionKey = self.sessionKey {
-        appendSection(tag: "SESS_KEY_", data: sessionKey)
-      }
-      
-      try consolidatedData.write(to: consolidatedDataURL)
-      print("✅ Created consolidated data file: \(consolidatedDataURL.lastPathComponent)")
-      
-      // Clean up temporary directory
-      try? fileManager.removeItem(at: cardDataDirectory)
-      
-      // Store the consolidated data file URL for sharing
-      self.lastExportedZipURL = consolidatedDataURL
-      
-      print("📦 Consolidated data file ready for sharing: \(consolidatedDataURL.path)")
-      return consolidatedDataURL
+      return imageFiles
       
     } catch {
-      print("❌ Error creating ZIP file: \(error)")
+      print("❌ Error saving raw image files: \(error)")
       return nil
     }
   }
   
-  // Public method to get the last exported file URL for sharing
-  func getLastExportedFileURL() -> URL? {
-    return lastExportedZipURL
+  // Public method to get the last exported image URLs for sharing
+  func getLastExportedImageURLs() -> [URL]? {
+    return lastExportedImageURLs
   }
   
   // Create test data with specified sizes for testing share functionality
@@ -861,9 +730,6 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
     
     // DETAILED FULL HEX DUMP LOG
     logDetailedCardData(cardData)
-    
-    // Save raw data to compressed file and make it shareable
-    let _ = saveRawDataToZipFile(cardData)
     
     return cardData
   }

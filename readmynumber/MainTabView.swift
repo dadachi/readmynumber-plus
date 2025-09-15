@@ -185,8 +185,8 @@ struct ResidentTabView: View {
                 ResidenceCardSampleView()
             }
             .sheet(isPresented: $showingTestDataExportSheet) {
-                if let fileURL = getTestDataFileURL() {
-                    ShareSheet(activityItems: [fileURL])
+                if let fileURLs = getTestDataFileURL() {
+                    ShareSheet(activityItems: fileURLs)
                 }
             }
         }
@@ -230,8 +230,8 @@ struct ResidentTabView: View {
         // Generate test data with specified sizes (front: 7000 bytes, face: 3000 bytes)
         let testCardData = residenceCardReader.createTestResidenceCardData()
         
-        // Create the consolidated data file
-        if let _ = residenceCardReader.saveRawDataToZipFile(testCardData) {
+        // Create the raw image files
+        if let _ = residenceCardReader.saveRawImagesToFiles(testCardData) {
             showingTestDataExportSheet = true
             showError(title: "テストデータ生成完了", message: "フロント画像: 7000バイト、顔画像: 3000バイトのテストデータを生成しました")
         } else {
@@ -239,9 +239,9 @@ struct ResidentTabView: View {
         }
     }
     
-    // Get the test data file URL for sharing
-    private func getTestDataFileURL() -> URL? {
-        return residenceCardReader.getLastExportedFileURL()
+    // Get the test data image URLs for sharing
+    private func getTestDataFileURL() -> [URL]? {
+        return residenceCardReader.getLastExportedImageURLs()
     }
 }
 
