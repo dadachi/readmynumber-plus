@@ -34,6 +34,9 @@ class ResidenceCardReader: NSObject, ObservableObject {
   internal var readCompletion: ((Result<ResidenceCardData, Error>) -> Void)? // Made internal for testing
   @Published var isReadingInProgress: Bool = false
   
+  // Store the last exported image URLs for sharing
+  private var lastExportedImageURLs: [URL]?
+  
   // Dependency injection for testability
   private var commandExecutor: NFCCommandExecutor?
   private var sessionManager: NFCSessionManager
@@ -381,6 +384,10 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
         // カード読み取り処理
         let cardData = try await readCard(tag: iso7816Tag)
         
+        // Log successful card read
+        print("✅ Card read completed successfully")
+        print("   Card data retrieved and logged above")
+        
         await threadDispatcher.dispatchToMainActor {
           self.sessionManager.invalidate()
           self.isReadingInProgress = false
@@ -394,6 +401,226 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
         }
       }
     }
+  }
+  
+  // Helper function to create hex dump with ASCII representation
+  private func hexDump(_ data: Data, bytesPerLine: Int = 16) -> String {
+    var result = ""
+    var offset = 0
+    
+    while offset < data.count {
+      let lineEnd = min(offset + bytesPerLine, data.count)
+      let lineData = data.subdata(in: offset..<lineEnd)
+      
+      // Offset
+      result += String(format: "%08X: ", offset)
+      
+      // Hex bytes
+      for byte in lineData {
+        result += String(format: "%02X ", byte)
+      }
+      
+      // Padding for incomplete lines
+      if lineData.count < bytesPerLine {
+        for _ in lineData.count..<bytesPerLine {
+          result += "   "
+        }
+      }
+      
+      result += " |"
+      
+      // ASCII representation
+      for byte in lineData {
+        if byte >= 0x20 && byte < 0x7F {
+          result += String(Character(UnicodeScalar(byte)))
+        } else {
+          result += "."
+        }
+      }
+      
+      result += "|\n"
+      offset += bytesPerLine
+    }
+    
+    return result
+  }
+  
+  // Helper function to save raw image files for sharing
+  func saveRawImagesToFiles(_ cardData: ResidenceCardData) -> [URL]? {
+    let fileManager = FileManager.default
+    let tempDirectory = fileManager.temporaryDirectory
+    
+    // Create a timestamp for unique filenames
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyyMMdd_HHmmss"
+    let timestamp = formatter.string(from: Date())
+    
+    do {
+      // Save raw front image
+      let frontImageURL = tempDirectory.appendingPathComponent("front_image_\(timestamp).jpg")
+      try cardData.frontImage.write(to: frontImageURL)
+      print("✅ Saved raw front image: \(frontImageURL.lastPathComponent) (\(cardData.frontImage.count) bytes)")
+      
+      // Save raw face image
+      let faceImageURL = tempDirectory.appendingPathComponent("face_image_\(timestamp).jpg")
+      try cardData.faceImage.write(to: faceImageURL)
+      print("✅ Saved raw face image: \(faceImageURL.lastPathComponent) (\(cardData.faceImage.count) bytes)")
+      
+      // Store the file URLs for sharing
+      let imageFiles = [frontImageURL, faceImageURL]
+      self.lastExportedImageURLs = imageFiles
+      
+      print("📦 Raw image files ready for sharing:")
+      for url in imageFiles {
+        print("   - \(url.lastPathComponent)")
+      }
+      
+      return imageFiles
+      
+    } catch {
+      print("❌ Error saving raw image files: \(error)")
+      return nil
+    }
+  }
+  
+  // Public method to get the last exported image URLs for sharing
+  func getLastExportedImageURLs() -> [URL]? {
+    return lastExportedImageURLs
+  }
+  
+  // Create test data with specified sizes for testing share functionality
+  func createTestResidenceCardData() -> ResidenceCardData {
+    // Create test front image data (7000 bytes)
+    // Start with JPEG header and fill with test pattern
+    var frontImageData = Data([0xFF, 0xD8, 0xFF, 0xE0]) // JPEG header
+    frontImageData.append(contentsOf: Array(repeating: 0xAB, count: 7000 - 4))
+    
+    // Create test face image data (3000 bytes) 
+    // Start with JPEG header and fill with test pattern
+    var faceImageData = Data([0xFF, 0xD8, 0xFF, 0xE0]) // JPEG header
+    faceImageData.append(contentsOf: Array(repeating: 0xCD, count: 3000 - 4))
+    
+    // Create test common data (TLV format)
+    let commonData = Data([
+      0xC0, 0x02, 0x31, 0x30, // Version "10"
+      0xC1, 0x01, 0x31,       // Card type "1" (residence card)
+      0xC2, 0x08, 0x32, 0x30, 0x32, 0x34, 0x30, 0x39, 0x31, 0x33 // Date "20240913"
+    ])
+    
+    // Create test card type data
+    let cardTypeData = Data([0xC1, 0x01, 0x31]) // "1" for residence card
+    
+    // Create test address data (TLV format with Japanese text)
+    let addressText = "東京都新宿区西新宿2-8-1"
+    let addressData = Data([0xD4, UInt8(addressText.utf8.count)]) + addressText.data(using: .utf8)!
+    
+    // Create test additional data for residence card
+    let comprehensivePermission = Data([0x12, 0x10]) + "就労制限なし".data(using: .utf8)!
+    let individualPermission = Data([0x13, 0x08]) + "永住者".data(using: .utf8)!
+    let extensionApplication = Data([0x14, 0x06]) + "なし".data(using: .utf8)!
+    
+    let additionalData = ResidenceCardData.AdditionalData(
+      comprehensivePermission: comprehensivePermission,
+      individualPermission: individualPermission,
+      extensionApplication: extensionApplication
+    )
+    
+    // Create test signature data (256 bytes - typical RSA signature size)
+    let signatureData = Data(Array(0..<256).map { UInt8($0) })
+    
+    // Create test verification result
+    let verificationDetails = ResidenceCardSignatureVerifier.VerificationDetails(
+      checkCodeHash: "ABCDEF123456789",
+      calculatedHash: "ABCDEF123456789",
+      certificateSubject: "Test Certificate Subject",
+      certificateIssuer: "Test Certificate Issuer",
+      certificateNotBefore: Date(),
+      certificateNotAfter: Date().addingTimeInterval(365 * 24 * 60 * 60)
+    )
+    
+    let verificationResult = ResidenceCardSignatureVerifier.VerificationResult(
+      isValid: true,
+      error: nil,
+      details: verificationDetails
+    )
+    
+    // Set test card number and session key
+    self.cardNumber = "AB12345678CD"
+    self.sessionKey = Data([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+                           0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10])
+    
+    let testCardData = ResidenceCardData(
+      commonData: commonData,
+      cardType: cardTypeData,
+      frontImage: frontImageData,
+      faceImage: faceImageData,
+      address: addressData,
+      additionalData: additionalData,
+      signature: signatureData,
+      signatureVerificationResult: verificationResult
+    )
+    
+    return testCardData
+  }
+  
+  // Detailed logging function for full hex dump
+  private func logDetailedCardData(_ cardData: ResidenceCardData) {
+    print("\n")
+    print("╔════════════════════════════════════════════════════════════════════╗")
+    print("║           DETAILED RESIDENCE CARD DATA - FULL HEX DUMP            ║")
+    print("╚════════════════════════════════════════════════════════════════════╝")
+    
+    // Common Data - Full Hex Dump
+    print("\n┌─── COMMON DATA (\(cardData.commonData.count) bytes) ───────────────────────────────┐")
+    print(hexDump(cardData.commonData))
+    
+    // Card Type - Full Hex Dump
+    print("\n┌─── CARD TYPE (\(cardData.cardType.count) bytes) ─────────────────────────────────┐")
+    print(hexDump(cardData.cardType))
+    if let cardTypeString = parseCardType(from: cardData.cardType) {
+      print("Parsed Type: \(cardTypeString) (\(cardTypeString == "1" ? "在留カード" : "特別永住者証明書"))")
+    }
+    
+    // Address - Full Hex Dump
+    print("\n┌─── ADDRESS DATA (\(cardData.address.count) bytes) ───────────────────────────────┐")
+    print(hexDump(cardData.address))
+    
+    // Additional Data (if present) - Full Hex Dump
+    if let additional = cardData.additionalData {
+      print("\n┌─── COMPREHENSIVE PERMISSION (\(additional.comprehensivePermission.count) bytes) ──────┐")
+      print(hexDump(additional.comprehensivePermission))
+      
+      print("\n┌─── INDIVIDUAL PERMISSION (\(additional.individualPermission.count) bytes) ────────┐")
+      print(hexDump(additional.individualPermission))
+      
+      print("\n┌─── EXTENSION APPLICATION (\(additional.extensionApplication.count) bytes) ────────┐")
+      print(hexDump(additional.extensionApplication))
+    }
+    
+    // Front Image - FULL HEX DUMP
+    print("\n┌─── FRONT IMAGE - FULL DATA (\(cardData.frontImage.count) bytes) ─────────────────┐")
+    print("WARNING: Large data output - \(cardData.frontImage.count) bytes")
+    print(hexDump(cardData.frontImage))
+    
+    // Face Image - FULL HEX DUMP
+    print("\n┌─── FACE IMAGE - FULL DATA (\(cardData.faceImage.count) bytes) ───────────────────┐")
+    print("WARNING: Large data output - \(cardData.faceImage.count) bytes")
+    print(hexDump(cardData.faceImage))
+    
+    // Signature - Full Hex Dump
+    print("\n┌─── SIGNATURE (\(cardData.signature.count) bytes) ────────────────────────────────┐")
+    print(hexDump(cardData.signature))
+    
+    // Session Key (if available)
+    if let sessionKey = self.sessionKey {
+      print("\n┌─── SESSION KEY (\(sessionKey.count) bytes) ──────────────────────────────────┐")
+      print(hexDump(sessionKey))
+    }
+    
+    print("\n╔════════════════════════════════════════════════════════════════════╗")
+    print("║                    END OF DETAILED HEX DUMP                       ║")
+    print("╚════════════════════════════════════════════════════════════════════╝")
+    print("\n")
   }
   
   internal func readCard(tag: NFCISO7816Tag) async throws -> ResidenceCardData {
@@ -451,6 +678,58 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
       signature: signature,
       signatureVerificationResult: verificationResult
     )
+    
+    // Log ResidenceCardData to Xcode console (Summary)
+    print("========== ResidenceCardData Output ==========")
+    print("📋 Common Data: \(commonData.count) bytes")
+    print("   Hex: \(commonData.prefix(50).map { String(format: "%02X", $0) }.joined(separator: " "))\(commonData.count > 50 ? "..." : "")")
+    
+    print("\n🎴 Card Type: \(cardType.count) bytes")
+    if let cardTypeString = parseCardType(from: cardType) {
+      print("   Type: \(cardTypeString) (\(cardTypeString == "1" ? "在留カード" : "特別永住者証明書"))")
+    }
+    print("   Hex: \(cardType.map { String(format: "%02X", $0) }.joined(separator: " "))")
+    
+    print("\n🖼️ Front Image: \(frontImage.count) bytes")
+    print("   Format: \(frontImage.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))")
+    
+    print("\n👤 Face Image: \(faceImage.count) bytes")
+    print("   Format: \(faceImage.prefix(4).map { String(format: "%02X", $0) }.joined(separator: " "))")
+    
+    print("\n🏠 Address: \(address.count) bytes")
+    print("   Hex (first 50): \(address.prefix(50).map { String(format: "%02X", $0) }.joined(separator: " "))\(address.count > 50 ? "..." : "")")
+    
+    if let additional = additionalData {
+      print("\n📝 Additional Data (在留カード):")
+      print("   Comprehensive Permission: \(additional.comprehensivePermission.count) bytes")
+      print("   Individual Permission: \(additional.individualPermission.count) bytes")
+      print("   Extension Application: \(additional.extensionApplication.count) bytes")
+    } else {
+      print("\n📝 Additional Data: None (特別永住者証明書)")
+    }
+    
+    print("\n✍️ Signature: \(signature.count) bytes")
+    print("   Hex (first 50): \(signature.prefix(50).map { String(format: "%02X", $0) }.joined(separator: " "))\(signature.count > 50 ? "..." : "")")
+    
+    if let verificationResult = cardData.signatureVerificationResult {
+      print("\n🔐 Signature Verification:")
+      print("   Status: \(verificationResult.isValid ? "✅ Valid" : "❌ Invalid")")
+      if let details = verificationResult.details {
+        print("   Details: \(details)")
+      }
+    } else {
+      print("\n🔐 Signature Verification: Not performed")
+    }
+    
+    print("\n📊 Summary:")
+    let totalSize = commonData.count + cardType.count + frontImage.count + faceImage.count + address.count + signature.count
+    print("   Total data size: \(totalSize) bytes")
+    print("   Card Number: \(cardNumber)")
+    print("   Session Key: \(sessionKey?.map { String(format: "%02X", $0) }.joined(separator: " ") ?? "None")")
+    print("===============================================\n")
+    
+    // DETAILED FULL HEX DUMP LOG
+    logDetailedCardData(cardData)
     
     return cardData
   }

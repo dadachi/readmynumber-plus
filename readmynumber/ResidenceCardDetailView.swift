@@ -15,6 +15,8 @@ struct ResidenceCardDetailView: View {
     @State private var frontImageJPEG: UIImage?
     @State private var faceImageJPEG: UIImage?
     @State private var compositeImageWithTransparency: UIImage?
+    @State private var showingRawDataExportSheet = false
+    @State private var testModeEnabled = false
 
     var body: some View {
         ZStack {
@@ -114,6 +116,19 @@ struct ResidenceCardDetailView: View {
 
                             Spacer()
 
+                            // Toggle for test mode
+                            Button(action: { testModeEnabled.toggle() }) {
+                                HStack {
+                                    Image(systemName: testModeEnabled ? "testtube.2" : "testtube.2")
+                                    Text("テスト")
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(testModeEnabled ? Color.orange : Color.gray)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                            }
+                            
                             Button(action: exportImages) {
                                 HStack {
                                     Image(systemName: "square.and.arrow.up")
@@ -122,6 +137,18 @@ struct ResidenceCardDetailView: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
                                 .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                            }
+                            
+                            Button(action: shareRawData) {
+                                HStack {
+                                    Image(systemName: "doc.zipper")
+                                    Text("生データ")
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.blue)
                                 .foregroundColor(.white)
                                 .cornerRadius(8)
                             }
@@ -410,6 +437,11 @@ struct ResidenceCardDetailView: View {
                 ShareSheet(activityItems: [frontImageURL, faceImageURL])
             }
         }
+        .sheet(isPresented: $showingRawDataExportSheet) {
+            if let fileURLs = getRawDataFileURL() {
+                ShareSheet(activityItems: fileURLs)
+            }
+        }
         .alert(isPresented: $showAlert) {
             Alert(title: Text(alertTitle), message: Text(alertMessage), dismissButton: .default(Text("OK")))
         }
@@ -621,6 +653,34 @@ struct ResidenceCardDetailView: View {
         self.alertTitle = title
         self.alertMessage = message
         self.showAlert = true
+    }
+    
+    // Share raw data functionality
+    private func shareRawData() {
+        let reader = ResidenceCardReader()
+        
+        let dataToShare: ResidenceCardData
+        if testModeEnabled {
+            // Use test data with specified sizes
+            dataToShare = reader.createTestResidenceCardData()
+            showError(title: "テストモード", message: "テストデータを生成しました。フロント画像: 7000バイト, 顔画像: 3000バイト")
+        } else {
+            // Use actual card data
+            dataToShare = cardData
+        }
+        
+        // Generate the raw image files
+        if let _ = reader.saveRawImagesToFiles(dataToShare) {
+            showingRawDataExportSheet = true
+        } else {
+            showError(title: "エラー", message: "生データファイルの作成に失敗しました")
+        }
+    }
+    
+    // Get the raw image URLs for sharing
+    private func getRawDataFileURL() -> [URL]? {
+        let reader = ResidenceCardReader()
+        return reader.getLastExportedImageURLs()
     }
 }
 
