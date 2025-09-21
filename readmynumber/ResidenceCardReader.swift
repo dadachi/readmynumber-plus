@@ -525,9 +525,12 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
       extensionApplication: extensionApplication
     )
     
-    // Create test signature data (256 bytes - typical RSA signature size)
-    let signatureData = Data(Array(0..<256).map { UInt8($0) })
-    
+    // Create test check code (256 bytes - RSA-2048 encrypted hash)
+    let checkCodeData = Data(Array(0..<256).map { UInt8($0) })
+
+    // Create test certificate data (typical X.509 certificate size)
+    let certificateData = Data(Array(0..<1200).map { UInt8($0 % 256) })
+
     // Create test verification result
     let verificationDetails = ResidenceCardSignatureVerifier.VerificationDetails(
       checkCodeHash: "ABCDEF123456789",
@@ -537,18 +540,18 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
       certificateNotBefore: Date(),
       certificateNotAfter: Date().addingTimeInterval(365 * 24 * 60 * 60)
     )
-    
+
     let verificationResult = ResidenceCardSignatureVerifier.VerificationResult(
       isValid: true,
       error: nil,
       details: verificationDetails
     )
-    
+
     // Set test card number and session key
     self.cardNumber = "AB12345678CD"
     self.sessionKey = Data([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
                            0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10])
-    
+
     let testCardData = ResidenceCardData(
       commonData: commonData,
       cardType: cardTypeData,
@@ -556,7 +559,8 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
       faceImage: faceImageData,
       address: addressData,
       additionalData: additionalData,
-      signature: signatureData,
+      checkCode: checkCodeData,
+      certificate: certificateData,
       signatureVerificationResult: verificationResult
     )
     
@@ -607,9 +611,13 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
     print("WARNING: Large data output - \(cardData.faceImage.count) bytes")
     print(hexDump(cardData.faceImage))
     
-    // Signature - Full Hex Dump
-    print("\n┌─── SIGNATURE (\(cardData.signature.count) bytes) ────────────────────────────────┐")
-    print(hexDump(cardData.signature))
+    // Check Code - Full Hex Dump
+    print("\n┌─── CHECK CODE (\(cardData.checkCode.count) bytes) ───────────────────────────────┐")
+    print(hexDump(cardData.checkCode))
+
+    // Certificate - Full Hex Dump
+    print("\n┌─── CERTIFICATE (\(cardData.certificate.count) bytes) ─────────────────────────────┐")
+    print(hexDump(cardData.certificate))
     
     // Session Key (if available)
     if let sessionKey = self.sessionKey {
@@ -659,15 +667,26 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
     
     // 6. DF3選択と電子署名読み取り
     try await selectDF(executor: commandExecutor!, aid: AID.df3)
-    let signature = try await readBinaryPlain(executor: commandExecutor!, p1: 0x82)
+    let signatureData = try await readBinaryPlain(executor: commandExecutor!, p1: 0x82)
 
-    // 7. 署名検証 (3.4.3.1 署名検証方法)
+    // 7. 署名データからチェックコードと証明書を抽出
+    // Tag 0xDA: チェックコード (256 bytes encrypted hash)
+    // Tag 0xDB: 公開鍵証明書 (X.509 certificate)
+    guard let checkCode = parseTLV(data: signatureData, tag: 0xDA) else {
+      throw CardReaderError.invalidResponse
+    }
+    guard let certificate = parseTLV(data: signatureData, tag: 0xDB) else {
+      throw CardReaderError.invalidResponse
+    }
+
+    // 8. 署名検証 (3.4.3.1 署名検証方法)
     let verificationResult = signatureVerifier.verifySignature(
-      signatureData: signature,
+      checkCode: checkCode,
+      certificate: certificate,
       frontImageData: frontImage,
       faceImageData: faceImage
     )
-    
+
     let cardData = ResidenceCardData(
       commonData: commonData,
       cardType: cardType,
@@ -675,7 +694,8 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
       faceImage: faceImage,
       address: address,
       additionalData: additionalData,
-      signature: signature,
+      checkCode: checkCode,
+      certificate: certificate,
       signatureVerificationResult: verificationResult
     )
     
@@ -708,8 +728,11 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
       print("\n📝 Additional Data: None (特別永住者証明書)")
     }
     
-    print("\n✍️ Signature: \(signature.count) bytes")
-    print("   Hex (first 50): \(signature.prefix(50).map { String(format: "%02X", $0) }.joined(separator: " "))\(signature.count > 50 ? "..." : "")")
+    print("\n✍️ Check Code: \(checkCode.count) bytes")
+    print("   Hex (first 50): \(checkCode.prefix(50).map { String(format: "%02X", $0) }.joined(separator: " "))\(checkCode.count > 50 ? "..." : "")")
+
+    print("\n🔑 Certificate: \(certificate.count) bytes")
+    print("   Hex (first 50): \(certificate.prefix(50).map { String(format: "%02X", $0) }.joined(separator: " "))\(certificate.count > 50 ? "..." : "")")
     
     if let verificationResult = cardData.signatureVerificationResult {
       print("\n🔐 Signature Verification:")
@@ -722,7 +745,7 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
     }
     
     print("\n📊 Summary:")
-    let totalSize = commonData.count + cardType.count + frontImage.count + faceImage.count + address.count + signature.count
+    let totalSize = commonData.count + cardType.count + frontImage.count + faceImage.count + address.count + checkCode.count + certificate.count
     print("   Total data size: \(totalSize) bytes")
     print("   Card Number: \(cardNumber)")
     print("   Session Key: \(sessionKey?.map { String(format: "%02X", $0) }.joined(separator: " ") ?? "None")")
@@ -743,17 +766,18 @@ struct ResidenceCardData: Equatable {
   let faceImage: Data
   let address: Data
   let additionalData: AdditionalData?
-  let signature: Data
-  
+  let checkCode: Data      // Tag 0xDA - 256 bytes encrypted hash
+  let certificate: Data    // Tag 0xDB - X.509 public key certificate
+
   // Signature verification status
   var signatureVerificationResult: ResidenceCardSignatureVerifier.VerificationResult?
-  
+
   struct AdditionalData: Equatable {
     let comprehensivePermission: Data
     let individualPermission: Data
     let extensionApplication: Data
   }
-  
+
   // Custom Equatable implementation to handle optional verification result
   static func == (lhs: ResidenceCardData, rhs: ResidenceCardData) -> Bool {
     return lhs.commonData == rhs.commonData &&
@@ -762,7 +786,8 @@ struct ResidenceCardData: Equatable {
     lhs.faceImage == rhs.faceImage &&
     lhs.address == rhs.address &&
     lhs.additionalData == rhs.additionalData &&
-    lhs.signature == rhs.signature
+    lhs.checkCode == rhs.checkCode &&
+    lhs.certificate == rhs.certificate
     // Note: signatureVerificationResult is not included in equality check
   }
 }
@@ -1239,6 +1264,52 @@ extension ResidenceCardReader {
       return nil
     }
     return String(data: data.subdata(in: 2..<3), encoding: .utf8)
+  }
+
+  /// Parse TLV data to extract value for a specific tag
+  internal func parseTLV(data: Data, tag: UInt8) -> Data? {
+    var offset = 0
+
+    while offset < data.count {
+      guard offset + 2 <= data.count else { break }
+
+      let currentTag = data[offset]
+      var length = 0
+      var lengthFieldSize = 1
+
+      // Parse length according to BER-TLV encoding rules
+      let lengthByte = data[offset + 1]
+
+      if lengthByte <= 0x7F {
+        // Short form: length is directly encoded in one byte (0x00 to 0x7F)
+        length = Int(lengthByte)
+        lengthFieldSize = 1
+      } else if lengthByte == 0x81 {
+        // Extended form: next byte contains length (0x00 to 0xFF)
+        guard offset + 3 <= data.count else { break }
+        length = Int(data[offset + 2])
+        lengthFieldSize = 2
+      } else if lengthByte == 0x82 {
+        // Extended form: next 2 bytes contain length (big-endian)
+        guard offset + 4 <= data.count else { break }
+        length = Int(data[offset + 2]) * 256 + Int(data[offset + 3])
+        lengthFieldSize = 3
+      } else {
+        // Unsupported length encoding
+        break
+      }
+
+      let valueStart = offset + 1 + lengthFieldSize
+      guard valueStart + length <= data.count else { break }
+
+      if currentTag == tag {
+        return data.subdata(in: valueStart..<(valueStart + length))
+      }
+
+      offset = valueStart + length
+    }
+
+    return nil
   }
 }
 

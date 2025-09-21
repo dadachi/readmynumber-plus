@@ -194,7 +194,8 @@ struct ImageConverterTests {
             faceImage: jpegData,
             address: Data(),
             additionalData: nil,
-            signature: Data(),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(),
             signatureVerificationResult: nil
         )
         
@@ -218,7 +219,8 @@ struct ImageConverterTests {
             faceImage: jpegData,
             address: Data(),
             additionalData: nil,
-            signature: Data(),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(),
             signatureVerificationResult: nil
         )
         
@@ -240,7 +242,8 @@ struct ImageConverterTests {
             faceImage: invalidData,
             address: Data(),
             additionalData: nil,
-            signature: Data(),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(),
             signatureVerificationResult: nil
         )
         
@@ -261,7 +264,8 @@ struct ImageConverterTests {
             faceImage: invalidData,
             address: Data(),
             additionalData: nil,
-            signature: Data(),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(),
             signatureVerificationResult: nil
         )
         
@@ -282,7 +286,8 @@ struct ImageConverterTests {
             faceImage: emptyData,
             address: Data(),
             additionalData: nil,
-            signature: Data(),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(),
             signatureVerificationResult: nil
         )
         
