@@ -8,12 +8,14 @@ import Security
 protocol SignatureVerifier {
     /// Verify the digital signature of residence card data
     /// - Parameters:
-    ///   - signatureData: The signature data from DF3/EF01
+    ///   - checkCode: The check code (tag 0xDA) - 256 bytes encrypted hash
+    ///   - certificate: The X.509 certificate (tag 0xDB)
     ///   - frontImageData: The front image data from DF1/EF01
     ///   - faceImageData: The face image data from DF1/EF02
     /// - Returns: Verification result
     func verifySignature(
-        signatureData: Data,
+        checkCode: Data,
+        certificate: Data,
         frontImageData: Data,
         faceImageData: Data
     ) -> ResidenceCardSignatureVerifier.VerificationResult
@@ -28,12 +30,16 @@ class MockSignatureVerifier: SignatureVerifier {
     var verificationCalls: [(signatureData: Data, frontImageData: Data, faceImageData: Data)] = []
     
     func verifySignature(
-        signatureData: Data,
+        checkCode: Data,
+        certificate: Data,
         frontImageData: Data,
         faceImageData: Data
     ) -> ResidenceCardSignatureVerifier.VerificationResult {
-        verificationCalls.append((signatureData, frontImageData, faceImageData))
-        
+        // Store combined data for backwards compatibility
+        let combinedData = Data([0xDA]) + Data([UInt8(checkCode.count)]) + checkCode +
+                          Data([0xDB]) + Data([0x82, UInt8(certificate.count >> 8), UInt8(certificate.count & 0xFF)]) + certificate
+        verificationCalls.append((combinedData, frontImageData, faceImageData))
+
         if shouldReturnValid {
             return ResidenceCardSignatureVerifier.VerificationResult(isValid: true, error: nil, details: nil)
         } else {
@@ -185,7 +191,7 @@ public class ResidenceCardSignatureVerifier: SignatureVerifier {
     // MARK: - Public Methods
     
     /// Verify the digital signature according to section 3.4.3.1 of 在留カード等仕様書
-    /// 
+    ///
     /// This method implements the complete authentication sequence (3.5.2 認証シーケンス) by:
     /// 1. Following the data reading procedure (3.5 データの読み出し手順)
     /// 2. Performing cryptographic verification using RSA-2048 and SHA-256
@@ -193,38 +199,35 @@ public class ResidenceCardSignatureVerifier: SignatureVerifier {
     ///
     /// The verification process validates that the image data has not been tampered with
     /// by comparing a digitally signed hash with a calculated hash of the actual image data.
-    /// 
+    ///
     /// - Parameters:
-    ///   - signatureData: The signature data from DF3/EF01 containing encrypted hash and certificate
+    ///   - checkCode: The check code (tag 0xDA) - 256 bytes encrypted hash
+    ///   - certificate: The X.509 certificate (tag 0xDB) in DER format
     ///   - frontImageData: The front image data from DF1/EF01 (券面イメージ) - must be exactly 7000 bytes after padding
     ///   - faceImageData: The face image data from DF1/EF02 (顔画像) - must be exactly 3000 bytes after padding
     /// - Returns: Verification result with detailed information about the verification process
     public func verifySignature(
-        signatureData: Data,
+        checkCode: Data,
+        certificate: Data,
         frontImageData: Data,
         faceImageData: Data
     ) -> VerificationResult {
-        
-        // STEP 1: Extract signature components from DF3/EF01
-        // Following 3.5.2 認証シーケンス - Parse TLV structure to extract:
-        // - Tag 0xDA: チェックコード (encrypted hash, 256 bytes for RSA-2048)
-        // - Tag 0xDB: 公開鍵証明書 (X.509 certificate in DER format)
-        guard let checkCode = extractCheckCode(from: signatureData) else {
-            return VerificationResult(isValid: false, error: .missingCheckCode, details: nil)
-        }
-        
+
+        // STEP 1: Validate check code and certificate data
+        // The check code should be exactly 256 bytes (RSA-2048 encrypted hash)
         guard checkCode.count == Constants.checkCodeLength else {
             return VerificationResult(isValid: false, error: .invalidCheckCodeLength, details: nil)
         }
-        
-        guard let certificateData = extractCertificate(from: signatureData) else {
+
+        // Certificate should exist and be non-empty
+        guard !certificate.isEmpty else {
             return VerificationResult(isValid: false, error: .missingCertificate, details: nil)
         }
         
         // STEP 2: Extract RSA-2048 public key from X.509 certificate
         // The certificate is in DER format and contains the issuer's public key
         // used for verifying the digital signature created during card personalization
-        guard let publicKey = extractPublicKey(from: certificateData) else {
+        guard let publicKey = extractPublicKey(from: certificate) else {
             return VerificationResult(isValid: false, error: .publicKeyExtractionFailed, details: nil)
         }
         
@@ -269,7 +272,7 @@ public class ResidenceCardSignatureVerifier: SignatureVerifier {
         let isValid = extractedHash == calculatedHashData
         
         // Get certificate details for display
-        let details = extractCertificateDetails(from: certificateData)
+        let details = extractCertificateDetails(from: certificate)
         
         let verificationDetails = VerificationDetails(
             checkCodeHash: extractedHash.hexString,
@@ -286,16 +289,8 @@ public class ResidenceCardSignatureVerifier: SignatureVerifier {
             details: verificationDetails
         )
     }
-    
+
     // MARK: - Private Methods
-    
-    private func extractCheckCode(from signatureData: Data) -> Data? {
-        return parseTLV(data: signatureData, tag: Constants.checkCodeTag)
-    }
-    
-    private func extractCertificate(from signatureData: Data) -> Data? {
-        return parseTLV(data: signatureData, tag: Constants.certificateTag)
-    }
     
     private func extractImageValue(from imageData: Data) -> Data? {
         // Extract and process image data following the TLV structure defined in 3.5 データの読み出し手順

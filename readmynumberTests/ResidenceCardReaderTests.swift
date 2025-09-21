@@ -181,14 +181,15 @@ struct ResidenceCardDataTests {
         let frontImage = Data([0xFF, 0xD8]) // JPEG marker
         let faceImage = Data([0xFF, 0xD8])
         let address = TestDataFactory.createValidAddress()
-        let signature = Data([0x30, 0x82]) // ASN.1 sequence
-        
+        let checkCode = Data(repeating: 0xAA, count: 256) // RSA-2048 signature
+        let certificate = Data([0x30, 0x82]) // ASN.1 sequence for X.509 cert
+
         let additionalData = ResidenceCardData.AdditionalData(
             comprehensivePermission: Data("Permission".utf8),
             individualPermission: Data("Individual".utf8),
             extensionApplication: Data("Extension".utf8)
         )
-        
+
         let cardData = ResidenceCardData(
             commonData: commonData,
             cardType: cardType,
@@ -196,17 +197,19 @@ struct ResidenceCardDataTests {
             faceImage: faceImage,
             address: address,
             additionalData: additionalData,
-            signature: signature,
+            checkCode: checkCode,
+            certificate: certificate,
             signatureVerificationResult: nil
         )
-        
+
         #expect(cardData.commonData == commonData)
         #expect(cardData.cardType == cardType)
         #expect(cardData.frontImage == frontImage)
         #expect(cardData.faceImage == faceImage)
         #expect(cardData.address == address)
         #expect(cardData.additionalData != nil)
-        #expect(cardData.signature == signature)
+        #expect(cardData.checkCode == checkCode)
+        #expect(cardData.certificate == certificate)
     }
     
     @Test("TLV parsing with valid data")
@@ -224,7 +227,8 @@ struct ResidenceCardDataTests {
             faceImage: Data(),
             address: Data(),
             additionalData: nil,
-            signature: Data(),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(),
             signatureVerificationResult: nil
         )
         
@@ -253,7 +257,8 @@ struct ResidenceCardDataTests {
             faceImage: Data(),
             address: Data(),
             additionalData: nil,
-            signature: Data(),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(),
             signatureVerificationResult: nil
         )
         
@@ -273,7 +278,8 @@ struct ResidenceCardDataTests {
             faceImage: Data(),
             address: Data(),
             additionalData: nil,
-            signature: Data(),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(),
             signatureVerificationResult: nil
         )
         
@@ -3037,7 +3043,8 @@ struct ResidenceCardDataManagerTests {
                 faceImage: Data([0x04]),
                 address: Data([0x05]),
                 additionalData: nil,
-                signature: Data([0x06]),
+                checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data([0x06]),
                 signatureVerificationResult: nil
             )
             
@@ -3055,7 +3062,8 @@ struct ResidenceCardDataManagerTests {
             #expect(manager.cardData?.faceImage == Data([0x04]))
             #expect(manager.cardData?.address == Data([0x05]))
             #expect(manager.cardData?.additionalData == nil)
-            #expect(manager.cardData?.signature == Data([0x06]))
+            #expect(manager.cardData?.checkCode == Data(repeating: 0x00, count: 256))
+            #expect(manager.cardData?.certificate == Data([0x06]))
             
             // Clear data
             manager.clearData()
@@ -3087,7 +3095,8 @@ struct ResidenceCardDataManagerTests {
             faceImage: Data([0x40]),
             address: Data([0x50]),
             additionalData: additionalData,
-            signature: Data([0x60]),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data([0x60]),
             signatureVerificationResult: nil
         )
         
@@ -3124,7 +3133,8 @@ struct ResidenceCardDataManagerTests {
                 faceImage: Data(),
                 address: Data(),
                 additionalData: nil,
-                signature: Data(),
+                checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(),
                 signatureVerificationResult: nil
             )
             
@@ -3172,7 +3182,8 @@ struct ResidenceCardReaderIntegrationTests {
             faceImage: faceImage,
             address: address,
             additionalData: additionalData,
-            signature: signature,
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: signature,
             signatureVerificationResult: nil
         )
         
@@ -3183,7 +3194,8 @@ struct ResidenceCardReaderIntegrationTests {
         #expect(cardData.faceImage.count == 1000)
         #expect(cardData.address.count > 0)
         #expect(cardData.additionalData != nil)
-        #expect(cardData.signature.count > 0)
+        #expect(cardData.checkCode.count == 256)
+        #expect(cardData.certificate.count > 0)
         
         // Test TLV parsing on the created data
         let parsedCommon = cardData.parseTLV(data: commonData, tag: 0xC0)
@@ -3639,7 +3651,8 @@ struct FrontImageLoadingTests {
             faceImage: faceImageData,
             address: Data([0x11, 0x10, 0x6A, 0x65, 0x6E, 0x6B, 0x69, 0x6E, 0x73]),
             additionalData: nil,
-            signature: Data(repeating: 0xFF, count: 256),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(repeating: 0xFF, count: 256),
             signatureVerificationResult: nil
         )
         
@@ -3671,7 +3684,8 @@ struct FrontImageLoadingTests {
             faceImage: faceImageData,
             address: Data([0x11, 0x10, 0x6A, 0x65, 0x6E, 0x6B, 0x69, 0x6E, 0x73]),
             additionalData: nil,
-            signature: Data(repeating: 0xFF, count: 256),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(repeating: 0xFF, count: 256),
             signatureVerificationResult: nil
         )
         
@@ -3727,7 +3741,8 @@ struct FrontImageLoadingTests {
             faceImage: faceImageData,
             address: Data([0x11, 0x10, 0x6A, 0x65, 0x6E, 0x6B, 0x69, 0x6E, 0x73]),
             additionalData: nil,
-            signature: Data(repeating: 0xFF, count: 256),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(repeating: 0xFF, count: 256),
             signatureVerificationResult: nil
         )
         
@@ -3870,8 +3885,13 @@ struct SignatureVerificationTests {
         let frontImage = Data(repeating: 0x33, count: 100)
         let faceImage = Data(repeating: 0x44, count: 50)
 
+        // Extract check code and certificate from TLV for new API
+        let mockCheckCode = Data(repeating: 0x11, count: 256) // RSA-2048 size
+        let mockCertificate = Data(repeating: 0x22, count: 1200) // Typical cert size
+
         let result = verifier.verifySignature(
-            signatureData: mockSignature,
+            checkCode: mockCheckCode,
+            certificate: mockCertificate,
             frontImageData: frontImage,
             faceImageData: faceImage
         )
@@ -3885,9 +3905,10 @@ struct SignatureVerificationTests {
     func testErrorHandlingForMissingData() {
         let verifier = ResidenceCardSignatureVerifier()
 
-        // Test with empty signature data
+        // Test with empty check code and certificate
         let emptyResult = verifier.verifySignature(
-            signatureData: Data(),
+            checkCode: Data(),
+            certificate: Data(),
             frontImageData: Data([0x01]),
             faceImageData: Data([0x02])
         )
@@ -3901,14 +3922,19 @@ struct SignatureVerificationTests {
         incompleteSignature.append(0x0A)
         incompleteSignature.append(Data(repeating: 0x33, count: 10))
 
+        // Test with invalid check code length
+        let invalidCheckCode = Data(repeating: 0x11, count: 128) // Wrong size
+        let validCertificate = Data(repeating: 0x22, count: 1200)
+
         let missingCheckCodeResult = verifier.verifySignature(
-            signatureData: incompleteSignature,
+            checkCode: invalidCheckCode,
+            certificate: validCertificate,
             frontImageData: Data([0x01]),
             faceImageData: Data([0x02])
         )
 
         #expect(missingCheckCodeResult.isValid == false)
-        #expect(missingCheckCodeResult.error != nil)
+        #expect(missingCheckCodeResult.error == .invalidCheckCodeLength)
     }
 
     @Test("PKCS#1 padding extraction test")
@@ -3980,8 +4006,13 @@ struct SignatureVerificationTests {
         let frontImageData = Data("Test Front".utf8)
         let faceImageData = Data("Test Face".utf8)
 
+        // Extract check code and certificate from TLV structure
+        let checkCode = Data(repeating: 0xAA, count: 256)
+        let certificate = Data(repeating: 0xBB, count: 50)
+
         let result = verifier.verifySignature(
-            signatureData: signatureData,
+            checkCode: checkCode,
+            certificate: certificate,
             frontImageData: frontImageData,
             faceImageData: faceImageData
         )
@@ -4441,7 +4472,8 @@ struct PerformAuthenticationLinesTests {
             faceImage: Data(),
             address: Data(),
             additionalData: nil,
-            signature: Data(),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(),
             signatureVerificationResult: nil
         )
         
@@ -4482,7 +4514,8 @@ struct PerformAuthenticationLinesTests {
             faceImage: Data(),
             address: Data(),
             additionalData: nil,
-            signature: Data(),
+            checkCode: Data(repeating: 0x00, count: 256),
+            certificate: Data(),
             signatureVerificationResult: nil
         )
         

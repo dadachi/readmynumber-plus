@@ -1,0 +1,160 @@
+{
+  "source": "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/MDocView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "M-Doc読み取り中...",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 175
+        }
+      },
+      {
+        "comment": "",
+        "key": "© 2025 Meikenn",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 165
+        }
+      },
+      {
+        "comment": "",
+        "key": "M-Doc読み取り",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 44
+        }
+      },
+      {
+        "comment": "",
+        "key": "ISO/IEC 18013-5準拠のモバイル文書フォーマットに対応しています。デジタル身分証明書やモバイル運転免許証などを読み取ることができます。",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 65
+        }
+      },
+      {
+        "comment": "",
+        "key": "Mobile Document (M-Doc)",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 54
+        }
+      },
+      {
+        "comment": "",
+        "key": "ISO/IEC 18013-5 (mDL)",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 72
+        }
+      },
+      {
+        "comment": "",
+        "key": "ISO/IEC 23220 (モバイルeID)",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 76
+        }
+      },
+      {
+        "comment": "",
+        "key": "NFC & QRコード両対応",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 80
+        }
+      },
+      {
+        "comment": "",
+        "key": "読み取り方法:",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 90
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 94
+        }
+      },
+      {
+        "comment": "",
+        "key": "QRコード",
+        "location": {
+          "startingColumn": 43,
+          "startingLine": 95
+        }
+      },
+      {
+        "comment": "",
+        "key": "NFC",
+        "location": {
+          "startingColumn": 43,
+          "startingLine": 96
+        }
+      },
+      {
+        "comment": "",
+        "key": "Bluetooth",
+        "location": {
+          "startingColumn": 43,
+          "startingLine": 97
+        }
+      },
+      {
+        "comment": "",
+        "key": "M-Docを読み取る",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 108
+        }
+      },
+      {
+        "comment": "",
+        "key": "対応文書タイプ",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 131
+        }
+      },
+      {
+        "comment": "",
+        "key": "モバイル運転免許証 (mDL)",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 139
+        }
+      },
+      {
+        "comment": "",
+        "key": "デジタル身分証明書",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 146
+        }
+      },
+      {
+        "comment": "",
+        "key": "デジタル社員証",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 153
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 106,
+          "startingLine": 183
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,269 @@
+{
+  "" : {
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumber-primary.dia",
+    "emit-module-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumber-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumber-primary-emit-module.dia",
+    "pch" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumber-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumber-primary.swiftdeps"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/GeneratedAssetSymbols~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/CertificateDetailView.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/CertificateDetailView.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/CertificateDetailView.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/CertificateDetailView.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/CertificateDetailView.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/CertificateDetailView.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/CertificateDetailView.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/CertificateDetailView.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/CertificateDetailView~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/ContentView.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ContentView.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ContentView.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ContentView.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ContentView.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ContentView.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ContentView.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ContentView.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ContentView~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/ImageConverter.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageConverter.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageConverter.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageConverter.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageConverter.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageConverter.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageConverter.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageConverter.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageConverter~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/ImageLoadingDiagnostic.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageLoadingDiagnostic.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageLoadingDiagnostic.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageLoadingDiagnostic.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageLoadingDiagnostic.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageLoadingDiagnostic.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageLoadingDiagnostic.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageLoadingDiagnostic.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageLoadingDiagnostic~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/ImageProcessor.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageProcessor.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageProcessor.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageProcessor.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageProcessor.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageProcessor.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageProcessor.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageProcessor.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ImageProcessor~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/MDocDataStructures.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDataStructures.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDataStructures.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDataStructures.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDataStructures.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDataStructures.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDataStructures.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDataStructures.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDataStructures~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/MDocDetailView.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDetailView.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDetailView.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDetailView.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDetailView.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDetailView.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDetailView.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDetailView.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocDetailView~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/MDocParser.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocParser.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocParser.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocParser.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocParser.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocParser.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocParser.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocParser.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocParser~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/MDocReader.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocReader.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocReader.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocReader.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocReader.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocReader.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocReader.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocReader.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocReader~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/MDocView.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocView.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocView.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocView.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocView.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocView.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocView.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocView.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MDocView~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/MainTabView.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MainTabView.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MainTabView.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MainTabView.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MainTabView.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MainTabView.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MainTabView.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MainTabView.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/MainTabView~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/NFCCommandExecutor.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCCommandExecutor.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCCommandExecutor.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCCommandExecutor.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCCommandExecutor.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCCommandExecutor.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCCommandExecutor.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCCommandExecutor.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCCommandExecutor~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/NFCSessionManager.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCSessionManager.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCSessionManager.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCSessionManager.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCSessionManager.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCSessionManager.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCSessionManager.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCSessionManager.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/NFCSessionManager~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/PlainBinaryReader.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/PlainBinaryReader.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/PlainBinaryReader.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/PlainBinaryReader.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/PlainBinaryReader.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/PlainBinaryReader.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/PlainBinaryReader.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/PlainBinaryReader.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/PlainBinaryReader~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/ResidenceCardDetailView.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardDetailView.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardDetailView.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardDetailView.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardDetailView.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardDetailView.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardDetailView.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardDetailView.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardDetailView~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/ResidenceCardReader.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardReader.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardReader.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardReader.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardReader.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardReader.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardReader.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardReader.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardReader~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/ResidenceCardSampleView.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardSampleView.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardSampleView.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardSampleView.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardSampleView.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardSampleView.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardSampleView.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardSampleView.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ResidenceCardSampleView~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/SecureMessagingReader.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SecureMessagingReader.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SecureMessagingReader.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SecureMessagingReader.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SecureMessagingReader.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SecureMessagingReader.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SecureMessagingReader.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SecureMessagingReader.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SecureMessagingReader~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/SignatureCertificateReader.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureCertificateReader.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureCertificateReader.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureCertificateReader.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureCertificateReader.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureCertificateReader.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureCertificateReader.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureCertificateReader.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureCertificateReader~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/SignatureVerifier.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureVerifier.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureVerifier.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureVerifier.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureVerifier.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureVerifier.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureVerifier.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureVerifier.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/SignatureVerifier~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/TDESCryptography.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TDESCryptography.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TDESCryptography.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TDESCryptography.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TDESCryptography.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TDESCryptography.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TDESCryptography.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TDESCryptography.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TDESCryptography~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/ThreadDispatcher.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ThreadDispatcher.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ThreadDispatcher.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ThreadDispatcher.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ThreadDispatcher.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ThreadDispatcher.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ThreadDispatcher.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ThreadDispatcher.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/ThreadDispatcher~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/TransparentBackgroundTestView.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TransparentBackgroundTestView.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TransparentBackgroundTestView.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TransparentBackgroundTestView.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TransparentBackgroundTestView.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TransparentBackgroundTestView.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TransparentBackgroundTestView.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TransparentBackgroundTestView.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/TransparentBackgroundTestView~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/UserAuthenticationCertificateReader.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/UserAuthenticationCertificateReader.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/UserAuthenticationCertificateReader.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/UserAuthenticationCertificateReader.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/UserAuthenticationCertificateReader.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/UserAuthenticationCertificateReader.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/UserAuthenticationCertificateReader.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/UserAuthenticationCertificateReader.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/UserAuthenticationCertificateReader~partial.swiftmodule"
+  },
+  "/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/readmynumberApp.swift" : {
+    "const-values" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumberApp.swiftconstvalues",
+    "dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumberApp.d",
+    "diagnostics" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumberApp.dia",
+    "index-unit-output-path" : "/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumberApp.o",
+    "llvm-bc" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumberApp.bc",
+    "object" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumberApp.o",
+    "swift-dependencies" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumberApp.swiftdeps",
+    "swiftmodule" : "/Users/adachi/pg/iphone/readmynumber-plus/build/readmynumber.build/Debug-iphonesimulator/readmynumber.build/Objects-normal/arm64/readmynumberApp~partial.swiftmodule"
+  }
+}

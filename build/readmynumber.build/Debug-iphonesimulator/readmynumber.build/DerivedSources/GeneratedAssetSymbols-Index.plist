@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>colors</key>
+	<array/>
+	<key>images</key>
+	<array>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameFrontImage</string>
+			<key>relativePath</key>
+			<string>./front_image.imageset</string>
+			<key>swiftSymbol</key>
+			<string>front</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameFrontImageBackground</string>
+			<key>relativePath</key>
+			<string>./front_image_background.imageset</string>
+			<key>swiftSymbol</key>
+			<string>frontImageBackground</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/adachi/pg/iphone/readmynumber-plus/readmynumber/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameFrontImageWithBackground</string>
+			<key>relativePath</key>
+			<string>./front_image_with_background.imageset</string>
+			<key>swiftSymbol</key>
+			<string>frontImageWithBackground</string>
+		</dict>
+	</array>
+	<key>symbols</key>
+	<array/>
+</dict>
+</plist>
