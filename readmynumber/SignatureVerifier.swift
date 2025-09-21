@@ -35,9 +35,8 @@ class MockSignatureVerifier: SignatureVerifier {
         frontImageData: Data,
         faceImageData: Data
     ) -> ResidenceCardSignatureVerifier.VerificationResult {
-        // Store combined data for backwards compatibility
-        let combinedData = Data([0xDA]) + Data([UInt8(checkCode.count)]) + checkCode +
-                          Data([0xDB]) + Data([0x82, UInt8(certificate.count >> 8), UInt8(certificate.count & 0xFF)]) + certificate
+        // Store simple combined data for backwards compatibility
+        let combinedData = checkCode + certificate
         verificationCalls.append((combinedData, frontImageData, faceImageData))
 
         if shouldReturnValid {

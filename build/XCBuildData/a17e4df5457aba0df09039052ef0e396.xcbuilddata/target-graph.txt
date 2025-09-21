@@ -1,0 +1,4 @@
+Target dependency graph (2 targets)
+Target 'readmynumberTests' in project 'readmynumber'
+➜ Explicit dependency on target 'readmynumber' in project 'readmynumber'
+Target 'readmynumber' in project 'readmynumber' (no dependencies)
