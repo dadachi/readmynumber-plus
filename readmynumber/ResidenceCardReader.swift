@@ -184,7 +184,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
   /// - 在留カード等仕様書 3.5.2 認証シーケンス
   /// - ISO/IEC 7816-4 セキュアメッセージング
   /// - FIPS 46-3 Triple-DES暗号化標準
-  internal func performAuthentication(executor: NFCCommandExecutor) async throws {
+  internal func performAuthentication(executor: NFCCommandExecutor) async throws -> Data {
     // STEP 1: GET CHALLENGE - ICCチャレンジ取得
     // カードから8バイトのランダムな乱数（RND.ICC）を取得します。
     // この乱数は認証プロセスでリプレイ攻撃を防ぐために使用されます。
@@ -241,7 +241,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
     
     // セッション鍵生成: K.Session = SHA-1((K.IFD ⊕ K.ICC) || 00000001)[0..15]
     // この鍵は以降のセキュアメッセージング通信で使用されます
-    sessionKey = try generateSessionKey(kIFD: kIFD, kICC: kICC)
+    let generatedSessionKey = try generateSessionKey(kIFD: kIFD, kICC: kICC)
+    sessionKey = generatedSessionKey
     
     // STEP 5: VERIFY - 在留カード番号による認証実行
     // セッション鍵を使って在留カード番号を暗号化し、カードに送信して認証を行います。
@@ -272,6 +273,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     try checkStatusWord(sw1: sw1Verify, sw2: sw2Verify)
     
     // 認証完了 - セッション鍵によるセキュアメッセージング通信が確立されました
+    return generatedSessionKey
   }
   
   // バイナリ読み出し（SMあり）
@@ -640,7 +642,7 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
     let cardType = try await readBinaryPlain(executor: commandExecutor!, p1: 0x8A)
 
     // 3. 認証処理
-    try await performAuthentication(executor: commandExecutor!)
+    let sessionKey = try await performAuthentication(executor: commandExecutor!)
 
     // 4. DF1選択と券面情報読み取り
     try await selectDF(executor: commandExecutor!, aid: AID.df1)
@@ -748,7 +750,7 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
     let totalSize = commonData.count + cardType.count + frontImage.count + faceImage.count + address.count + checkCode.count + certificate.count
     print("   Total data size: \(totalSize) bytes")
     print("   Card Number: \(cardNumber)")
-    print("   Session Key: \(sessionKey?.map { String(format: "%02X", $0) }.joined(separator: " ") ?? "None")")
+      print("   Session Key: \(sessionKey.map { String(format: "%02X", $0) }.joined(separator: " "))")
     print("===============================================\n")
     
     // DETAILED FULL HEX DUMP LOG
