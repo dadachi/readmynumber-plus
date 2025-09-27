@@ -1013,12 +1013,7 @@ extension ResidenceCardReader {
     internal func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, rndIFD: Data, kEnc: Data, kMac: Data) throws -> Data {
         // STEP 1: MAC検証 - データ完全性の確認
         // カードから受信したM.ICCと、E.ICCから計算したMACを比較
-        let calculatedMAC: Data
-        do {
-            calculatedMAC = try cryptoProvider.calculateRetailMAC(data: eICC, key: kMac)
-        } catch let error as CryptoProviderImpl.CryptoError {
-            throw ResidenceCardReaderError.cryptographyError(error.localizedDescription)
-        }
+        let calculatedMAC = try cryptoProvider.calculateRetailMAC(data: eICC, key: kMac)
         guard calculatedMAC == mICC else {
             throw ResidenceCardReaderError.cryptographyError("MAC verification failed")
         }

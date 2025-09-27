@@ -1695,12 +1695,12 @@ struct ResidenceCardReaderTests {
         let shortKey = Data([0x01, 0x02, 0x03]) // Too short
         let data = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
 
-        #expect(throws: CryptoProviderImpl.CryptoError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try cryptoProvider.performSingleDES(data: data, key: shortKey, encrypt: true)
         }
 
         let longKey = Data(repeating: 0x01, count: 16) // Too long
-        #expect(throws: CryptoProviderImpl.CryptoError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try cryptoProvider.performSingleDES(data: data, key: longKey, encrypt: true)
         }
     }
@@ -1712,12 +1712,12 @@ struct ResidenceCardReaderTests {
         let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
         let shortData = Data([0x11, 0x22, 0x33]) // Too short
 
-        #expect(throws: CryptoProviderImpl.CryptoError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try cryptoProvider.performSingleDES(data: shortData, key: key, encrypt: true)
         }
 
         let longData = Data(repeating: 0x11, count: 16) // Too long
-        #expect(throws: CryptoProviderImpl.CryptoError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try cryptoProvider.performSingleDES(data: longData, key: key, encrypt: true)
         }
     }

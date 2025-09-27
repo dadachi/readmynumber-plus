@@ -59,7 +59,7 @@ class AuthenticationProviderImpl: AuthenticationProvider {
         let mIFD: Data
         do {
             mIFD = try cryptoProvider.calculateRetailMAC(data: eIFD, key: kMac)
-        } catch let error as CryptoProviderImpl.CryptoError {
+        } catch _ as ResidenceCardReaderError {
             throw AuthenticationError.invalidCardNumber // Convert to AuthenticationError
         }
 
