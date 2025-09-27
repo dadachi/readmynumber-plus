@@ -9,10 +9,10 @@ protocol RDCAuthenticationProvider {
 
 class RDCAuthenticationProviderImpl: RDCAuthenticationProvider {
     private let tdesCryptography: TDESCryptography
-    private let cryptoProvider: CryptoProvider
+    private let cryptoProvider: RDCCryptoProvider
 
     init(tdesCryptography: TDESCryptography = TDESCryptography(),
-         cryptoProvider: CryptoProvider = CryptoProviderImpl()) {
+         cryptoProvider: RDCCryptoProvider = RDCCryptoProviderImpl()) {
         self.tdesCryptography = tdesCryptography
         self.cryptoProvider = cryptoProvider
     }

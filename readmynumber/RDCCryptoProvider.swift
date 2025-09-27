@@ -1,11 +1,11 @@
 import Foundation
 import CommonCrypto
 
-protocol CryptoProvider {
+protocol RDCCryptoProvider {
     func calculateRetailMAC(data: Data, key: Data) throws -> Data
 }
 
-class CryptoProviderImpl: CryptoProvider {
+class RDCCryptoProviderImpl: RDCCryptoProvider {
 
     func calculateRetailMAC(data: Data, key: Data) throws -> Data {
         guard key.count == 16 else {

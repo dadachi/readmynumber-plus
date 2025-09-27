@@ -44,7 +44,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     private var signatureVerifier: SignatureVerifier
     private var authenticationProvider: RDCAuthenticationProvider
     internal var tdesCryptography: TDESCryptography
-    private var cryptoProvider: CryptoProvider
+    private var cryptoProvider: RDCCryptoProvider
 
     // MARK: - Initialization
 
@@ -55,7 +55,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
         self.signatureVerifier = ResidenceCardSignatureVerifier()
         self.authenticationProvider = RDCAuthenticationProviderImpl()
         self.tdesCryptography = TDESCryptography()
-        self.cryptoProvider = CryptoProviderImpl()
+        self.cryptoProvider = RDCCryptoProviderImpl()
         super.init()
     }
 
@@ -66,7 +66,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
         signatureVerifier: SignatureVerifier,
         authenticationProvider: RDCAuthenticationProvider = RDCAuthenticationProviderImpl(),
         tdesCryptography: TDESCryptography = TDESCryptography(),
-        cryptoProvider: CryptoProvider = CryptoProviderImpl()
+        cryptoProvider: RDCCryptoProvider = RDCCryptoProviderImpl()
     ) {
         self.sessionManager = sessionManager
         self.threadDispatcher = threadDispatcher
