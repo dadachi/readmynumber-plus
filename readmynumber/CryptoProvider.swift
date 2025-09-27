@@ -65,7 +65,7 @@ class CryptoProviderImpl: CryptoProvider {
         return mac
     }
 
-    private func performSingleDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
+    internal func performSingleDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
         guard key.count == 8 && data.count == 8 else {
             throw CryptoError.invalidDataLength("Invalid data or key length for single DES")
         }

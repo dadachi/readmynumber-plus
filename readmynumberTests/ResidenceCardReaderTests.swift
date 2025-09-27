@@ -668,16 +668,16 @@ struct ResidenceCardReaderTests {
         ])
         
         // Basic functionality test
-        let mac = try reader.calculateRetailMAC(data: data, key: key)
+        let mac = try CryptoProviderImpl().calculateRetailMAC(data: data, key: key)
         #expect(mac.count == 8) // MAC should be 8 bytes
         
         // MAC should be deterministic
-        let mac2 = try reader.calculateRetailMAC(data: data, key: key)
+        let mac2 = try CryptoProviderImpl().calculateRetailMAC(data: data, key: key)
         #expect(mac == mac2) // Same data and key should produce same MAC
         
         // Different data should produce different MAC
         let differentData = Data([0x05, 0x06, 0x07, 0x08])
-        let differentMAC = try reader.calculateRetailMAC(data: differentData, key: key)
+        let differentMAC = try CryptoProviderImpl().calculateRetailMAC(data: differentData, key: key)
         #expect(mac != differentMAC) // Different data should produce different MAC
     }
     
@@ -750,8 +750,8 @@ struct ResidenceCardReaderTests {
         
         // Test that MAC calculation is consistent
         // We calculate MAC for the same data twice to ensure consistency
-        let calculatedMAC = try reader.calculateRetailMAC(data: eIFD, key: kMac)
-        let calculatedMAC2 = try reader.calculateRetailMAC(data: eIFD, key: kMac)
+        let calculatedMAC = try CryptoProviderImpl().calculateRetailMAC(data: eIFD, key: kMac)
+        let calculatedMAC2 = try CryptoProviderImpl().calculateRetailMAC(data: eIFD, key: kMac)
         #expect(calculatedMAC == calculatedMAC2) // MAC should be deterministic
         
         // The MAC from generateAuthenticationData should also be consistent
@@ -790,7 +790,7 @@ struct ResidenceCardReaderTests {
         // Create ICC authentication data: rndICC + rndIFD + kICC
         let iccAuthData = rndICC + rndIFD + kICC // 32 bytes total
         let eICC = try reader.tdesCryptography.performTDES(data: iccAuthData, key: kEnc, encrypt: true)
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try CryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         // Test verification
       let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
@@ -901,11 +901,11 @@ struct ResidenceCardReaderTests {
         let key = Data(repeating: 0x55, count: 16)
         
         // MAC of empty data should still work
-        let mac = try reader.calculateRetailMAC(data: Data(), key: key)
+        let mac = try CryptoProviderImpl().calculateRetailMAC(data: Data(), key: key)
         #expect(mac.count == 8) // Should still produce 8-byte MAC
         
         // Should be deterministic
-        let mac2 = try reader.calculateRetailMAC(data: Data(), key: key)
+        let mac2 = try CryptoProviderImpl().calculateRetailMAC(data: Data(), key: key)
         #expect(mac == mac2)
     }
     
@@ -973,7 +973,7 @@ struct ResidenceCardReaderTests {
         let kICC = Data(repeating: 0x99, count: 16)
         let iccAuthData = rndICC + rndIFD + kICC
         let eICC = try reader.tdesCryptography.performTDES(data: iccAuthData, key: kEnc, encrypt: true)
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try CryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         // Test with corrupted encrypted data
         var corruptedEICC = eICC
@@ -985,7 +985,7 @@ struct ResidenceCardReaderTests {
         
         // Test with wrong encrypted data size
         let wrongSizeEICC = Data(repeating: 0xAA, count: 16) // Too small (16 bytes instead of 32)
-        let wrongSizeMAC = try reader.calculateRetailMAC(data: wrongSizeEICC, key: kMac)
+        let wrongSizeMAC = try CryptoProviderImpl().calculateRetailMAC(data: wrongSizeEICC, key: kMac)
         
         // This should fail during RND.ICC verification because decrypted data structure is wrong
         #expect(throws: CardReaderError.self) {
@@ -1138,7 +1138,7 @@ struct ResidenceCardReaderTests {
         
         let iccAuthData = rndICC + rndIFD + kICC // Card's authentication data
         let eICC = try reader.tdesCryptography.performTDES(data: iccAuthData, key: kEnc, encrypt: true)
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try CryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         // Step 3: IFD verifies card response
       let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
@@ -1208,7 +1208,7 @@ struct ResidenceCardReaderTests {
             #expect(decrypted.prefix(data.count) == data)
             
             // Test MAC calculation
-            let mac = try reader.calculateRetailMAC(data: data, key: key)
+            let mac = try CryptoProviderImpl().calculateRetailMAC(data: data, key: key)
             #expect(mac.count == 8)
             
             // Test session key generation
@@ -1669,74 +1669,74 @@ struct ResidenceCardReaderTests {
     }
 
     // MARK: - Tests for performSingleDES
-    
+
     @Test("Single DES encryption and decryption")
     func testSingleDESEncryptionDecryption() throws {
-        let reader = ResidenceCardReader()
-        
+        let cryptoProvider = CryptoProviderImpl()
+
         let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
         let plaintext = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
-        
+
         // Encrypt
-        let encrypted = try reader.performSingleDES(data: plaintext, key: key, encrypt: true)
+        let encrypted = try cryptoProvider.performSingleDES(data: plaintext, key: key, encrypt: true)
         #expect(encrypted.count == 8)
         #expect(encrypted != plaintext)
-        
+
         // Decrypt
-        let decrypted = try reader.performSingleDES(data: encrypted, key: key, encrypt: false)
+        let decrypted = try cryptoProvider.performSingleDES(data: encrypted, key: key, encrypt: false)
         #expect(decrypted == plaintext)
     }
-    
+
     @Test("Single DES with invalid key length")
     func testSingleDESInvalidKeyLength() throws {
-        let reader = ResidenceCardReader()
-        
+        let cryptoProvider = CryptoProviderImpl()
+
         let shortKey = Data([0x01, 0x02, 0x03]) // Too short
         let data = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
-        
-        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
-            _ = try reader.performSingleDES(data: data, key: shortKey, encrypt: true)
+
+        #expect(throws: CryptoProviderImpl.CryptoError.self) {
+            _ = try cryptoProvider.performSingleDES(data: data, key: shortKey, encrypt: true)
         }
-        
+
         let longKey = Data(repeating: 0x01, count: 16) // Too long
-        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
-            _ = try reader.performSingleDES(data: data, key: longKey, encrypt: true)
+        #expect(throws: CryptoProviderImpl.CryptoError.self) {
+            _ = try cryptoProvider.performSingleDES(data: data, key: longKey, encrypt: true)
         }
     }
-    
+
     @Test("Single DES with invalid data length")
     func testSingleDESInvalidDataLength() throws {
-        let reader = ResidenceCardReader()
-        
+        let cryptoProvider = CryptoProviderImpl()
+
         let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
         let shortData = Data([0x11, 0x22, 0x33]) // Too short
-        
-        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
-            _ = try reader.performSingleDES(data: shortData, key: key, encrypt: true)
+
+        #expect(throws: CryptoProviderImpl.CryptoError.self) {
+            _ = try cryptoProvider.performSingleDES(data: shortData, key: key, encrypt: true)
         }
-        
+
         let longData = Data(repeating: 0x11, count: 16) // Too long
-        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
-            _ = try reader.performSingleDES(data: longData, key: key, encrypt: true)
+        #expect(throws: CryptoProviderImpl.CryptoError.self) {
+            _ = try cryptoProvider.performSingleDES(data: longData, key: key, encrypt: true)
         }
     }
-    
+
     @Test("Single DES with known test vector")
     func testSingleDESKnownVector() throws {
-        let reader = ResidenceCardReader()
-        
+        let cryptoProvider = CryptoProviderImpl()
+
         // Known DES test vector
         let key = Data([0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01])
         let plaintext = Data([0x95, 0xF8, 0xA5, 0xE5, 0xDD, 0x31, 0xD9, 0x00])
-        
-        let encrypted = try reader.performSingleDES(data: plaintext, key: key, encrypt: true)
+
+        let encrypted = try cryptoProvider.performSingleDES(data: plaintext, key: key, encrypt: true)
         #expect(encrypted.count == 8)
-        
+
         // Verify it's reversible
-        let decrypted = try reader.performSingleDES(data: encrypted, key: key, encrypt: false)
+        let decrypted = try cryptoProvider.performSingleDES(data: encrypted, key: key, encrypt: false)
         #expect(decrypted == plaintext)
     }
-    
+
     // MARK: - Tests for private validation methods (now internal)
     
     @Test("Valid characters check")
@@ -2037,10 +2037,10 @@ struct ResidenceCardReaderTests {
         #expect(largeEncrypted.count >= largeData.count) // Should be padded
         
         // Test Retail MAC with various data sizes
-        let emptyMAC = try reader.calculateRetailMAC(data: Data(), key: key)
+        let emptyMAC = try CryptoProviderImpl().calculateRetailMAC(data: Data(), key: key)
         #expect(emptyMAC.count == 8)
         
-        let singleByteMAC = try reader.calculateRetailMAC(data: Data([0x01]), key: key)
+        let singleByteMAC = try CryptoProviderImpl().calculateRetailMAC(data: Data([0x01]), key: key)
         #expect(singleByteMAC.count == 8)
         #expect(singleByteMAC != emptyMAC) // Should be different
         
@@ -4157,7 +4157,7 @@ struct PerformAuthenticationLinesTests {
         let eICC = try reader.tdesCryptography.performTDES(data: expectedDecrypted, key: kEnc, encrypt: true)
         
         // Calculate MAC for eICC
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try CryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         // Test the method
         let extractedKICC = try reader.verifyAndExtractKICC(
@@ -4214,7 +4214,7 @@ struct PerformAuthenticationLinesTests {
         let wrongRNDICC = Data(repeating: 0xFF, count: 8)
         let invalidData = wrongRNDICC + rndIFD + kICC
         let eICC = try reader.tdesCryptography.performTDES(data: invalidData, key: kEnc, encrypt: true)
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try CryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         #expect(throws: CardReaderError.self) {
             _ = try reader.verifyAndExtractKICC(
@@ -4242,7 +4242,7 @@ struct PerformAuthenticationLinesTests {
         let wrongRNDIFD = Data(repeating: 0xFF, count: 8)
         let invalidData = rndICC + wrongRNDIFD + kICC
         let eICC = try reader.tdesCryptography.performTDES(data: invalidData, key: kEnc, encrypt: true)
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try CryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         #expect(throws: CardReaderError.self) {
             _ = try reader.verifyAndExtractKICC(
