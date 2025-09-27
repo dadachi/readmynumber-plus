@@ -140,7 +140,7 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("selectMF with executor successful")
     func testSelectMFWithExecutorSuccessful() async throws {
-        let mockExecutor = MockNFCCommandExecutor()
+        let mockExecutor = MockRDCNFCCommandExecutor()
         let mockSession = MockNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
         let mockVerifier = MockSignatureVerifier()
@@ -165,7 +165,7 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("selectDF with executor successful")
     func testSelectDFWithExecutorSuccessful() async throws {
-        let mockExecutor = MockNFCCommandExecutor()
+        let mockExecutor = MockRDCNFCCommandExecutor()
         let mockSession = MockNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
         let mockVerifier = MockSignatureVerifier()
@@ -213,7 +213,7 @@ struct ResidenceCardReaderOrchestrationTests {
         )
         
         // Test that command executor can be set
-        let mockExecutor = MockNFCCommandExecutor()
+        let mockExecutor = MockRDCNFCCommandExecutor()
         reader.setCommandExecutor(mockExecutor)
         
         // Test passes if no exceptions are thrown

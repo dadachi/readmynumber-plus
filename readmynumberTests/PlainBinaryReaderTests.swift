@@ -14,7 +14,7 @@ struct PlainBinaryReaderTests {
 
     @Test("PlainBinaryReader initialization")
     func testPlainBinaryReaderInitialization() {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = PlainBinaryReader(commandExecutor: executor)
 
         // Test passes if initialization succeeds
@@ -23,7 +23,7 @@ struct PlainBinaryReaderTests {
 
     @Test("PlainBinaryReader successful read")
     func testPlainBinaryReaderSuccess() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = PlainBinaryReader(commandExecutor: executor)
         let expectedData = Data([0x30, 0x31, 0x32, 0x33])  // "0123"
 
@@ -40,7 +40,7 @@ struct PlainBinaryReaderTests {
 
     @Test("PlainBinaryReader error handling")
     func testPlainBinaryReaderError() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = PlainBinaryReader(commandExecutor: executor)
 
         executor.shouldSucceed = false
@@ -64,7 +64,7 @@ struct PlainBinaryReaderTests {
 
     @Test("PlainBinaryReader with different p1/p2 parameter combinations")
     func testPlainBinaryReaderParameterCombinations() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = PlainBinaryReader(commandExecutor: executor)
         
         let testCases: [(p1: UInt8, p2: UInt8, data: Data)] = [
@@ -94,7 +94,7 @@ struct PlainBinaryReaderTests {
 
     @Test("PlainBinaryReader with large response data")
     func testPlainBinaryReaderLargeResponse() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = PlainBinaryReader(commandExecutor: executor)
         
         // Create data close to maxAPDUResponseLength (1693 bytes)
@@ -112,7 +112,7 @@ struct PlainBinaryReaderTests {
 
     @Test("PlainBinaryReader with empty response data")
     func testPlainBinaryReaderEmptyResponse() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = PlainBinaryReader(commandExecutor: executor)
         
         // Configure empty response
@@ -129,7 +129,7 @@ struct PlainBinaryReaderTests {
 
     @Test("PlainBinaryReader parameter validation")
     func testPlainBinaryReaderParameterValidation() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = PlainBinaryReader(commandExecutor: executor)
         let testData = Data([0xFF, 0xEE, 0xDD, 0xCC])
         
@@ -153,7 +153,7 @@ struct PlainBinaryReaderTests {
 
     @Test("PlainBinaryReader different status word combinations")
     func testPlainBinaryReaderDifferentStatusWords() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = PlainBinaryReader(commandExecutor: executor)
         
         let errorCases: [(sw1: UInt8, sw2: UInt8, description: String)] = [

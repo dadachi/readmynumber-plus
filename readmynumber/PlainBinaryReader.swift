@@ -11,11 +11,11 @@ import CoreNFC
 /// Handles plain (non-encrypted) READ BINARY operations
 class PlainBinaryReader {
     
-    private let commandExecutor: NFCCommandExecutor
+    private let commandExecutor: RDCNFCCommandExecutor
 
     /// Initialize with an NFC command executor
     /// - Parameter commandExecutor: The executor for sending NFC commands
-    init(commandExecutor: NFCCommandExecutor) {
+    init(commandExecutor: RDCNFCCommandExecutor) {
         self.commandExecutor = commandExecutor
     }
     

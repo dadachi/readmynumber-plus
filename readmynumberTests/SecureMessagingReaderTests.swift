@@ -35,7 +35,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader initialization with session key")
     func testSecureMessagingReaderInitialization() {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let mockCrypto = MockTDESCryptography()
 
@@ -47,7 +47,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader initialization without session key")
     func testSecureMessagingReaderInitializationNoKey() {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let mockCrypto = MockTDESCryptography()
 
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: nil, tdesCryptography: mockCrypto)
@@ -58,7 +58,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader successful read with SM")
     func testSecureMessagingReaderSuccess() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let mockCrypto = MockTDESCryptography()
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
@@ -81,7 +81,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader error handling - no session key")
     func testSecureMessagingReaderNoSessionKey() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let mockCrypto = MockTDESCryptography()
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: nil, tdesCryptography: mockCrypto)
         
@@ -105,7 +105,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader error handling - card error")
     func testSecureMessagingReaderCardError() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let mockCrypto = MockTDESCryptography()
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
@@ -131,7 +131,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader invalid TLV response")
     func testSecureMessagingReaderInvalidTLV() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let mockCrypto = MockTDESCryptography()
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
@@ -156,7 +156,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader BER length parsing")
     func testBERLengthParsing() throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let mockCrypto = MockTDESCryptography()
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
@@ -182,7 +182,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader BER length parsing errors")
     func testBERLengthParsingErrors() {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let mockCrypto = MockTDESCryptography()
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
@@ -220,7 +220,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader ISO 7816-4 padding removal")
     func testISO7816PaddingRemoval() throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let mockCrypto = MockTDESCryptography()
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
@@ -238,7 +238,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader PKCS7 padding removal")
     func testPKCS7PaddingRemoval() throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let mockCrypto = MockTDESCryptography()
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
@@ -256,7 +256,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader invalid padding scenarios")
     func testInvalidPaddingScenarios() {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let mockCrypto = MockTDESCryptography()
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
@@ -309,7 +309,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader reading single chunk")
     func testReadBinaryWithSMSingleChunk() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
 
@@ -340,7 +340,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader chunked reading single chunk")
     func testReadBinaryChunkedWithSMSingleChunk() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
 
@@ -371,7 +371,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader chunked reading multiple chunks")
     func testReadBinaryChunkedWithSMMultipleChunks() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
         
@@ -424,7 +424,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader automatic chunked reading when response is large")
     func testReadBinaryWithSMTriggerChunkedReading() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
         
@@ -491,7 +491,7 @@ struct SecureMessagingReaderTests {
 
     @Test("SecureMessagingReader cryptography failure")
     func testCryptographyFailure() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let mockCrypto = MockTDESCryptography()
         mockCrypto.shouldSucceed = false

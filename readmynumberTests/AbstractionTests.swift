@@ -10,12 +10,12 @@ import Foundation
 import CoreNFC
 @testable import readmynumber
 
-// MARK: - NFCCommandExecutor Tests
+// MARK: - RDCNFCCommandExecutor Tests
 
-struct NFCCommandExecutorTests {
-    @Test("MockNFCCommandExecutor default behavior")
+struct RDCNFCCommandExecutorTests {
+    @Test("MockRDCNFCCommandExecutor default behavior")
     func testMockCommandExecutorDefaults() {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
 
         #expect(executor.shouldSucceed == true)
         #expect(executor.errorSW1 == 0x6A)
@@ -24,9 +24,9 @@ struct NFCCommandExecutorTests {
         #expect(executor.mockResponses.isEmpty)
     }
 
-    @Test("MockNFCCommandExecutor successful command execution")
+    @Test("MockRDCNFCCommandExecutor successful command execution")
     func testMockCommandExecutorSuccess() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
 
         let command = NFCISO7816APDU(
             instructionClass: 0x00,
@@ -46,9 +46,9 @@ struct NFCCommandExecutorTests {
         #expect(executor.commandHistory[0].instructionCode == 0xA4)
     }
 
-    @Test("MockNFCCommandExecutor failure scenario")
+    @Test("MockRDCNFCCommandExecutor failure scenario")
     func testMockCommandExecutorFailure() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         executor.shouldSucceed = false
         executor.errorSW1 = 0x62
         executor.errorSW2 = 0x82
@@ -79,9 +79,9 @@ struct NFCCommandExecutorTests {
         #expect(executor.commandHistory.count == 1)
     }
 
-    @Test("MockNFCCommandExecutor custom response configuration")
+    @Test("MockRDCNFCCommandExecutor custom response configuration")
     func testMockCommandExecutorCustomResponse() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let expectedData = Data([0xCA, 0xFE, 0xBA, 0xBE])
 
         executor.configureMockResponse(for: 0xB0, response: expectedData, sw1: 0x91, sw2: 0x01)
@@ -102,9 +102,9 @@ struct NFCCommandExecutorTests {
         #expect(sw2 == 0x01)
     }
 
-    @Test("MockNFCCommandExecutor parameter-specific response")
+    @Test("MockRDCNFCCommandExecutor parameter-specific response")
     func testMockCommandExecutorParameterSpecificResponse() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let specificData = Data([0xDE, 0xAD, 0xBE, 0xEF])
 
         executor.configureMockResponse(for: 0xB0, p1: 0x85, p2: 0x00, response: specificData)
@@ -134,9 +134,9 @@ struct NFCCommandExecutorTests {
         #expect(nonMatchingData.isEmpty)  // Default empty response
     }
 
-    @Test("MockNFCCommandExecutor reset functionality")
+    @Test("MockRDCNFCCommandExecutor reset functionality")
     func testMockCommandExecutorReset() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
 
         // Set up some state
         executor.shouldSucceed = false

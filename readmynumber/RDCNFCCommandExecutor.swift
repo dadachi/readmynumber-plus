@@ -1,5 +1,5 @@
 //
-//  NFCCommandExecutor.swift
+//  RDCNFCCommandExecutor.swift
 //  readmynumber
 //
 //  Created on 2025/09/09.
@@ -9,7 +9,7 @@ import Foundation
 import CoreNFC
 
 /// Protocol for executing NFC commands, allowing for testability
-protocol NFCCommandExecutor {
+protocol RDCNFCCommandExecutor {
     /// Execute an NFC command and return the response
     /// - Parameter apdu: The APDU command to execute
     /// - Returns: Tuple containing response data, SW1, and SW2
@@ -17,7 +17,7 @@ protocol NFCCommandExecutor {
 }
 
 /// Concrete implementation that wraps actual NFCISO7816Tag
-class NFCCommandExecutorImpl: NFCCommandExecutor {
+class RDCNFCCommandExecutorImpl: RDCNFCCommandExecutor {
     private let tag: NFCISO7816Tag
     
     init(tag: NFCISO7816Tag) {
@@ -30,7 +30,7 @@ class NFCCommandExecutorImpl: NFCCommandExecutor {
 }
 
 /// Mock implementation for testing
-class MockNFCCommandExecutor: NFCCommandExecutor {
+class MockRDCNFCCommandExecutor: RDCNFCCommandExecutor {
     var shouldSucceed = true
     var errorSW1: UInt8 = 0x6A
     var errorSW2: UInt8 = 0x82

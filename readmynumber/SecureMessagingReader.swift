@@ -15,7 +15,7 @@ let maxAPDUResponseLength: Int = 1693
 /// Handles Secure Messaging READ BINARY operations for residence cards
 class SecureMessagingReader {
 
-    private let commandExecutor: NFCCommandExecutor
+    private let commandExecutor: RDCNFCCommandExecutor
     private let sessionKey: Data?
     private let tdesCryptography: TDESCryptography
 
@@ -24,7 +24,7 @@ class SecureMessagingReader {
     ///   - commandExecutor: The executor for sending NFC commands
     ///   - sessionKey: The session key for decryption (if available)
     ///   - tdesCryptography: The TDES cryptography instance for decryption
-    init(commandExecutor: NFCCommandExecutor, sessionKey: Data? = nil, tdesCryptography: TDESCryptography = TDESCryptography()) {
+    init(commandExecutor: RDCNFCCommandExecutor, sessionKey: Data? = nil, tdesCryptography: TDESCryptography = TDESCryptography()) {
         self.commandExecutor = commandExecutor
         self.sessionKey = sessionKey
         self.tdesCryptography = tdesCryptography

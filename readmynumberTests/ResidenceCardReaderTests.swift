@@ -1448,7 +1448,7 @@ struct ResidenceCardReaderTests {
         )
         
         // Set up mock executor
-        let mockExecutor = MockNFCCommandExecutor()
+        let mockExecutor = MockRDCNFCCommandExecutor()
         mockExecutor.configureMockResponse(for: 0xA4, response: Data())
         
         // Test the executor version directly (which is what selectMF(tag:) calls internally)
@@ -1477,7 +1477,7 @@ struct ResidenceCardReaderTests {
         )
         
         // Set up mock executor to fail
-        let mockExecutor = MockNFCCommandExecutor()
+        let mockExecutor = MockRDCNFCCommandExecutor()
         mockExecutor.shouldSucceed = false
         mockExecutor.errorSW1 = 0x6A
         mockExecutor.errorSW2 = 0x82
@@ -1500,7 +1500,7 @@ struct ResidenceCardReaderTests {
     
     @Test("SecureMessagingReader with missing session key")
     func testSecureMessagingReaderMissingSessionKey() async {
-        let mockExecutor = MockNFCCommandExecutor()
+        let mockExecutor = MockRDCNFCCommandExecutor()
         
         // Try to create reader without session key (nil)
         // This test verifies the reader handles missing session key appropriately
@@ -2298,7 +2298,7 @@ struct ResidenceCardReaderTests {
     
     @Test("performAuthentication basic flow")
     func testPerformAuthentication() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Test card number for authentication
@@ -2332,7 +2332,7 @@ struct ResidenceCardReaderTests {
     
     @Test("performAuthentication GET CHALLENGE failure")
     func testPerformAuthenticationGetChallengeFailure() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         reader.cardNumber = "AB1234567890"
         
@@ -2362,7 +2362,7 @@ struct ResidenceCardReaderTests {
     
     @Test("performAuthentication MUTUAL AUTHENTICATE failure")
     func testPerformAuthenticationMutualAuthenticateFailure() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         reader.cardNumber = "AB1234567890"
         
@@ -2395,7 +2395,7 @@ struct ResidenceCardReaderTests {
     
     @Test("performAuthentication cryptographic validation failure")
     func testPerformAuthenticationCryptographicFailure() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         reader.cardNumber = "AB1234567890"
         
@@ -2432,7 +2432,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain successful operation")
     func testReadBinaryPlainSuccess() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Configure successful response with mock data
@@ -2458,7 +2458,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain with custom P2 parameter")
     func testReadBinaryPlainCustomP2() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Configure successful response
@@ -2483,7 +2483,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain card error handling")
     func testReadBinaryPlainCardError() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Configure executor to fail when no mock response is found
@@ -2512,7 +2512,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain command delegation verification")
     func testReadBinaryPlainDelegation() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Configure response for different file selections
@@ -2546,7 +2546,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain empty response handling")
     func testReadBinaryPlainEmptyResponse() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Configure empty but successful response
@@ -2566,7 +2566,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain large data response")
     func testReadBinaryPlainLargeData() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Create large data response (close to APDU limit)
@@ -2588,7 +2588,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain different file selections")
     func testReadBinaryPlainFileSelections() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Test common residence card file selections with realistic data
@@ -2633,7 +2633,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM successful operation")
     func testReadBinaryWithSMSuccess() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let reader = ResidenceCardReader()
         reader.sessionKey = sessionKey
@@ -2664,7 +2664,7 @@ struct ResidenceCardReaderTests {
 
     @Test("readBinaryWithSM custom P2 parameter")
     func testReadBinaryWithSMCustomP2() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Set up session key
@@ -2688,7 +2688,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM session key propagation")
     func testReadBinaryWithSMSessionKeyPropagation() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Set up specific session key
@@ -2710,7 +2710,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM command delegation verification")
     func testReadBinaryWithSMDelegation() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Set up session key
@@ -2738,7 +2738,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM error handling")
     func testReadBinaryWithSMError() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Set up session key
@@ -2771,7 +2771,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM empty response handling")
     func testReadBinaryWithSMEmptyResponse() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Set up session key
@@ -2792,7 +2792,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM large data response")
     func testReadBinaryWithSMLargeData() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         let reader = ResidenceCardReader()
         reader.sessionKey = sessionKey
@@ -2861,7 +2861,7 @@ struct ResidenceCardReaderTests {
 
 //    @Test("readBinaryWithSM different file selections for residence card")
 //    func testReadBinaryWithSMFileSelections() async throws {
-//        let executor = MockNFCCommandExecutor()
+//        let executor = MockRDCNFCCommandExecutor()
 //        let reader = ResidenceCardReader()
 //        
 //        // Set up session key
@@ -2906,7 +2906,7 @@ struct ResidenceCardReaderTests {
     
     @Test("readCard individual operations without authentication")
     func testReadCardOperations() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         
@@ -4426,7 +4426,7 @@ struct PerformAuthenticationLinesTests {
     
     @Test("performAuthentication executes through lines 237-270")
     func testPerformAuthenticationExecutesLines237to270() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         
         // Set up test card number
@@ -4553,7 +4553,7 @@ struct PerformAuthenticationLinesTests {
     
     @Test("readCard operations with large images (1694+ bytes)")
     func testReadCardOperationsWithLargeImages() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let reader = ResidenceCardReader()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         

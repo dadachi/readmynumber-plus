@@ -38,7 +38,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     private var lastExportedImageURLs: [URL]?
 
     // Dependency injection for testability
-    private var commandExecutor: NFCCommandExecutor?
+    private var commandExecutor: RDCNFCCommandExecutor?
     private var sessionManager: NFCSessionManager
     private var threadDispatcher: ThreadDispatcher
     private var signatureVerifier: SignatureVerifier
@@ -80,7 +80,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     // MARK: - Public Methods
 
     /// Set a custom command executor for testing
-    func setCommandExecutor(_ executor: NFCCommandExecutor) {
+    func setCommandExecutor(_ executor: RDCNFCCommandExecutor) {
         self.commandExecutor = executor
     }
 
@@ -143,7 +143,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     // MARK: - Private Methods
 
     // MFの選択
-    internal func selectMF(executor: NFCCommandExecutor) async throws {
+    internal func selectMF(executor: RDCNFCCommandExecutor) async throws {
         let command = NFCISO7816APDU(
             instructionClass: 0x00,
             instructionCode: Command.selectFile,
@@ -158,7 +158,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     }
 
     // DFの選択
-    internal func selectDF(executor: NFCCommandExecutor, aid: Data) async throws {
+    internal func selectDF(executor: RDCNFCCommandExecutor, aid: Data) async throws {
         let command = NFCISO7816APDU(
             instructionClass: 0x00,
             instructionCode: Command.selectFile,
@@ -192,7 +192,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     /// - 在留カード等仕様書 3.5.2 認証シーケンス
     /// - ISO/IEC 7816-4 セキュアメッセージング
     /// - FIPS 46-3 Triple-DES暗号化標準
-    internal func performAuthentication(executor: NFCCommandExecutor) async throws -> Data {
+    internal func performAuthentication(executor: RDCNFCCommandExecutor) async throws -> Data {
         // STEP 1: GET CHALLENGE - ICCチャレンジ取得
         // カードから8バイトのランダムな乱数（RND.ICC）を取得します。
         // この乱数は認証プロセスでリプレイ攻撃を防ぐために使用されます。
@@ -285,13 +285,13 @@ class ResidenceCardReader: NSObject, ObservableObject {
     }
 
     // バイナリ読み出し（SMあり）
-    internal func readBinaryWithSM(executor: NFCCommandExecutor, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+    internal func readBinaryWithSM(executor: RDCNFCCommandExecutor, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
         let smReader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
         return try await smReader.readBinaryWithSM(p1: p1, p2: p2)
     }
 
     // バイナリ読み出し（平文）
-    internal func readBinaryPlain(executor: NFCCommandExecutor, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
+    internal func readBinaryPlain(executor: RDCNFCCommandExecutor, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
         let plainReader = PlainBinaryReader(commandExecutor: executor)
         return try await plainReader.readBinaryPlain(p1: p1, p2: p2)
     }
@@ -320,7 +320,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     /// - Throws: ResidenceCardReaderError セッションキーがない、データ形式が不正、復号化失敗時
     internal func decryptSMResponse(encryptedData: Data) throws -> Data {
         let smReader = SecureMessagingReader(
-            commandExecutor: MockNFCCommandExecutor(), // Tests don't need real executor
+            commandExecutor: MockRDCNFCCommandExecutor(), // Tests don't need real executor
             sessionKey: sessionKey,
             tdesCryptography: tdesCryptography
         )
@@ -332,7 +332,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     /// Parse BER/DER length encoding - delegated to SecureMessagingReader for testing
     internal func parseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
         let smReader = SecureMessagingReader(
-            commandExecutor: MockNFCCommandExecutor(),
+            commandExecutor: MockRDCNFCCommandExecutor(),
             sessionKey: sessionKey,
             tdesCryptography: tdesCryptography
         )
@@ -342,7 +342,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     /// Remove padding from decrypted data - delegated to SecureMessagingReader for testing
     internal func removePadding(data: Data) throws -> Data {
         let smReader = SecureMessagingReader(
-            commandExecutor: MockNFCCommandExecutor(),
+            commandExecutor: MockRDCNFCCommandExecutor(),
             sessionKey: sessionKey,
             tdesCryptography: tdesCryptography
         )
@@ -352,7 +352,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     /// Remove PKCS#7 padding from data - delegated to SecureMessagingReader for testing
     internal func removePKCS7Padding(data: Data) throws -> Data {
         let smReader = SecureMessagingReader(
-            commandExecutor: MockNFCCommandExecutor(),
+            commandExecutor: MockRDCNFCCommandExecutor(),
             sessionKey: sessionKey,
             tdesCryptography: tdesCryptography
         )
