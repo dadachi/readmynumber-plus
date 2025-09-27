@@ -43,7 +43,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
   private var threadDispatcher: ThreadDispatcher
   private var signatureVerifier: SignatureVerifier
   internal var tdesCryptography: TDESCryptography
-  
+  private var authenticationProvider: AuthenticationProvider
+
   // MARK: - Initialization
   
   /// Initialize with default implementations
@@ -51,6 +52,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     self.sessionManager = NFCSessionManagerImpl()
     self.threadDispatcher = SystemThreadDispatcher()
     self.signatureVerifier = ResidenceCardSignatureVerifier()
+    self.authenticationProvider = AuthenticationProviderImpl()
     self.tdesCryptography = TDESCryptography()
     super.init()
   }
@@ -60,11 +62,13 @@ class ResidenceCardReader: NSObject, ObservableObject {
     sessionManager: NFCSessionManager,
     threadDispatcher: ThreadDispatcher,
     signatureVerifier: SignatureVerifier,
+    authenticationProvider: AuthenticationProvider = AuthenticationProviderImpl(),
     tdesCryptography: TDESCryptography = TDESCryptography()
   ) {
     self.sessionManager = sessionManager
     self.threadDispatcher = threadDispatcher
     self.signatureVerifier = signatureVerifier
+    self.authenticationProvider = authenticationProvider
     self.tdesCryptography = tdesCryptography
     super.init()
   }
@@ -204,8 +208,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
     // STEP 2: 認証鍵生成とセッション鍵交換データ準備
     // 在留カード番号からSHA-1ハッシュ化により暗号化鍵（K.Enc）と
     // MAC鍵（K.Mac）を生成します（在留カード等仕様書 3.5.2.1）
-    let (kEnc, kMac) = try generateKeys(from: cardNumber)
-    
+    let (kEnc, kMac) = try authenticationProvider.generateKeys(from: cardNumber)
+
     // IFD（端末）側の認証データを生成:
     // - RND.IFD（端末乱数8バイト）+ RND.ICC（カード乱数8バイト）+ K.IFD（端末鍵16バイト）
     // - この32バイトデータを3DES暗号化してE.IFDを作成
