@@ -723,15 +723,15 @@ struct ResidenceCardReaderTests {
     @Test("Authentication data generation")
     #endif
     func testAuthenticationDataGeneration() throws {
-        let reader = ResidenceCardReader()
-        
+        let authProvider = AuthenticationProviderImpl()
+
         // Test data
         let rndICC = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]) // 8 bytes
         let kEnc = Data((0..<16).map { UInt8($0) }) // 16 bytes
         let kMac = Data((16..<32).map { UInt8($0) }) // 16 bytes, different from kEnc
-        
+
         // Generate authentication data
-      let (eIFD, mIFD, rndIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+      let (eIFD, mIFD, rndIFD, kIFD) = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
 
         // Verify data sizes
         // Note: eIFD might be larger than 32 due to PKCS#7 padding in 3DES
@@ -741,7 +741,7 @@ struct ResidenceCardReaderTests {
         #expect(kIFD.count == 16) // Generated key should be 16 bytes
         
         // Generate again - should produce different results due to random components
-        let (eIFD2, mIFD2, rndIFD2, kIFD2) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        let (eIFD2, mIFD2, rndIFD2, kIFD2) = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
 
         // Random components should make results different
         #expect(eIFD != eIFD2) // Different random kIFD and rndIFD should produce different encrypted data
@@ -766,7 +766,8 @@ struct ResidenceCardReaderTests {
     #endif
     func testCardAuthenticationDataVerification() throws {
         let reader = ResidenceCardReader()
-        
+        let authProvider = AuthenticationProviderImpl()
+
         // Simulate the mutual authentication flow
         let rndICC = Data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11]) // 8 bytes
         let kEnc = Data([
@@ -777,9 +778,9 @@ struct ResidenceCardReaderTests {
             0x10, 0x0F, 0x0E, 0x0D, 0x0C, 0x0B, 0x0A, 0x09,
             0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01
         ])
-        
+
         // Generate IFD authentication data first
-        let (eIFD, mIFD, rndIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        let (eIFD, mIFD, rndIFD, kIFD) = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
 
         // Simulate card response: create ICC authentication data
         // In real scenario, card would generate its own rndIFD echo and kICC
@@ -936,23 +937,23 @@ struct ResidenceCardReaderTests {
     
     @Test("Authentication data with wrong key lengths")
     func testAuthenticationDataWithWrongKeyLengths() {
-        let reader = ResidenceCardReader()
+        let authProvider = AuthenticationProviderImpl()
         let rndICC = Data(repeating: 0x11, count: 8)
-        
+
         // Test with wrong kEnc length
         let wrongKEnc = Data(repeating: 0x22, count: 15) // 15 bytes instead of 16
         let correctKMac = Data(repeating: 0x33, count: 16)
-        
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: wrongKEnc, kMac: correctKMac)
+
+        #expect(throws: (any Error).self) {
+            _ = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: wrongKEnc, kMac: correctKMac)
         }
-        
+
         // Test with wrong kMac length
         let correctKEnc = Data(repeating: 0x44, count: 16)
         let wrongKMac = Data(repeating: 0x55, count: 17) // 17 bytes instead of 16
-        
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: correctKEnc, kMac: wrongKMac)
+
+        #expect(throws: (any Error).self) {
+            _ = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: correctKEnc, kMac: wrongKMac)
         }
     }
     
@@ -1128,7 +1129,7 @@ struct ResidenceCardReaderTests {
         
         // Step 1: IFD generates challenge response
         let rndICC = Data((0..<8).map { _ in UInt8.random(in: 0...255) }) // Card challenge
-        let (eIFD, mIFD, rndIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        let (eIFD, mIFD, rndIFD, kIFD) = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
 
         // Step 2: Simulate card processing and response
         // Card verifies IFD authentication data (we'll skip this)

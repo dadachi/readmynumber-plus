@@ -218,7 +218,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
         // - RND.IFD（端末乱数8バイト）+ RND.ICC（カード乱数8バイト）+ K.IFD（端末鍵16バイト）
         // - この32バイトデータを3DES暗号化してE.IFDを作成
         // - E.IFDのRetail MACを計算してM.IFDを作成
-        let (eIFD, mIFD, rndIFD, kIFD) = try generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        let (eIFD, mIFD, rndIFD, kIFD) = try authenticationProvider.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
 
         // STEP 3: MUTUAL AUTHENTICATE - 相互認証実行
         // E.IFD（32バイト暗号化データ）+ M.IFD（8バイトMAC）を送信
@@ -961,60 +961,6 @@ extension ResidenceCardReader {
 extension ResidenceCardReader {
 
 
-    /// IFD（端末）側の相互認証データ生成
-    ///
-    /// 在留カード等仕様書 3.5.2.2 の相互認証プロトコルに従って、
-    /// 端末側の認証データ（E.IFD, M.IFD）を生成します。
-    ///
-    /// データ構造:
-    /// 1. RND.IFD（8バイト）: 端末が生成するランダム数
-    /// 2. RND.ICC（8バイト）: カードから受信したランダム数
-    /// 3. K.IFD（16バイト）: 端末が生成するセッション鍵素材
-    ///
-    /// 暗号化プロセス:
-    /// 1. 平文 = RND.IFD || RND.ICC || K.IFD （32バイト）
-    /// 2. E.IFD = 3DES_Encrypt(平文, K.Enc) （32バイト）
-    /// 3. M.IFD = RetailMAC(E.IFD, K.Mac) （8バイト）
-    ///
-    /// セキュリティ機能:
-    /// - Challenge-Response認証によるリプレイ攻撃防止
-    /// - MAC による完全性保護
-    /// - セッション鍵の安全な交換
-    ///
-    /// - Parameters:
-    ///   - rndICC: カードから受信した8バイトのランダム数
-    ///   - kEnc: 暗号化に使用する16バイト鍵
-    ///   - kMac: MAC計算に使用する16バイト鍵
-    /// - Returns: 暗号化データ、MAC、端末鍵のタプル
-    /// - Throws: CardReaderError.cryptographyError 暗号化処理失敗時
-    internal func generateAuthenticationData(rndICC: Data, kEnc: Data, kMac: Data) throws -> (eIFD: Data, mIFD: Data, rndIFD: Data, kIFD: Data) {
-        // STEP 1: 端末側ランダム数生成（8バイト）
-        // 暗号学的に安全な乱数を生成してリプレイ攻撃を防止
-        let rndIFD = Data((0..<8).map { _ in UInt8.random(in: 0...255) })
-
-        // STEP 2: 端末セッション鍵素材生成（16バイト）
-        // この鍵はカードの K.ICC と XOR されて最終セッション鍵になる
-        let kIFD = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
-
-        // STEP 3: 認証データ連結
-        // 在留カード等仕様書で規定された順序: RND.IFD || RND.ICC || K.IFD
-        let plaintext = rndIFD + rndICC + kIFD
-
-        // STEP 4: Triple-DES暗号化
-        // CBCモードでPKCS#7パディングを使用（32バイト → 32バイト）
-        let eIFD = try tdesCryptography.performTDES(data: plaintext, key: kEnc, encrypt: true)
-
-        // STEP 5: Retail MAC計算（ISO/IEC 9797-1 Algorithm 3）
-        // 暗号化データの完全性を保護するため8バイトMACを計算
-        let mIFD: Data
-        do {
-            mIFD = try cryptoProvider.calculateRetailMAC(data: eIFD, key: kMac)
-        } catch let error as CryptoProviderImpl.CryptoError {
-            throw CardReaderError.cryptographyError(error.localizedDescription)
-        }
-
-        return (eIFD: eIFD, mIFD: mIFD, rndIFD: rndIFD, kIFD: kIFD)
-    }
 
 
     /// セッション鍵生成（在留カード等仕様書 3.5.2.3）
