@@ -2,12 +2,12 @@ import Foundation
 import CommonCrypto
 
 
-protocol AuthenticationProvider {
+protocol RDCAuthenticationProvider {
     func generateKeys(from cardNumber: String) throws -> (kEnc: Data, kMac: Data)
     func generateAuthenticationData(rndICC: Data, kEnc: Data, kMac: Data) throws -> (eIFD: Data, mIFD: Data, rndIFD: Data, kIFD: Data)
 }
 
-class AuthenticationProviderImpl: AuthenticationProvider {
+class RDCAuthenticationProviderImpl: RDCAuthenticationProvider {
     private let tdesCryptography: TDESCryptography
     private let cryptoProvider: CryptoProvider
 

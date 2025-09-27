@@ -42,7 +42,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     private var sessionManager: NFCSessionManager
     private var threadDispatcher: ThreadDispatcher
     private var signatureVerifier: SignatureVerifier
-    private var authenticationProvider: AuthenticationProvider
+    private var authenticationProvider: RDCAuthenticationProvider
     internal var tdesCryptography: TDESCryptography
     private var cryptoProvider: CryptoProvider
 
@@ -53,7 +53,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
         self.sessionManager = NFCSessionManagerImpl()
         self.threadDispatcher = SystemThreadDispatcher()
         self.signatureVerifier = ResidenceCardSignatureVerifier()
-        self.authenticationProvider = AuthenticationProviderImpl()
+        self.authenticationProvider = RDCAuthenticationProviderImpl()
         self.tdesCryptography = TDESCryptography()
         self.cryptoProvider = CryptoProviderImpl()
         super.init()
@@ -64,7 +64,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
         sessionManager: NFCSessionManager,
         threadDispatcher: ThreadDispatcher,
         signatureVerifier: SignatureVerifier,
-        authenticationProvider: AuthenticationProvider = AuthenticationProviderImpl(),
+        authenticationProvider: RDCAuthenticationProvider = RDCAuthenticationProviderImpl(),
         tdesCryptography: TDESCryptography = TDESCryptography(),
         cryptoProvider: CryptoProvider = CryptoProviderImpl()
     ) {

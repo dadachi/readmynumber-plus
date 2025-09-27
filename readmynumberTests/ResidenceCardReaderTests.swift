@@ -317,7 +317,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Card number validation")
     func testCardNumberValidation() {
-        let authProvider = AuthenticationProviderImpl()
+        let authProvider = RDCAuthenticationProviderImpl()
 
         // Valid 12-digit card number
         #expect(throws: Never.self) {
@@ -723,7 +723,7 @@ struct ResidenceCardReaderTests {
     @Test("Authentication data generation")
     #endif
     func testAuthenticationDataGeneration() throws {
-        let authProvider = AuthenticationProviderImpl()
+        let authProvider = RDCAuthenticationProviderImpl()
 
         // Test data
         let rndICC = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]) // 8 bytes
@@ -766,7 +766,7 @@ struct ResidenceCardReaderTests {
     #endif
     func testCardAuthenticationDataVerification() throws {
         let reader = ResidenceCardReader()
-        let authProvider = AuthenticationProviderImpl()
+        let authProvider = RDCAuthenticationProviderImpl()
 
         // Simulate the mutual authentication flow
         let rndICC = Data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11]) // 8 bytes
@@ -937,7 +937,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Authentication data with wrong key lengths")
     func testAuthenticationDataWithWrongKeyLengths() {
-        let authProvider = AuthenticationProviderImpl()
+        let authProvider = RDCAuthenticationProviderImpl()
         let rndICC = Data(repeating: 0x11, count: 8)
 
         // Test with wrong kEnc length
@@ -1124,7 +1124,7 @@ struct ResidenceCardReaderTests {
         
         // Simulate complete mutual authentication flow
         let cardNumber = "AB12345678CD"
-        let authProvider = AuthenticationProviderImpl()
+        let authProvider = RDCAuthenticationProviderImpl()
         let (kEnc, kMac) = try authProvider.generateKeys(from: cardNumber)
         
         // Step 1: IFD generates challenge response
@@ -1175,7 +1175,7 @@ struct ResidenceCardReaderTests {
         var generatedKeys: [Data] = []
         
         for cardNumber in cardNumbers {
-            let authProvider = AuthenticationProviderImpl()
+            let authProvider = RDCAuthenticationProviderImpl()
             let (kEnc, kMac) = try authProvider.generateKeys(from: cardNumber)
             #expect(kEnc.count == 16)
             #expect(kMac.count == 16)
