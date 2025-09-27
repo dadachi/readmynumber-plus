@@ -119,13 +119,13 @@ class ResidenceCardReader: NSObject, ObservableObject {
 
         // Check if we're in test environment by looking for test bundle
         if Bundle.main.bundlePath.hasSuffix(".xctest") || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
-            completion(.failure(CardReaderError.nfcNotAvailable))
+            completion(.failure(ResidenceCardReaderError.nfcNotAvailable))
             return
         }
 
         // Check if we're in test environment (no real NFC or simulator)
         guard sessionManager.isReadingAvailable else {
-            completion(.failure(CardReaderError.nfcNotAvailable))
+            completion(.failure(ResidenceCardReaderError.nfcNotAvailable))
             return
         }
 
@@ -300,7 +300,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     internal func encryptCardNumber(cardNumber: String, sessionKey: Data) throws -> Data {
         guard let cardNumberData = cardNumber.data(using: .ascii),
               cardNumberData.count == 12 else {
-            throw CardReaderError.invalidCardNumber
+            throw ResidenceCardReaderError.invalidCardNumber
         }
 
         // パディング追加
@@ -317,7 +317,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     ///
     /// - Parameter encryptedData: TLV形式の暗号化データ
     /// - Returns: 復号化されたデータ（パディング除去済み）
-    /// - Throws: CardReaderError セッションキーがない、データ形式が不正、復号化失敗時
+    /// - Throws: ResidenceCardReaderError セッションキーがない、データ形式が不正、復号化失敗時
     internal func decryptSMResponse(encryptedData: Data) throws -> Data {
         let smReader = SecureMessagingReader(
             commandExecutor: MockNFCCommandExecutor(), // Tests don't need real executor
@@ -362,7 +362,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     // ステータスワードチェック
     internal func checkStatusWord(sw1: UInt8, sw2: UInt8) throws {
         guard sw1 == 0x90 && sw2 == 0x00 else {
-            throw CardReaderError.cardError(sw1: sw1, sw2: sw2)
+            throw ResidenceCardReaderError.cardError(sw1: sw1, sw2: sw2)
         }
     }
 }
@@ -683,10 +683,10 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
         // Tag 0xDA: チェックコード (256 bytes encrypted hash)
         // Tag 0xDB: 公開鍵証明書 (X.509 certificate)
         guard let checkCode = parseTLV(data: signatureData, tag: 0xDA) else {
-            throw CardReaderError.invalidResponse
+            throw ResidenceCardReaderError.invalidResponse
         }
         guard let certificate = parseTLV(data: signatureData, tag: 0xDB) else {
-            throw CardReaderError.invalidResponse
+            throw ResidenceCardReaderError.invalidResponse
         }
 
         // 8. 署名検証 (3.4.3.1 署名検証方法)
@@ -802,38 +802,6 @@ struct ResidenceCardData: Equatable {
     }
 }
 
-// MARK: - Error Types
-enum CardReaderError: LocalizedError, Equatable {
-    case nfcNotAvailable
-    case invalidCardNumber
-    case invalidCardNumberFormat
-    case invalidCardNumberLength
-    case invalidCardNumberCharacters
-    case invalidResponse
-    case cardError(sw1: UInt8, sw2: UInt8)
-    case cryptographyError(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .nfcNotAvailable:
-            return "NFCが利用できません"
-        case .invalidCardNumber:
-            return "無効な在留カード番号です"
-        case .invalidCardNumberFormat:
-            return "在留カード番号の形式が正しくありません（英字2桁+数字8桁+英字2桁）"
-        case .invalidCardNumberLength:
-            return "在留カード番号は12桁で入力してください"
-        case .invalidCardNumberCharacters:
-            return "在留カード番号に無効な文字が含まれています"
-        case .invalidResponse:
-            return "カードからの応答が不正です"
-        case .cardError(let sw1, let sw2):
-            return String(format: "カードエラー: SW1=%02X, SW2=%02X", sw1, sw2)
-        case .cryptographyError(let message):
-            return "暗号処理エラー: \(message)"
-        }
-    }
-}
 
 // MARK: - Card Number Validation
 extension ResidenceCardReader {
@@ -847,17 +815,17 @@ extension ResidenceCardReader {
 
         // Check length (must be exactly 12 characters)
         guard trimmedCardNumber.count == 12 else {
-            throw CardReaderError.invalidCardNumberLength
+            throw ResidenceCardReaderError.invalidCardNumberLength
         }
 
         // Check format: 英字2桁 + 数字8桁 + 英字2桁
         guard isValidResidenceCardFormat(trimmedCardNumber) else {
-            throw CardReaderError.invalidCardNumberFormat
+            throw ResidenceCardReaderError.invalidCardNumberFormat
         }
 
         // Check character validity
         guard isValidCharacters(trimmedCardNumber) else {
-            throw CardReaderError.invalidCardNumberCharacters
+            throw ResidenceCardReaderError.invalidCardNumberCharacters
         }
 
         return trimmedCardNumber
@@ -1041,7 +1009,7 @@ extension ResidenceCardReader {
     ///   - kEnc: 復号用暗号化鍵（16バイト）
     ///   - kMac: MAC検証用鍵（16バイト）
     /// - Returns: カード鍵K.ICC（16バイト）
-    /// - Throws: CardReaderError.cryptographyError 検証失敗時
+    /// - Throws: ResidenceCardReaderError.cryptographyError 検証失敗時
     internal func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, rndIFD: Data, kEnc: Data, kMac: Data) throws -> Data {
         // STEP 1: MAC検証 - データ完全性の確認
         // カードから受信したM.ICCと、E.ICCから計算したMACを比較
@@ -1049,10 +1017,10 @@ extension ResidenceCardReader {
         do {
             calculatedMAC = try cryptoProvider.calculateRetailMAC(data: eICC, key: kMac)
         } catch let error as CryptoProviderImpl.CryptoError {
-            throw CardReaderError.cryptographyError(error.localizedDescription)
+            throw ResidenceCardReaderError.cryptographyError(error.localizedDescription)
         }
         guard calculatedMAC == mICC else {
-            throw CardReaderError.cryptographyError("MAC verification failed")
+            throw ResidenceCardReaderError.cryptographyError("MAC verification failed")
         }
 
         // STEP 2: 認証データの復号化
@@ -1063,13 +1031,13 @@ extension ResidenceCardReader {
         // 復号データの先頭8バイトが最初のRND.ICCと一致することを確認
         // これによりリプレイ攻撃を防止し、カードの正当性を確認
         guard decrypted.prefix(8) == rndICC else {
-            throw CardReaderError.cryptographyError("RND.ICC verification failed")
+            throw ResidenceCardReaderError.cryptographyError("RND.ICC verification failed")
         }
 
         // STEP 4: 端末乱数による相互性の検証
         // 復号データの8バイト目から16バイト目までが端末のRND.IFDと一致することを確認
         guard decrypted.subdata(in: 8..<16) == rndIFD else {
-            throw CardReaderError.cryptographyError("RND.IFD verification failed")
+            throw ResidenceCardReaderError.cryptographyError("RND.IFD verification failed")
         }
 
         // STEP 5: カード鍵K.ICCの抽出

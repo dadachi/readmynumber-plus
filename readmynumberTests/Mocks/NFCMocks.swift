@@ -69,7 +69,7 @@ class MockNFCISO7816Tag {
                     return (mockData, 0x90, 0x00)
                 }
             } else {
-                throw CardReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
+                throw ResidenceCardReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
             }
         }
         
@@ -77,8 +77,8 @@ class MockNFCISO7816Tag {
         if shouldSucceed {
             return (Data(), 0x90, 0x00)
         } else {
-            // Simulate CardReaderError.cardError
-            throw CardReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
+            // Simulate ResidenceCardReaderError.cardError
+            throw ResidenceCardReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
         }
     }
 }
@@ -196,7 +196,7 @@ struct MockTestUtils {
         // Ensure we don't try to read more data than we have
         let firstPartSize = min(availableSpaceInFirstChunk, encryptedData.count)
         guard firstPartSize > 0 else {
-            throw CardReaderError.invalidResponse
+            throw ResidenceCardReaderError.invalidResponse
         }
         
         // First chunk: TLV header + prefix + partial encrypted data

@@ -80,7 +80,7 @@ class SecureMessagingReader {
     // Parse TLV to determine total data size
     guard initialResponse.count >= 3,
           initialResponse[0] == 0x86 else {
-      throw CardReaderError.invalidResponse
+      throw ResidenceCardReaderError.invalidResponse
     }
 
     let (totalLength, tlvHeaderSize) = try parseBERLength(data: initialResponse, offset: 1)
@@ -136,7 +136,7 @@ class SecureMessagingReader {
     /// Check status words for errors
     private func checkStatusWord(sw1: UInt8, sw2: UInt8) throws {
         guard sw1 == 0x90 && sw2 == 0x00 else {
-            throw CardReaderError.cardError(sw1: sw1, sw2: sw2)
+            throw ResidenceCardReaderError.cardError(sw1: sw1, sw2: sw2)
         }
     }
     
@@ -147,24 +147,24 @@ class SecureMessagingReader {
     /// 
     /// - Parameter encryptedData: TLV形式の暗号化データ
     /// - Returns: 復号化されたデータ（パディング除去済み）
-    /// - Throws: CardReaderError セッションキーがない、データ形式が不正、復号化失敗時
+    /// - Throws: ResidenceCardReaderError セッションキーがない、データ形式が不正、復号化失敗時
     internal func decryptSMResponse(encryptedData: Data) throws -> Data {
         // セッションキーの存在確認
         guard let sessionKey = sessionKey else {
-            throw CardReaderError.cryptographyError("Session key not available")
+            throw ResidenceCardReaderError.cryptographyError("Session key not available")
         }
         
         // TLV構造から暗号化データを取り出す
         guard encryptedData.count > 3,
               encryptedData[0] == 0x86 else {
-            throw CardReaderError.invalidResponse
+            throw ResidenceCardReaderError.invalidResponse
         }
         
         let (length, nextOffset) = try parseBERLength(data: encryptedData, offset: 1)
         guard encryptedData.count >= nextOffset + length,
               length > 1,
               encryptedData[nextOffset] == 0x01 else {
-            throw CardReaderError.invalidResponse
+            throw ResidenceCardReaderError.invalidResponse
         }
         
         let ciphertext = encryptedData.subdata(in: (nextOffset + 1)..<(nextOffset + length))
@@ -184,10 +184,10 @@ class SecureMessagingReader {
     ///   - data: 解析対象のデータ
     ///   - offset: 長さフィールドの開始位置
     /// - Returns: (解析された長さ, 次のフィールドの開始位置)
-    /// - Throws: CardReaderError データが不正な場合
+    /// - Throws: ResidenceCardReaderError データが不正な場合
     internal func parseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
         guard offset < data.count else {
-            throw CardReaderError.invalidResponse
+            throw ResidenceCardReaderError.invalidResponse
         }
         
         let firstByte = data[offset]
@@ -196,17 +196,17 @@ class SecureMessagingReader {
             return (Int(firstByte), offset + 1)
         } else if firstByte == 0x81 {
             guard offset + 1 < data.count else {
-                throw CardReaderError.invalidResponse
+                throw ResidenceCardReaderError.invalidResponse
             }
             return (Int(data[offset + 1]), offset + 2)
         } else if firstByte == 0x82 {
             guard offset + 2 < data.count else {
-                throw CardReaderError.invalidResponse
+                throw ResidenceCardReaderError.invalidResponse
             }
             let length = (Int(data[offset + 1]) << 8) | Int(data[offset + 2])
             return (length, offset + 3)
         } else {
-            throw CardReaderError.invalidResponse
+            throw ResidenceCardReaderError.invalidResponse
         }
     }
     
@@ -217,10 +217,10 @@ class SecureMessagingReader {
     /// 
     /// - Parameter data: パディング付きデータ
     /// - Returns: パディング除去後のデータ
-    /// - Throws: CardReaderError パディングが不正な場合
+    /// - Throws: ResidenceCardReaderError パディングが不正な場合
     internal func removePadding(data: Data) throws -> Data {
         guard !data.isEmpty else {
-            throw CardReaderError.invalidResponse
+            throw ResidenceCardReaderError.invalidResponse
         }
         
         // Try ISO/IEC 7816-4 padding first (0x80 format)
@@ -230,7 +230,7 @@ class SecureMessagingReader {
                 guard data[i] == 0x00 else {
                     // Invalid ISO 7816-4 padding - has non-zero bytes after 0x80
                     // Don't fallback to PKCS#7 if 0x80 is present but invalid
-                    throw CardReaderError.invalidResponse
+                    throw ResidenceCardReaderError.invalidResponse
                 }
             }
             return data.prefix(paddingIndex)
@@ -246,10 +246,10 @@ class SecureMessagingReader {
     /// 
     /// - Parameter data: PKCS#7パディング付きデータ
     /// - Returns: パディング除去後のデータ
-    /// - Throws: CardReaderError パディングが不正な場合
+    /// - Throws: ResidenceCardReaderError パディングが不正な場合
     internal func removePKCS7Padding(data: Data) throws -> Data {
         guard !data.isEmpty else {
-            throw CardReaderError.invalidResponse
+            throw ResidenceCardReaderError.invalidResponse
         }
         
         // PKCS#7 パディング除去
@@ -257,14 +257,14 @@ class SecureMessagingReader {
         
         // パディング長が有効範囲内かチェック
         guard paddingLength > 0 && paddingLength <= 8 && paddingLength <= data.count else {
-            throw CardReaderError.invalidResponse
+            throw ResidenceCardReaderError.invalidResponse
         }
         
         // パディングバイトがすべて同じ値（パディング長）かチェック
         let paddingStart = data.count - paddingLength
         for i in paddingStart..<data.count {
             guard data[i] == paddingLength else {
-                throw CardReaderError.invalidResponse
+                throw ResidenceCardReaderError.invalidResponse
             }
         }
         

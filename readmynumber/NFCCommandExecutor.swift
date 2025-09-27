@@ -82,7 +82,7 @@ class MockNFCCommandExecutor: NFCCommandExecutor {
             // Return empty data with success status
             return (Data(), 0x90, 0x00)
         } else {
-            throw CardReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
+            throw ResidenceCardReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
         }
     }
     

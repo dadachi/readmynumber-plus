@@ -36,7 +36,7 @@ struct ResidenceCardReaderOrchestrationTests {
         // The startReading method detects test environment and fails early
         #expect(completionResult != nil)
         if case .failure(let error) = completionResult {
-            if let cardError = error as? CardReaderError {
+            if let cardError = error as? ResidenceCardReaderError {
                 #expect(cardError == .nfcNotAvailable)
             } else {
                 #expect(Bool(false), "Wrong error type: \(error)")
@@ -70,7 +70,7 @@ struct ResidenceCardReaderOrchestrationTests {
         
         #expect(completionResult != nil)
         if case .failure(let error) = completionResult {
-            #expect(error is CardReaderError)
+            #expect(error is ResidenceCardReaderError)
         } else {
             #expect(Bool(false), "Should have failed with invalid card number")
         }
@@ -96,7 +96,7 @@ struct ResidenceCardReaderOrchestrationTests {
         
         #expect(completionResult != nil)
         if case .failure(let error) = completionResult {
-            #expect(error is CardReaderError)
+            #expect(error is ResidenceCardReaderError)
         } else {
             #expect(Bool(false), "Should have failed with empty card number")
         }
@@ -124,7 +124,7 @@ struct ResidenceCardReaderOrchestrationTests {
         
         #expect(completionResult != nil)
         if case .failure(let error) = completionResult {
-            if let cardError = error as? CardReaderError {
+            if let cardError = error as? ResidenceCardReaderError {
                 #expect(cardError == .nfcNotAvailable)
             } else {
                 #expect(Bool(false), "Wrong error type")

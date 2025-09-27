@@ -33,10 +33,10 @@ class TDESCryptography {
   ///   - key: 16バイトの暗号化鍵（2-key 3DES用）
   ///   - encrypt: true=暗号化, false=復号化
   /// - Returns: 処理されたデータ
-  /// - Throws: CardReaderError.cryptographyError 処理失敗時
+  /// - Throws: ResidenceCardReaderError.cryptographyError 処理失敗時
   func performTDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
     guard key.count == 16 else {
-      throw CardReaderError.cryptographyError("Invalid key length: \(key.count), expected 16")
+      throw ResidenceCardReaderError.cryptographyError("Invalid key length: \(key.count), expected 16")
     }
     
     // Convert 2-key (16 bytes) to 3-key (24 bytes) for CommonCrypto
@@ -92,7 +92,7 @@ class TDESCryptography {
       default:
         errorMessage = "TDES operation failed with status: \(status)"
       }
-      throw CardReaderError.cryptographyError(errorMessage)
+      throw ResidenceCardReaderError.cryptographyError(errorMessage)
     }
     
     result.count = numBytesProcessed

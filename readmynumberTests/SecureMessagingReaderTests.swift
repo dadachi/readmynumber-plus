@@ -18,7 +18,7 @@ class MockTDESCryptography: TDESCryptography {
     
     override func performTDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
         guard shouldSucceed else {
-            throw CardReaderError.cryptographyError("Mock decryption failed")
+            throw ResidenceCardReaderError.cryptographyError("Mock decryption failed")
         }
         
         return encrypt ? encryptedData : decryptedData
@@ -92,7 +92,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try await reader.readBinaryWithSM(p1: 0x8A, p2: 0x00)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .cryptographyError(let message) = error {
                 #expect(message == "Session key not available")
             } else {
@@ -117,7 +117,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try await reader.readBinaryWithSM(p1: 0x8A, p2: 0x00)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x6A)
                 #expect(sw2 == 0x82)
@@ -143,7 +143,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try await reader.readBinaryWithSM(p1: 0x8A, p2: 0x00)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .invalidResponse = error {
                 // Expected
             } else {
@@ -192,7 +192,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try reader.parseBERLength(data: data, offset: 5)
             #expect(Bool(false), "Should have thrown error for out of bounds offset")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .invalidResponse = error {
                 // Expected
             } else {
@@ -207,7 +207,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try reader.parseBERLength(data: incompleteData, offset: 0)
             #expect(Bool(false), "Should have thrown error for incomplete data")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .invalidResponse = error {
                 // Expected
             } else {
@@ -266,7 +266,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try reader.removePadding(data: invalidISO)
             #expect(Bool(false), "Should have thrown error for invalid ISO padding")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .invalidResponse = error {
                 // Expected
             } else {
@@ -281,7 +281,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try reader.removePKCS7Padding(data: invalidPKCS7)
             #expect(Bool(false), "Should have thrown error for invalid PKCS7 padding")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .invalidResponse = error {
                 // Expected  
             } else {
@@ -296,7 +296,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try reader.removePadding(data: emptyData)
             #expect(Bool(false), "Should have thrown error for empty data")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .invalidResponse = error {
                 // Expected
             } else {
@@ -504,7 +504,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try await reader.readBinaryWithSM(p1: 0x8A, p2: 0x00)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .cryptographyError(let message) = error {
                 #expect(message == "Mock decryption failed")
             } else {

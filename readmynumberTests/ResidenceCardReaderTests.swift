@@ -289,24 +289,24 @@ struct ResidenceCardDataTests {
     }
 }
 
-// MARK: - CardReaderError Tests
-struct CardReaderErrorTests {
+// MARK: - ResidenceCardReaderError Tests
+struct ResidenceCardReaderErrorTests {
     
     @Test("Error descriptions")
     func testErrorDescriptions() {
-        let nfcError = CardReaderError.nfcNotAvailable
+        let nfcError = ResidenceCardReaderError.nfcNotAvailable
         #expect(nfcError.errorDescription == "NFCが利用できません")
         
-        let cardNumberError = CardReaderError.invalidCardNumber
+        let cardNumberError = ResidenceCardReaderError.invalidCardNumber
         #expect(cardNumberError.errorDescription == "無効な在留カード番号です")
         
-        let responseError = CardReaderError.invalidResponse
+        let responseError = ResidenceCardReaderError.invalidResponse
         #expect(responseError.errorDescription == "カードからの応答が不正です")
         
-        let cardError = CardReaderError.cardError(sw1: 0x6A, sw2: 0x82)
+        let cardError = ResidenceCardReaderError.cardError(sw1: 0x6A, sw2: 0x82)
         #expect(cardError.errorDescription == "カードエラー: SW1=6A, SW2=82")
         
-        let cryptoError = CardReaderError.cryptographyError("Test error")
+        let cryptoError = ResidenceCardReaderError.cryptographyError("Test error")
         #expect(cryptoError.errorDescription == "暗号処理エラー: Test error")
     }
 }
@@ -372,7 +372,7 @@ struct ResidenceCardReaderTests {
         ]
         
         for cardNumber in invalidLengths {
-            #expect(throws: CardReaderError.invalidCardNumberLength) {
+            #expect(throws: ResidenceCardReaderError.invalidCardNumberLength) {
                 _ = try reader.validateCardNumber(cardNumber)
             }
         }
@@ -395,7 +395,7 @@ struct ResidenceCardReaderTests {
         ]
         
         for cardNumber in invalidFormats {
-            #expect(throws: CardReaderError.invalidCardNumberFormat) {
+            #expect(throws: ResidenceCardReaderError.invalidCardNumberFormat) {
                 _ = try reader.validateCardNumber(cardNumber)
             }
         }
@@ -493,7 +493,7 @@ struct ResidenceCardReaderTests {
         #expect(offset3 == 3)
         
         // Invalid offset
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: Data([0x01]), offset: 5)
         }
     }
@@ -514,13 +514,13 @@ struct ResidenceCardReaderTests {
         
         // Invalid padding (non-zero after 0x80)
         let invalidPadding = Data([0x01, 0x02, 0x80, 0x01])
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.removePadding(data: invalidPadding)
         }
         
         // No padding marker
         let noPadding = Data([0x01, 0x02, 0x03])
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.removePadding(data: noPadding)
         }
     }
@@ -576,11 +576,11 @@ struct ResidenceCardReaderTests {
         }
         
         // Various error codes
-        #expect(throws: CardReaderError.cardError(sw1: 0x6A, sw2: 0x82)) {
+        #expect(throws: ResidenceCardReaderError.cardError(sw1: 0x6A, sw2: 0x82)) {
             try reader.checkStatusWord(sw1: 0x6A, sw2: 0x82)
         }
         
-        #expect(throws: CardReaderError.cardError(sw1: 0x69, sw2: 0x84)) {
+        #expect(throws: ResidenceCardReaderError.cardError(sw1: 0x69, sw2: 0x84)) {
             try reader.checkStatusWord(sw1: 0x69, sw2: 0x84)
         }
     }
@@ -602,11 +602,11 @@ struct ResidenceCardReaderTests {
             #expect(Bool(false), "Expected failure in test environment without real NFC card")
         case .failure(let error):
             // Verify we get the expected NFC unavailable error
-            if let cardReaderError = error as? CardReaderError {
+            if let cardReaderError = error as? ResidenceCardReaderError {
                 #expect(cardReaderError == .nfcNotAvailable, "Expected NFC unavailable error, got: \(cardReaderError)")
             } else {
                 // Other NFC-related errors might also occur in test environment
-                #expect(true, "Received non-CardReaderError: \(error)")
+                #expect(true, "Received non-ResidenceCardReaderError: \(error)")
             }
         }
     }
@@ -629,7 +629,7 @@ struct ResidenceCardReaderTests {
             #expect(encrypted.count % 8 == 0) // Should be multiple of block size
         } catch {
             // If it fails due to simulator issues, that's acceptable for this test
-            #expect(error is CardReaderError)
+            #expect(error is ResidenceCardReaderError)
         }
     }
     
@@ -650,7 +650,7 @@ struct ResidenceCardReaderTests {
         ]
         
         for invalidKey in invalidKeys {
-            #expect(throws: CardReaderError.self) {
+            #expect(throws: ResidenceCardReaderError.self) {
                 _ = try reader.tdesCryptography.performTDES(data: plaintext, key: invalidKey, encrypt: true)
             }
         }
@@ -799,19 +799,19 @@ struct ResidenceCardReaderTests {
         
         // Test verification failure with wrong MAC
         let wrongMAC = Data(repeating: 0xFF, count: 8)
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: wrongMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
         
         // Test verification failure with wrong rndICC
         let wrongRndICC = Data(repeating: 0x00, count: 8)
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: wrongRndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
         
         // Test verification failure with wrong rndIFD - this tests the guard decrypted.subdata(in: 8..<16) == rndIFD
         let wrongRndIFD = Data(repeating: 0xFF, count: 8)
-        #expect(throws: CardReaderError.cryptographyError("RND.IFD verification failed")) {
+        #expect(throws: ResidenceCardReaderError.cryptographyError("RND.IFD verification failed")) {
             _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: wrongRndIFD, kEnc: kEnc, kMac: kMac)
         }
     }
@@ -980,7 +980,7 @@ struct ResidenceCardReaderTests {
         var corruptedEICC = eICC
         corruptedEICC[0] = corruptedEICC[0] ^ 0xFF // Flip bits in first byte
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
           _ = try reader.verifyAndExtractKICC(eICC: corruptedEICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
         
@@ -989,7 +989,7 @@ struct ResidenceCardReaderTests {
         let wrongSizeMAC = try CryptoProviderImpl().calculateRetailMAC(data: wrongSizeEICC, key: kMac)
         
         // This should fail during RND.ICC verification because decrypted data structure is wrong
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
           _ = try reader.verifyAndExtractKICC(eICC: wrongSizeEICC, mICC: wrongSizeMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
     }
@@ -1002,14 +1002,14 @@ struct ResidenceCardReaderTests {
         // Test with wrong session key length
         let wrongSizeKey = Data(repeating: 0x42, count: 8) // 8 bytes instead of 16
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: wrongSizeKey)
         }
         
         // Test with empty session key
         let emptyKey = Data()
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: emptyKey)
         }
     }
@@ -1020,27 +1020,27 @@ struct ResidenceCardReaderTests {
         let validSessionKey = Data(repeating: 0x01, count: 16)
         
         // Test with card number that's too short
-        #expect(throws: CardReaderError.invalidCardNumber) {
+        #expect(throws: ResidenceCardReaderError.invalidCardNumber) {
             _ = try reader.encryptCardNumber(cardNumber: "AB12345678C", sessionKey: validSessionKey)
         }
         
         // Test with card number that's too long
-        #expect(throws: CardReaderError.invalidCardNumber) {
+        #expect(throws: ResidenceCardReaderError.invalidCardNumber) {
             _ = try reader.encryptCardNumber(cardNumber: "AB12345678CDE", sessionKey: validSessionKey)
         }
         
         // Test with card number containing non-ASCII characters
-        #expect(throws: CardReaderError.invalidCardNumber) {
+        #expect(throws: ResidenceCardReaderError.invalidCardNumber) {
             _ = try reader.encryptCardNumber(cardNumber: "AB1234567あCD", sessionKey: validSessionKey)
         }
         
         // Test with empty card number
-        #expect(throws: CardReaderError.invalidCardNumber) {
+        #expect(throws: ResidenceCardReaderError.invalidCardNumber) {
             _ = try reader.encryptCardNumber(cardNumber: "", sessionKey: validSessionKey)
         }
         
         // Test with card number containing extended ASCII characters
-        #expect(throws: CardReaderError.invalidCardNumber) {
+        #expect(throws: ResidenceCardReaderError.invalidCardNumber) {
             _ = try reader.encryptCardNumber(cardNumber: "AB12345678C\u{00FF}", sessionKey: validSessionKey)
         }
     }
@@ -1065,15 +1065,15 @@ struct ResidenceCardReaderTests {
         #expect(unpadded3 == Data([0x01]))
         
         // Test error cases
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.removePadding(data: Data()) // Empty data
         }
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.removePadding(data: Data([0x01, 0x02])) // No padding marker
         }
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.removePadding(data: Data([0x01, 0x80, 0x01])) // Invalid padding (non-zero after 0x80)
         }
     }
@@ -1101,15 +1101,15 @@ struct ResidenceCardReaderTests {
         #expect(maxOffset == 3)
         
         // Test error cases
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: Data([0x81]), offset: 0) // Incomplete extended form
         }
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: Data([0x82, 0x01]), offset: 0) // Incomplete 0x82 form
         }
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: Data([0x01]), offset: 10) // Offset beyond data
         }
     }
@@ -1272,7 +1272,7 @@ struct ResidenceCardReaderTests {
         tlvData.append(0x05) // Length
         tlvData.append(contentsOf: [0x01, 0x02, 0x03, 0x04, 0x05])
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.decryptSMResponse(encryptedData: tlvData)
         }
     }
@@ -1288,7 +1288,7 @@ struct ResidenceCardReaderTests {
         tlvData.append(0x08) // Length
         tlvData.append(contentsOf: Data(repeating: 0x02, count: 8)) // No 0x01 prefix
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.decryptSMResponse(encryptedData: tlvData)
         }
     }
@@ -1319,7 +1319,7 @@ struct ResidenceCardReaderTests {
         // Data too short (less than 3 bytes)
         let shortData = Data([0x86, 0x01])
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.decryptSMResponse(encryptedData: shortData)
         }
     }
@@ -1397,7 +1397,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.testSelectMF(mockTag: mockTag)
             #expect(Bool(false), "Should have thrown an error")
-        } catch CardReaderError.cardError(let sw1, let sw2) {
+        } catch ResidenceCardReaderError.cardError(let sw1, let sw2) {
             #expect(sw1 == 0x6A)
             #expect(sw2 == 0x82)
         } catch {
@@ -1426,7 +1426,7 @@ struct ResidenceCardReaderTests {
             do {
                 try await reader.testSelectMF(mockTag: mockTag)
                 #expect(Bool(false), "Should have thrown error for \(description)")
-            } catch CardReaderError.cardError(let receivedSW1, let receivedSW2) {
+            } catch ResidenceCardReaderError.cardError(let receivedSW1, let receivedSW2) {
                 #expect(receivedSW1 == sw1)
                 #expect(receivedSW2 == sw2)
             } catch {
@@ -1486,7 +1486,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.selectMF(executor: mockExecutor)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x6A)
                 #expect(sw2 == 0x82)
@@ -1586,7 +1586,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.testSelectDF(mockTag: mockTag, aid: testAID)
             #expect(Bool(false), "Should have thrown an error")
-        } catch CardReaderError.cardError(let sw1, let sw2) {
+        } catch ResidenceCardReaderError.cardError(let sw1, let sw2) {
             #expect(sw1 == 0x6A)
             #expect(sw2 == 0x82)
         } catch {
@@ -1619,7 +1619,7 @@ struct ResidenceCardReaderTests {
             do {
                 try await reader.testSelectDF(mockTag: mockTag, aid: testAID)
                 #expect(Bool(false), "Should have thrown error for \(description)")
-            } catch CardReaderError.cardError(let receivedSW1, let receivedSW2) {
+            } catch ResidenceCardReaderError.cardError(let receivedSW1, let receivedSW2) {
                 #expect(receivedSW1 == sw1)
                 #expect(receivedSW2 == sw2)
             } catch {
@@ -1822,18 +1822,18 @@ struct ResidenceCardReaderTests {
         
         // Invalid padding - inconsistent bytes
         let invalidData1 = Data([0x01, 0x02, 0x03, 0x04, 0x03, 0x04, 0x04])
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.removePKCS7Padding(data: invalidData1)
         }
         
         // Invalid padding - padding length > data length
         let invalidData2 = Data([0x01, 0x02, 0x09])
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.removePKCS7Padding(data: invalidData2)
         }
         
         // Empty data
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.removePKCS7Padding(data: Data())
         }
     }
@@ -1919,13 +1919,13 @@ struct ResidenceCardReaderTests {
         
         // Test invalid long form (unsupported)
         let invalidLongForm = Data([0x83, 0x00, 0x01, 0x00]) // 3-byte length not supported
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: invalidLongForm, offset: 0)
         }
         
         // Test insufficient data for long form
         let insufficientData = Data([0x82, 0x01]) // Missing second length byte
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: ResidenceCardReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: insufficientData, offset: 0)
         }
     }
@@ -2009,7 +2009,7 @@ struct ResidenceCardReaderTests {
             do {
                 try reader.checkStatusWord(sw1: sw1, sw2: sw2)
                 #expect(Bool(false)) // Should throw
-            } catch CardReaderError.cardError(let receivedSW1, let receivedSW2) {
+            } catch ResidenceCardReaderError.cardError(let receivedSW1, let receivedSW2) {
                 #expect(receivedSW1 == sw1)
                 #expect(receivedSW2 == sw2)
             } catch {
@@ -2110,15 +2110,15 @@ struct ResidenceCardReaderTests {
         let longKey = Data(repeating: 0x01, count: 17) // 17 bytes
         let emptyKey = Data()
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try tdesCrypto.performTDES(data: plaintext, key: shortKey, encrypt: true)
         }
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try tdesCrypto.performTDES(data: plaintext, key: longKey, encrypt: true)
         }
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try tdesCrypto.performTDES(data: plaintext, key: emptyKey, encrypt: true)
         }
     }
@@ -2313,7 +2313,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.performAuthentication(executor: executor)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .cryptographyError(let message) = error {
                 // MAC verification fails with empty default response
                 #expect(message == "MAC verification failed")
@@ -2344,7 +2344,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.performAuthentication(executor: executor)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x6A)
                 #expect(sw2 == 0x82)
@@ -2376,7 +2376,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.performAuthentication(executor: executor)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x63)
                 #expect(sw2 == 0x00)
@@ -2413,7 +2413,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.performAuthentication(executor: executor)
             #expect(Bool(false), "Should have thrown a cryptography error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .cryptographyError(let message) = error {
                 // Should fail at MAC verification step
                 #expect(message == "MAC verification failed")
@@ -2494,7 +2494,7 @@ struct ResidenceCardReaderTests {
         do {
             _ = try await reader.readBinaryPlain(executor: executor, p1: 0x86)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x63)
                 #expect(sw2 == 0x00)
@@ -2753,7 +2753,7 @@ struct ResidenceCardReaderTests {
         do {
             _ = try await reader.readBinaryWithSM(executor: executor, p1: 0x86)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x6A)
                 #expect(sw2 == 0x82)
@@ -3236,7 +3236,7 @@ struct ResidenceCardReaderIntegrationTests {
                         #expect(Bool(false), "Expected failure for invalid card number: '\(cardNumber)'")
                     case .failure(let error):
                         // Verify we get appropriate error types
-                        if let cardReaderError = error as? CardReaderError {
+                        if let cardReaderError = error as? ResidenceCardReaderError {
                             switch cardReaderError {
                             case .nfcNotAvailable:
                                 // This is expected in simulator environment
@@ -3269,7 +3269,7 @@ struct ResidenceCardReaderIntegrationTests {
                     // Should not succeed in test environment due to no real NFC card
                     #expect(Bool(false), "Unexpected success in test environment")
                 case .failure(let error):
-                    if let cardReaderError = error as? CardReaderError {
+                    if let cardReaderError = error as? ResidenceCardReaderError {
                         // Should only fail due to NFC not being available in test environment
                         #expect(cardReaderError == .nfcNotAvailable, "Expected NFC unavailable error for valid card number")
                     } else {
@@ -4189,7 +4189,7 @@ struct PerformAuthenticationLinesTests {
         // Use wrong MAC
         let wrongMAC = Data(repeating: 0xFF, count: 8)
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try reader.verifyAndExtractKICC(
                 eICC: eICC,
                 mICC: wrongMAC,
@@ -4217,7 +4217,7 @@ struct PerformAuthenticationLinesTests {
         let eICC = try reader.tdesCryptography.performTDES(data: invalidData, key: kEnc, encrypt: true)
         let mICC = try CryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try reader.verifyAndExtractKICC(
                 eICC: eICC,
                 mICC: mICC,
@@ -4245,7 +4245,7 @@ struct PerformAuthenticationLinesTests {
         let eICC = try reader.tdesCryptography.performTDES(data: invalidData, key: kEnc, encrypt: true)
         let mICC = try CryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try reader.verifyAndExtractKICC(
                 eICC: eICC,
                 mICC: mICC,
@@ -4359,11 +4359,11 @@ struct PerformAuthenticationLinesTests {
         let shortNumber = "12345"
         let longNumber = "1234567890123"
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try reader.encryptCardNumber(cardNumber: shortNumber, sessionKey: sessionKey)
         }
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try reader.encryptCardNumber(cardNumber: longNumber, sessionKey: sessionKey)
         }
     }
@@ -4375,7 +4375,7 @@ struct PerformAuthenticationLinesTests {
         
         let unicodeNumber = "１２３４５６７８９０１２"  // Full-width digits
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try reader.encryptCardNumber(cardNumber: unicodeNumber, sessionKey: sessionKey)
         }
     }

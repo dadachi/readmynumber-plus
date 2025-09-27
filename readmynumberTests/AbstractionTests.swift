@@ -65,7 +65,7 @@ struct NFCCommandExecutorTests {
         do {
             _ = try await executor.sendCommand(apdu: command)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as ResidenceCardReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x62)
                 #expect(sw2 == 0x82)
