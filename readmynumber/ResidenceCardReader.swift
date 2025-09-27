@@ -1006,7 +1006,12 @@ extension ResidenceCardReader {
     
     // STEP 5: Retail MAC計算（ISO/IEC 9797-1 Algorithm 3）
     // 暗号化データの完全性を保護するため8バイトMACを計算
-    let mIFD = try cryptoProvider.calculateRetailMAC(data: eIFD, key: kMac)
+    let mIFD: Data
+    do {
+      mIFD = try cryptoProvider.calculateRetailMAC(data: eIFD, key: kMac)
+    } catch let error as CryptoProviderImpl.CryptoError {
+      throw CardReaderError.cryptographyError(error.localizedDescription)
+    }
 
     return (eIFD: eIFD, mIFD: mIFD, rndIFD: rndIFD, kIFD: kIFD)
   }
@@ -1196,7 +1201,12 @@ extension ResidenceCardReader {
   internal func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, rndIFD: Data, kEnc: Data, kMac: Data) throws -> Data {
     // STEP 1: MAC検証 - データ完全性の確認
     // カードから受信したM.ICCと、E.ICCから計算したMACを比較
-    let calculatedMAC = try cryptoProvider.calculateRetailMAC(data: eICC, key: kMac)
+    let calculatedMAC: Data
+    do {
+      calculatedMAC = try cryptoProvider.calculateRetailMAC(data: eICC, key: kMac)
+    } catch let error as CryptoProviderImpl.CryptoError {
+      throw CardReaderError.cryptographyError(error.localizedDescription)
+    }
     guard calculatedMAC == mICC else {
       throw CardReaderError.cryptographyError("MAC verification failed")
     }

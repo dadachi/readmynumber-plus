@@ -6,10 +6,21 @@ protocol CryptoProvider {
 }
 
 class CryptoProviderImpl: CryptoProvider {
-    enum CryptoError: Error {
+    enum CryptoError: Error, LocalizedError {
         case invalidKeyLength(String)
         case invalidDataLength(String)
         case operationFailed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidKeyLength(let message):
+                return message
+            case .invalidDataLength(let message):
+                return message
+            case .operationFailed(let message):
+                return message
+            }
+        }
     }
 
     func calculateRetailMAC(data: Data, key: Data) throws -> Data {
