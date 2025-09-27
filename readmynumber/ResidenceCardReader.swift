@@ -956,39 +956,6 @@ extension ResidenceCardReader {
 // MARK: - Cryptography Extensions
 extension ResidenceCardReader {
   
-  /// 在留カード番号から認証鍵を生成
-  /// 
-  /// 在留カード等仕様書 3.5.2.1 に従って、在留カード番号から認証に使用する
-  /// 暗号化鍵（K.Enc）とMAC鍵（K.Mac）を生成します。
-  /// 
-  /// 処理手順:
-  /// 1. 在留カード番号（12文字ASCII）をSHA-1でハッシュ化（20バイト出力）
-  /// 2. ハッシュの先頭16バイトを暗号化鍵とMAC鍵の両方に使用
-  /// 
-  /// セキュリティ考慮事項:
-  /// - SHA-1を使用するのは仕様書の要求による（レガシー仕様）
-  /// - 同一鍵を暗号化とMACに使用（仕様書準拠）
-  /// - カード番号の秘匿性がセキュリティの基盤となる
-  /// 
-  /// - Parameter cardNumber: 12文字の在留カード番号（英数字）
-  /// - Returns: 暗号化鍵とMAC鍵のタプル（両方とも16バイト）
-  /// - Throws: CardReaderError.invalidCardNumber カード番号が無効な場合
-  internal func generateKeys(from cardNumber: String) throws -> (kEnc: Data, kMac: Data) {
-    guard let cardNumberData = cardNumber.data(using: .ascii) else {
-      throw CardReaderError.invalidCardNumber
-    }
-    
-    // SHA-1ハッシュ化（在留カード等仕様書 3.5.2.1 準拠）
-    var hash = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
-    cardNumberData.withUnsafeBytes { bytes in
-      _ = CC_SHA1(bytes.bindMemory(to: UInt8.self).baseAddress, CC_LONG(cardNumberData.count), &hash)
-    }
-    
-    // 先頭16バイトを暗号化鍵およびMAC鍵として使用
-    // 注: 仕様書では同一鍵を両方の目的に使用することが規定されている
-    let key = Data(hash.prefix(16))
-    return (kEnc: key, kMac: key)
-  }
   
   /// IFD（端末）側の相互認証データ生成
   /// 

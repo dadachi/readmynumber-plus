@@ -317,16 +317,16 @@ struct ResidenceCardReaderTests {
     
     @Test("Card number validation")
     func testCardNumberValidation() {
-        let reader = ResidenceCardReader()
-        
+        let authProvider = AuthenticationProviderImpl()
+
         // Valid 12-digit card number
         #expect(throws: Never.self) {
-            _ = try reader.generateKeys(from: "AB12345678CD")
+            _ = try authProvider.generateKeys(from: "AB12345678CD")
         }
-        
+
         // Invalid card number (non-ASCII)
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.generateKeys(from: "あいうえお")
+        #expect(throws: AuthenticationError.self) {
+            _ = try authProvider.generateKeys(from: "あいうえお")
         }
     }
     
@@ -1123,7 +1123,8 @@ struct ResidenceCardReaderTests {
         
         // Simulate complete mutual authentication flow
         let cardNumber = "AB12345678CD"
-        let (kEnc, kMac) = try reader.generateKeys(from: cardNumber)
+        let authProvider = AuthenticationProviderImpl()
+        let (kEnc, kMac) = try authProvider.generateKeys(from: cardNumber)
         
         // Step 1: IFD generates challenge response
         let rndICC = Data((0..<8).map { _ in UInt8.random(in: 0...255) }) // Card challenge
@@ -1173,7 +1174,8 @@ struct ResidenceCardReaderTests {
         var generatedKeys: [Data] = []
         
         for cardNumber in cardNumbers {
-            let (kEnc, kMac) = try reader.generateKeys(from: cardNumber)
+            let authProvider = AuthenticationProviderImpl()
+            let (kEnc, kMac) = try authProvider.generateKeys(from: cardNumber)
             #expect(kEnc.count == 16)
             #expect(kMac.count == 16)
             #expect(kEnc == kMac) // Should be identical for this implementation
