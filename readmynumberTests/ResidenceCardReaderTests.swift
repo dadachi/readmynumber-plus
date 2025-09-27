@@ -325,7 +325,7 @@ struct ResidenceCardReaderTests {
         }
 
         // Invalid card number (non-ASCII)
-        #expect(throws: AuthenticationError.self) {
+        #expect(throws: ResidenceCardReaderError.self) {
             _ = try authProvider.generateKeys(from: "あいうえお")
         }
     }

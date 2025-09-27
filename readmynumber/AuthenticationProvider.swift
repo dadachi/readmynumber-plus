@@ -1,9 +1,6 @@
 import Foundation
 import CommonCrypto
 
-enum AuthenticationError: Error {
-    case invalidCardNumber
-}
 
 protocol AuthenticationProvider {
     func generateKeys(from cardNumber: String) throws -> (kEnc: Data, kMac: Data)
@@ -22,7 +19,7 @@ class AuthenticationProviderImpl: AuthenticationProvider {
 
     func generateKeys(from cardNumber: String) throws -> (kEnc: Data, kMac: Data) {
         guard let cardNumberData = cardNumber.data(using: .ascii) else {
-            throw AuthenticationError.invalidCardNumber
+            throw ResidenceCardReaderError.invalidCardNumber
         }
 
         // SHA-1ハッシュ化（在留カード等仕様書 3.5.2.1 準拠）
@@ -56,12 +53,7 @@ class AuthenticationProviderImpl: AuthenticationProvider {
 
         // STEP 5: Retail MAC計算（ISO/IEC 9797-1 Algorithm 3）
         // 暗号化データの完全性を保護するため8バイトMACを計算
-        let mIFD: Data
-        do {
-            mIFD = try cryptoProvider.calculateRetailMAC(data: eIFD, key: kMac)
-        } catch _ as ResidenceCardReaderError {
-            throw AuthenticationError.invalidCardNumber // Convert to AuthenticationError
-        }
+        let mIFD = try cryptoProvider.calculateRetailMAC(data: eIFD, key: kMac)
 
         return (eIFD: eIFD, mIFD: mIFD, rndIFD: rndIFD, kIFD: kIFD)
     }
