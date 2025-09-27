@@ -1,5 +1,5 @@
 //
-//  PlainBinaryReader.swift
+//  RDCPlainBinaryReader.swift
 //  readmynumber
 //
 //  Created on 2025/09/09.
@@ -9,7 +9,7 @@ import Foundation
 import CoreNFC
 
 /// Handles plain (non-encrypted) READ BINARY operations
-class PlainBinaryReader {
+class RDCPlainBinaryReader {
     
     private let commandExecutor: RDCNFCCommandExecutor
 

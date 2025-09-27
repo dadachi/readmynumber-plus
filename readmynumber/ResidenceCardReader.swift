@@ -292,7 +292,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
 
     // バイナリ読み出し（平文）
     internal func readBinaryPlain(executor: RDCNFCCommandExecutor, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        let plainReader = PlainBinaryReader(commandExecutor: executor)
+        let plainReader = RDCPlainBinaryReader(commandExecutor: executor)
         return try await plainReader.readBinaryPlain(p1: p1, p2: p2)
     }
 
