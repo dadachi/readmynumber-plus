@@ -447,7 +447,7 @@ struct ResidenceCardDetailView: View {
     
     // 画像変換処理
     private func convertImages() {
-        let convertedImages = ImageConverter.convertResidenceCardImages(cardData: cardData)
+        let convertedImages = RDCImageConverter.convertResidenceCardImages(cardData: cardData)
         frontImageJPEG = convertedImages.front
         faceImageJPEG = convertedImages.face
     }

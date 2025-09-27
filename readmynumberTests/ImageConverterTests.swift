@@ -12,7 +12,7 @@ import ImageIO
 import UniformTypeIdentifiers
 @testable import readmynumber
 
-struct ImageConverterTests {
+struct RDCImageConverterTests {
     
     // MARK: - Test Helpers
     
@@ -87,7 +87,7 @@ struct ImageConverterTests {
     @Test("Convert valid TIFF data to UIImage")
     func testConvertValidTIFFToUIImage() {
         let tiffData = createTestTIFFData()
-        let result = ImageConverter.convertTIFFToUIImage(data: tiffData)
+        let result = RDCImageConverter.convertTIFFToUIImage(data: tiffData)
         
         #expect(result != nil, "Should successfully convert valid TIFF data")
         #expect(result?.size.width == 2, "Image width should be 2")
@@ -97,7 +97,7 @@ struct ImageConverterTests {
     @Test("Convert empty TIFF data returns nil")
     func testConvertEmptyTIFFData() {
         let emptyData = createEmptyData()
-        let result = ImageConverter.convertTIFFToUIImage(data: emptyData)
+        let result = RDCImageConverter.convertTIFFToUIImage(data: emptyData)
         
         #expect(result == nil, "Should return nil for empty data")
     }
@@ -105,7 +105,7 @@ struct ImageConverterTests {
     @Test("Convert small TIFF data returns nil")
     func testConvertSmallTIFFData() {
         let smallData = createSmallData()
-        let result = ImageConverter.convertTIFFToUIImage(data: smallData)
+        let result = RDCImageConverter.convertTIFFToUIImage(data: smallData)
         
         #expect(result == nil, "Should return nil for data smaller than 100 bytes")
     }
@@ -113,7 +113,7 @@ struct ImageConverterTests {
     @Test("Convert invalid TIFF data returns nil")
     func testConvertInvalidTIFFData() {
         let invalidData = createInvalidImageData()
-        let result = ImageConverter.convertTIFFToUIImage(data: invalidData)
+        let result = RDCImageConverter.convertTIFFToUIImage(data: invalidData)
         
         #expect(result == nil, "Should return nil for invalid TIFF data")
     }
@@ -123,7 +123,7 @@ struct ImageConverterTests {
     @Test("Convert valid JPEG data to UIImage")
     func testConvertValidJPEGToUIImage() {
         let jpegData = createTestJPEGData()
-        let result = ImageConverter.convertJPEG2000ToUIImage(data: jpegData)
+        let result = RDCImageConverter.convertJPEG2000ToUIImage(data: jpegData)
         
         #expect(result != nil, "Should successfully convert valid JPEG data")
         #expect(result?.size.width == 2, "Image width should be 2")
@@ -133,7 +133,7 @@ struct ImageConverterTests {
     @Test("Convert empty JPEG2000 data returns nil")
     func testConvertEmptyJPEG2000Data() {
         let emptyData = createEmptyData()
-        let result = ImageConverter.convertJPEG2000ToUIImage(data: emptyData)
+        let result = RDCImageConverter.convertJPEG2000ToUIImage(data: emptyData)
         
         #expect(result == nil, "Should return nil for empty data")
     }
@@ -141,7 +141,7 @@ struct ImageConverterTests {
     @Test("Convert small JPEG2000 data returns nil")
     func testConvertSmallJPEG2000Data() {
         let smallData = createSmallData()
-        let result = ImageConverter.convertJPEG2000ToUIImage(data: smallData)
+        let result = RDCImageConverter.convertJPEG2000ToUIImage(data: smallData)
         
         #expect(result == nil, "Should return nil for data smaller than 100 bytes")
     }
@@ -149,7 +149,7 @@ struct ImageConverterTests {
     @Test("Convert invalid JPEG2000 data returns nil")
     func testConvertInvalidJPEG2000Data() {
         let invalidData = createInvalidImageData()
-        let result = ImageConverter.convertJPEG2000ToUIImage(data: invalidData)
+        let result = RDCImageConverter.convertJPEG2000ToUIImage(data: invalidData)
         
         #expect(result == nil, "Should return nil for invalid JPEG2000 data")
     }
@@ -159,7 +159,7 @@ struct ImageConverterTests {
     @Test("Convert generic valid image data")
     func testConvertGenericImageData() {
         let jpegData = createTestJPEGData()
-        let result = ImageConverter.convertImageDataToUIImage(data: jpegData)
+        let result = RDCImageConverter.convertImageDataToUIImage(data: jpegData)
         
         #expect(result != nil, "Should successfully convert valid image data")
     }
@@ -167,7 +167,7 @@ struct ImageConverterTests {
     @Test("Convert generic empty data returns nil")
     func testConvertGenericEmptyData() {
         let emptyData = createEmptyData()
-        let result = ImageConverter.convertImageDataToUIImage(data: emptyData)
+        let result = RDCImageConverter.convertImageDataToUIImage(data: emptyData)
         
         #expect(result == nil, "Should return nil for empty data")
     }
@@ -175,7 +175,7 @@ struct ImageConverterTests {
     @Test("Convert generic small data returns nil")
     func testConvertGenericSmallData() {
         let smallData = createSmallData()
-        let result = ImageConverter.convertImageDataToUIImage(data: smallData)
+        let result = RDCImageConverter.convertImageDataToUIImage(data: smallData)
         
         #expect(result == nil, "Should return nil for small data")
     }
@@ -199,7 +199,7 @@ struct ImageConverterTests {
             signatureVerificationResult: nil
         )
         
-        let result = ImageConverter.convertResidenceCardImages(cardData: cardData)
+        let result = RDCImageConverter.convertResidenceCardImages(cardData: cardData)
         
         #expect(result.front != nil, "Should convert front image")
         #expect(result.face != nil, "Should convert face image")
@@ -224,7 +224,7 @@ struct ImageConverterTests {
             signatureVerificationResult: nil
         )
         
-        let result = ImageConverter.convertResidenceCardImages(cardData: cardData)
+        let result = RDCImageConverter.convertResidenceCardImages(cardData: cardData)
         
         #expect(result.front == nil, "Should return nil for invalid front image")
         #expect(result.face != nil, "Should still convert valid face image")
@@ -247,7 +247,7 @@ struct ImageConverterTests {
             signatureVerificationResult: nil
         )
         
-        let result = ImageConverter.convertResidenceCardImages(cardData: cardData)
+        let result = RDCImageConverter.convertResidenceCardImages(cardData: cardData)
         
         #expect(result.front != nil, "Should convert valid front image")
         #expect(result.face == nil, "Should return nil for invalid face image")
@@ -269,7 +269,7 @@ struct ImageConverterTests {
             signatureVerificationResult: nil
         )
         
-        let result = ImageConverter.convertResidenceCardImages(cardData: cardData)
+        let result = RDCImageConverter.convertResidenceCardImages(cardData: cardData)
         
         #expect(result.front == nil, "Should return nil for invalid front image")
         #expect(result.face == nil, "Should return nil for invalid face image")
@@ -291,7 +291,7 @@ struct ImageConverterTests {
             signatureVerificationResult: nil
         )
         
-        let result = ImageConverter.convertResidenceCardImages(cardData: cardData)
+        let result = RDCImageConverter.convertResidenceCardImages(cardData: cardData)
         
         #expect(result.front == nil, "Should return nil for empty front image")
         #expect(result.face == nil, "Should return nil for empty face image")
@@ -333,7 +333,7 @@ struct ImageConverterTests {
         
         // Measure conversion time
         let startTime = Date()
-        let result = ImageConverter.convertTIFFToUIImage(data: tiffData)
+        let result = RDCImageConverter.convertTIFFToUIImage(data: tiffData)
         let endTime = Date()
         
         let conversionTime = endTime.timeIntervalSince(startTime)

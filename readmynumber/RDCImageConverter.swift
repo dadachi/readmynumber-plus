@@ -10,7 +10,7 @@ import ImageIO
 import CoreGraphics
 
 /// A utility class for converting various image formats to UIImage
-class ImageConverter {
+class RDCImageConverter {
     
     // MARK: - Public Methods
     
