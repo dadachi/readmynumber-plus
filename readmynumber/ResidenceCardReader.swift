@@ -42,8 +42,9 @@ class ResidenceCardReader: NSObject, ObservableObject {
   private var sessionManager: NFCSessionManager
   private var threadDispatcher: ThreadDispatcher
   private var signatureVerifier: SignatureVerifier
-  internal var tdesCryptography: TDESCryptography
   private var authenticationProvider: AuthenticationProvider
+  internal var tdesCryptography: TDESCryptography
+  private var cryptoProvider: CryptoProvider
 
   // MARK: - Initialization
   
@@ -54,7 +55,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
     self.signatureVerifier = ResidenceCardSignatureVerifier()
     self.authenticationProvider = AuthenticationProviderImpl()
     self.tdesCryptography = TDESCryptography()
-    super.init()
+    self.cryptoProvider = CryptoProviderImpl()
+   super.init()
   }
   
   /// Initialize with custom dependencies for testing
@@ -63,13 +65,15 @@ class ResidenceCardReader: NSObject, ObservableObject {
     threadDispatcher: ThreadDispatcher,
     signatureVerifier: SignatureVerifier,
     authenticationProvider: AuthenticationProvider = AuthenticationProviderImpl(),
-    tdesCryptography: TDESCryptography = TDESCryptography()
+    tdesCryptography: TDESCryptography = TDESCryptography(),
+    cryptoProvider: CryptoProvider = CryptoProviderImpl()
   ) {
     self.sessionManager = sessionManager
     self.threadDispatcher = threadDispatcher
     self.signatureVerifier = signatureVerifier
     self.authenticationProvider = authenticationProvider
     self.tdesCryptography = tdesCryptography
+    self.cryptoProvider = cryptoProvider
     super.init()
   }
   
@@ -1002,8 +1006,8 @@ extension ResidenceCardReader {
     
     // STEP 5: Retail MAC計算（ISO/IEC 9797-1 Algorithm 3）
     // 暗号化データの完全性を保護するため8バイトMACを計算
-    let mIFD = try calculateRetailMAC(data: eIFD, key: kMac)
-    
+    let mIFD = try cryptoProvider.calculateRetailMAC(data: eIFD, key: kMac)
+
     return (eIFD: eIFD, mIFD: mIFD, rndIFD: rndIFD, kIFD: kIFD)
   }
   
@@ -1192,7 +1196,7 @@ extension ResidenceCardReader {
   internal func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, rndIFD: Data, kEnc: Data, kMac: Data) throws -> Data {
     // STEP 1: MAC検証 - データ完全性の確認
     // カードから受信したM.ICCと、E.ICCから計算したMACを比較
-    let calculatedMAC = try calculateRetailMAC(data: eICC, key: kMac)
+    let calculatedMAC = try cryptoProvider.calculateRetailMAC(data: eICC, key: kMac)
     guard calculatedMAC == mICC else {
       throw CardReaderError.cryptographyError("MAC verification failed")
     }
