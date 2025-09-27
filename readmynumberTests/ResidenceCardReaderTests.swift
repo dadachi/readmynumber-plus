@@ -1437,7 +1437,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Master File (MF) with executor delegation")
     func testSelectMFWithExecutorDelegation() async throws {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
         let mockVerifier = MockSignatureVerifier()
         
@@ -1466,7 +1466,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Master File (MF) with executor error handling")
     func testSelectMFWithExecutorErrorHandling() async {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
         let mockVerifier = MockSignatureVerifier()
         

@@ -259,13 +259,13 @@ struct ThreadDispatcherTests {
     }
 }
 
-// MARK: - NFCSessionManager Tests
+// MARK: - RDCNFCSessionManager Tests
 
-struct NFCSessionManagerTests {
+struct RDCNFCSessionManagerTests {
 
-    @Test("MockNFCSessionManager initialization")
-    func testMockNFCSessionManagerInitialization() {
-        let manager = MockNFCSessionManager()
+    @Test("MockRDCNFCSessionManager initialization")
+    func testMockRDCNFCSessionManagerInitialization() {
+        let manager = MockRDCNFCSessionManager()
 
         #expect(manager.isReadingAvailable == true)
         #expect(manager.shouldFailConnection == false)
@@ -276,9 +276,9 @@ struct NFCSessionManagerTests {
         #expect(manager.shouldSimulateTagDetection == true)
     }
 
-    @Test("MockNFCSessionManager session start")
-    func testMockNFCSessionManagerSessionStart() {
-        let manager = MockNFCSessionManager()
+    @Test("MockRDCNFCSessionManager session start")
+    func testMockRDCNFCSessionManagerSessionStart() {
+        let manager = MockRDCNFCSessionManager()
 
         manager.startSession(
             pollingOption: .iso14443,
@@ -291,9 +291,9 @@ struct NFCSessionManagerTests {
         #expect(manager.pollingOption == .iso14443)
     }
 
-    @Test("MockNFCSessionManager connection flags")
-    func testMockNFCSessionManagerConnectionFlags() {
-        let manager = MockNFCSessionManager()
+    @Test("MockRDCNFCSessionManager connection flags")
+    func testMockRDCNFCSessionManagerConnectionFlags() {
+        let manager = MockRDCNFCSessionManager()
 
         // Test connection failure configuration
         #expect(manager.shouldFailConnection == false)
@@ -305,9 +305,9 @@ struct NFCSessionManagerTests {
         #expect(manager.shouldFailConnection == true)
     }
 
-    @Test("MockNFCSessionManager invalidation")
-    func testMockNFCSessionManagerInvalidation() {
-        let manager = MockNFCSessionManager()
+    @Test("MockRDCNFCSessionManager invalidation")
+    func testMockRDCNFCSessionManagerInvalidation() {
+        let manager = MockRDCNFCSessionManager()
 
         manager.invalidate()
         #expect(manager.invalidated == true)
@@ -319,9 +319,9 @@ struct NFCSessionManagerTests {
         #expect(manager.invalidationErrorMessage == "Test error")
     }
 
-    @Test("MockNFCSessionManager reset")
-    func testMockNFCSessionManagerReset() {
-        let manager = MockNFCSessionManager()
+    @Test("MockRDCNFCSessionManager reset")
+    func testMockRDCNFCSessionManagerReset() {
+        let manager = MockRDCNFCSessionManager()
 
         // Set up some state
         manager.isReadingAvailable = false

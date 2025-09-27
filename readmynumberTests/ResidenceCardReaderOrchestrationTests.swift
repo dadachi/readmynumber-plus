@@ -16,7 +16,7 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("startReading with valid card number in test environment")
     func testStartReadingValidCardNumberInTestEnvironment() async {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
         let mockVerifier = MockSignatureVerifier()
         
@@ -52,7 +52,7 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("startReading with invalid card number")
     func testStartReadingInvalidCardNumber() async {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
         let mockVerifier = MockSignatureVerifier()
         
@@ -78,7 +78,7 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("startReading with empty card number")
     func testStartReadingEmptyCardNumber() async {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
         let mockVerifier = MockSignatureVerifier()
         
@@ -104,7 +104,7 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("startReading when NFC not available")
     func testStartReadingNFCNotAvailable() async {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         mockSession.isReadingAvailable = false
         
         let mockDispatcher = MockThreadDispatcher()
@@ -141,7 +141,7 @@ struct ResidenceCardReaderOrchestrationTests {
     @Test("selectMF with executor successful")
     func testSelectMFWithExecutorSuccessful() async throws {
         let mockExecutor = MockRDCNFCCommandExecutor()
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
         let mockVerifier = MockSignatureVerifier()
         
@@ -166,7 +166,7 @@ struct ResidenceCardReaderOrchestrationTests {
     @Test("selectDF with executor successful")
     func testSelectDFWithExecutorSuccessful() async throws {
         let mockExecutor = MockRDCNFCCommandExecutor()
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
         let mockVerifier = MockSignatureVerifier()
         
@@ -191,7 +191,7 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("Dependency injection setup")
     func testDependencyInjectionSetup() {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
         let mockVerifier = MockSignatureVerifier()
         
@@ -202,7 +202,7 @@ struct ResidenceCardReaderOrchestrationTests {
         )
         
         // Test that we can set dependencies
-        let newMockSession = MockNFCSessionManager()
+        let newMockSession = MockRDCNFCSessionManager()
         let newMockDispatcher = MockThreadDispatcher()
         let newMockVerifier = MockSignatureVerifier()
         
@@ -222,7 +222,7 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("Published properties initial state")
     func testPublishedPropertiesInitialState() {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
         let mockVerifier = MockSignatureVerifier()
         

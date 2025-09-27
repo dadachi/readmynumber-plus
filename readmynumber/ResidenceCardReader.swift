@@ -39,7 +39,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
 
     // Dependency injection for testability
     private var commandExecutor: RDCNFCCommandExecutor?
-    private var sessionManager: NFCSessionManager
+    private var sessionManager: RDCNFCSessionManager
     private var threadDispatcher: ThreadDispatcher
     private var signatureVerifier: SignatureVerifier
     private var authenticationProvider: RDCAuthenticationProvider
@@ -50,7 +50,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
 
     /// Initialize with default implementations
     override init() {
-        self.sessionManager = NFCSessionManagerImpl()
+        self.sessionManager = RDCNFCSessionManagerImpl()
         self.threadDispatcher = SystemThreadDispatcher()
         self.signatureVerifier = ResidenceCardSignatureVerifier()
         self.authenticationProvider = RDCAuthenticationProviderImpl()
@@ -61,7 +61,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
 
     /// Initialize with custom dependencies for testing
     init(
-        sessionManager: NFCSessionManager,
+        sessionManager: RDCNFCSessionManager,
         threadDispatcher: ThreadDispatcher,
         signatureVerifier: SignatureVerifier,
         authenticationProvider: RDCAuthenticationProvider = RDCAuthenticationProviderImpl(),
@@ -86,7 +86,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
 
     /// Set dependencies for testing
     func setDependencies(
-        sessionManager: NFCSessionManager? = nil,
+        sessionManager: RDCNFCSessionManager? = nil,
         threadDispatcher: ThreadDispatcher? = nil,
         signatureVerifier: SignatureVerifier? = nil,
         tdesCryptography: TDESCryptography? = nil
