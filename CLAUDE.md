@@ -69,6 +69,7 @@ This is an Xcode project with no package.json - use Xcode or command line tools:
 
 ## Testing Notes
 
+- Uses Swift Testing
 - App includes simulator fallback for NFC operations
 - Real testing requires physical iOS device with NFC capability
 - Japanese My Number card required for full functionality testing

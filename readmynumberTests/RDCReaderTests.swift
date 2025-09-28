@@ -794,25 +794,25 @@ struct RDCReaderTests {
         let mICC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         // Test verification
-      let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+      let extractedKICC = try reader.authenticationProvider.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         #expect(extractedKICC == kICC) // Should extract the correct kICC
         
         // Test verification failure with wrong MAC
         let wrongMAC = Data(repeating: 0xFF, count: 8)
         #expect(throws: RDCReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: wrongMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(eICC: eICC, mICC: wrongMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
         
         // Test verification failure with wrong rndICC
         let wrongRndICC = Data(repeating: 0x00, count: 8)
         #expect(throws: RDCReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: wrongRndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: wrongRndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
         
         // Test verification failure with wrong rndIFD - this tests the guard decrypted.subdata(in: 8..<16) == rndIFD
         let wrongRndIFD = Data(repeating: 0xFF, count: 8)
         #expect(throws: RDCReaderError.cryptographyError("RND.IFD verification failed")) {
-            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: wrongRndIFD, kEnc: kEnc, kMac: kMac)
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: wrongRndIFD, kEnc: kEnc, kMac: kMac)
         }
     }
     
@@ -981,7 +981,7 @@ struct RDCReaderTests {
         corruptedEICC[0] = corruptedEICC[0] ^ 0xFF // Flip bits in first byte
         
         #expect(throws: RDCReaderError.self) {
-          _ = try reader.verifyAndExtractKICC(eICC: corruptedEICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+          _ = try reader.authenticationProvider.verifyAndExtractKICC(eICC: corruptedEICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
         
         // Test with wrong encrypted data size
@@ -990,7 +990,7 @@ struct RDCReaderTests {
         
         // This should fail during RND.ICC verification because decrypted data structure is wrong
         #expect(throws: RDCReaderError.self) {
-          _ = try reader.verifyAndExtractKICC(eICC: wrongSizeEICC, mICC: wrongSizeMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+          _ = try reader.authenticationProvider.verifyAndExtractKICC(eICC: wrongSizeEICC, mICC: wrongSizeMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
     }
     
@@ -1142,7 +1142,7 @@ struct RDCReaderTests {
         let mICC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         // Step 3: IFD verifies card response
-      let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+      let extractedKICC = try reader.authenticationProvider.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         #expect(extractedKICC == kICC)
         
         // Step 4: Generate session key
@@ -4161,7 +4161,7 @@ struct PerformAuthenticationLinesTests {
         let mICC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         // Test the method
-        let extractedKICC = try reader.verifyAndExtractKICC(
+        let extractedKICC = try reader.authenticationProvider.verifyAndExtractKICC(
             eICC: eICC,
             mICC: mICC,
             rndICC: rndICC,
@@ -4190,7 +4190,7 @@ struct PerformAuthenticationLinesTests {
         let wrongMAC = Data(repeating: 0xFF, count: 8)
         
         #expect(throws: RDCReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(
                 eICC: eICC,
                 mICC: wrongMAC,
                 rndICC: rndICC,
@@ -4218,7 +4218,7 @@ struct PerformAuthenticationLinesTests {
         let mICC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         #expect(throws: RDCReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(
                 eICC: eICC,
                 mICC: mICC,
                 rndICC: rndICC,  // Expecting correct RND.ICC
@@ -4246,7 +4246,7 @@ struct PerformAuthenticationLinesTests {
         let mICC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         #expect(throws: RDCReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(
                 eICC: eICC,
                 mICC: mICC,
                 rndICC: rndICC,

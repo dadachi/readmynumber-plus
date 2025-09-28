@@ -5,6 +5,7 @@ import CommonCrypto
 protocol RDCAuthenticationProvider {
     func generateKeys(from cardNumber: String) throws -> (kEnc: Data, kMac: Data)
     func generateAuthenticationData(rndICC: Data, kEnc: Data, kMac: Data) throws -> (eIFD: Data, mIFD: Data, rndIFD: Data, kIFD: Data)
+    func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, rndIFD: Data, kEnc: Data, kMac: Data) throws -> Data
 }
 
 class RDCAuthenticationProviderImpl: RDCAuthenticationProvider {
@@ -56,5 +57,36 @@ class RDCAuthenticationProviderImpl: RDCAuthenticationProvider {
         let mIFD = try cryptoProvider.calculateRetailMAC(data: eIFD, key: kMac)
 
         return (eIFD: eIFD, mIFD: mIFD, rndIFD: rndIFD, kIFD: kIFD)
+    }
+
+    func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, rndIFD: Data, kEnc: Data, kMac: Data) throws -> Data {
+        // STEP 1: MAC検証 - データ完全性の確認
+        // カードから受信したM.ICCと、E.ICCから計算したMACを比較
+        let calculatedMAC = try cryptoProvider.calculateRetailMAC(data: eICC, key: kMac)
+        guard calculatedMAC == mICC else {
+            throw RDCReaderError.cryptographyError("MAC verification failed")
+        }
+
+        // STEP 2: 認証データの復号化
+        // E.ICCを3DES復号して32バイトの平文認証データを取得
+        let decrypted = try tdesCryptography.performTDES(data: eICC, key: kEnc, encrypt: false)
+
+        // STEP 3: チャレンジ・レスポンス検証
+        // 復号データの先頭8バイトが最初のRND.ICCと一致することを確認
+        // これによりリプレイ攻撃を防止し、カードの正当性を確認
+        guard decrypted.prefix(8) == rndICC else {
+            throw RDCReaderError.cryptographyError("RND.ICC verification failed")
+        }
+
+        // STEP 4: 端末乱数による相互性の検証
+        // 復号データの8バイト目から16バイト目までが端末のRND.IFDと一致することを確認
+        guard decrypted.subdata(in: 8..<16) == rndIFD else {
+            throw RDCReaderError.cryptographyError("RND.IFD verification failed")
+        }
+
+        // STEP 5: カード鍵K.ICCの抽出
+        // 復号データの最後16バイトがK.ICC（カードセッション鍵素材）
+        // この鍵はK.IFDとXORされて最終セッション鍵を生成
+        return decrypted.suffix(16)
     }
 }
