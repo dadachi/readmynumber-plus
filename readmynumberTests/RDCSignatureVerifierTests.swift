@@ -13,7 +13,7 @@ import Security
 
 struct SignatureVerifierTests {
     
-    let verifier = ResidenceCardSignatureVerifier()
+    let verifier = RDCSignatureVerifierImpl()
     
     // MARK: - TLV Parsing Tests
     
@@ -279,8 +279,8 @@ struct SignatureVerifierTests {
     // MARK: - Successful Verification Tests
 
     @Test func testSuccessfulSignatureVerification() throws {
-        // For now, let's test with MockSignatureVerifier to ensure our test framework works
-        let mockVerifier = MockSignatureVerifier()
+        // For now, let's test with MockRDCSignatureVerifier to ensure our test framework works
+        let mockVerifier = MockRDCSignatureVerifier()
         mockVerifier.shouldReturnValid = true
 
         // Create test image data with exact fixed lengths
@@ -302,13 +302,13 @@ struct SignatureVerifierTests {
         // Verify successful verification
         #expect(result.isValid == true)
         #expect(result.error == nil)
-        #expect(result.details == nil) // MockSignatureVerifier returns nil details
+        #expect(result.details == nil) // MockRDCSignatureVerifier returns nil details
     }
 
     @Test func testSuccessfulSignatureVerificationWithRealCrypto() throws {
         // This test attempts to use real cryptography but may fail due to complexity
         // of creating valid X.509 certificates in unit tests
-        let verifier = ResidenceCardSignatureVerifier()
+        let verifier = RDCSignatureVerifierImpl()
 
         // Create test image data with exact fixed lengths
         let frontImageData = Data(repeating: 0xAA, count: 7000) // Front image

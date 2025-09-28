@@ -44,7 +44,7 @@ struct ResidentTabView: View {
     @State private var alertMessage: String = ""
     @State private var showingSample = false
     @State private var showingTestDataExportSheet = false
-    @StateObject private var residenceCardReader = ResidenceCardReader()
+    @StateObject private var residenceCardReader = RDCReader()
     @StateObject private var dataManager = ResidenceCardDataManager.shared
     @Environment(\.colorScheme) var colorScheme
     
@@ -178,11 +178,11 @@ struct ResidentTabView: View {
             }
             .navigationDestination(isPresented: $dataManager.shouldNavigateToDetail) {
                 if let cardData = dataManager.cardData {
-                    ResidenceCardDetailView(cardData: cardData)
+                    RDCDetailView(cardData: cardData)
                 }
             }
             .sheet(isPresented: $showingSample) {
-                ResidenceCardSampleView()
+                RDCSampleView()
             }
             .sheet(isPresented: $showingTestDataExportSheet) {
                 if let fileURLs = getTestDataFileURL() {

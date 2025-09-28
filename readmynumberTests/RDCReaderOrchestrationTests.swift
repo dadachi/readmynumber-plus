@@ -1,5 +1,5 @@
 //
-//  ResidenceCardReaderOrchestrationTests.swift
+//  RDCReaderOrchestrationTests.swift
 //  readmynumberTests
 //
 //  Created on 2025/09/09.
@@ -10,17 +10,17 @@ import Foundation
 import CoreNFC
 @testable import readmynumber
 
-struct ResidenceCardReaderOrchestrationTests {
+struct RDCReaderOrchestrationTests {
     
     // MARK: - startReading Tests
     
     @Test("startReading with valid card number in test environment")
     func testStartReadingValidCardNumberInTestEnvironment() async {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
-        let mockVerifier = MockSignatureVerifier()
+        let mockVerifier = MockRDCSignatureVerifier()
         
-        let reader = ResidenceCardReader(
+        let reader = RDCReader(
             sessionManager: mockSession,
             threadDispatcher: mockDispatcher,
             signatureVerifier: mockVerifier
@@ -36,7 +36,7 @@ struct ResidenceCardReaderOrchestrationTests {
         // The startReading method detects test environment and fails early
         #expect(completionResult != nil)
         if case .failure(let error) = completionResult {
-            if let cardError = error as? CardReaderError {
+            if let cardError = error as? RDCReaderError {
                 #expect(cardError == .nfcNotAvailable)
             } else {
                 #expect(Bool(false), "Wrong error type: \(error)")
@@ -52,11 +52,11 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("startReading with invalid card number")
     func testStartReadingInvalidCardNumber() async {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
-        let mockVerifier = MockSignatureVerifier()
+        let mockVerifier = MockRDCSignatureVerifier()
         
-        let reader = ResidenceCardReader(
+        let reader = RDCReader(
             sessionManager: mockSession,
             threadDispatcher: mockDispatcher,
             signatureVerifier: mockVerifier
@@ -70,7 +70,7 @@ struct ResidenceCardReaderOrchestrationTests {
         
         #expect(completionResult != nil)
         if case .failure(let error) = completionResult {
-            #expect(error is CardReaderError)
+            #expect(error is RDCReaderError)
         } else {
             #expect(Bool(false), "Should have failed with invalid card number")
         }
@@ -78,11 +78,11 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("startReading with empty card number")
     func testStartReadingEmptyCardNumber() async {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
-        let mockVerifier = MockSignatureVerifier()
+        let mockVerifier = MockRDCSignatureVerifier()
         
-        let reader = ResidenceCardReader(
+        let reader = RDCReader(
             sessionManager: mockSession,
             threadDispatcher: mockDispatcher,
             signatureVerifier: mockVerifier
@@ -96,7 +96,7 @@ struct ResidenceCardReaderOrchestrationTests {
         
         #expect(completionResult != nil)
         if case .failure(let error) = completionResult {
-            #expect(error is CardReaderError)
+            #expect(error is RDCReaderError)
         } else {
             #expect(Bool(false), "Should have failed with empty card number")
         }
@@ -104,13 +104,13 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("startReading when NFC not available")
     func testStartReadingNFCNotAvailable() async {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         mockSession.isReadingAvailable = false
         
         let mockDispatcher = MockThreadDispatcher()
-        let mockVerifier = MockSignatureVerifier()
+        let mockVerifier = MockRDCSignatureVerifier()
         
-        let reader = ResidenceCardReader(
+        let reader = RDCReader(
             sessionManager: mockSession,
             threadDispatcher: mockDispatcher,
             signatureVerifier: mockVerifier
@@ -124,7 +124,7 @@ struct ResidenceCardReaderOrchestrationTests {
         
         #expect(completionResult != nil)
         if case .failure(let error) = completionResult {
-            if let cardError = error as? CardReaderError {
+            if let cardError = error as? RDCReaderError {
                 #expect(cardError == .nfcNotAvailable)
             } else {
                 #expect(Bool(false), "Wrong error type")
@@ -140,12 +140,12 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("selectMF with executor successful")
     func testSelectMFWithExecutorSuccessful() async throws {
-        let mockExecutor = MockNFCCommandExecutor()
-        let mockSession = MockNFCSessionManager()
+        let mockExecutor = MockRDCNFCCommandExecutor()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
-        let mockVerifier = MockSignatureVerifier()
+        let mockVerifier = MockRDCSignatureVerifier()
         
-        let reader = ResidenceCardReader(
+        let reader = RDCReader(
             sessionManager: mockSession,
             threadDispatcher: mockDispatcher,
             signatureVerifier: mockVerifier
@@ -165,12 +165,12 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("selectDF with executor successful")
     func testSelectDFWithExecutorSuccessful() async throws {
-        let mockExecutor = MockNFCCommandExecutor()
-        let mockSession = MockNFCSessionManager()
+        let mockExecutor = MockRDCNFCCommandExecutor()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
-        let mockVerifier = MockSignatureVerifier()
+        let mockVerifier = MockRDCSignatureVerifier()
         
-        let reader = ResidenceCardReader(
+        let reader = RDCReader(
             sessionManager: mockSession,
             threadDispatcher: mockDispatcher,
             signatureVerifier: mockVerifier
@@ -191,20 +191,20 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("Dependency injection setup")
     func testDependencyInjectionSetup() {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
-        let mockVerifier = MockSignatureVerifier()
+        let mockVerifier = MockRDCSignatureVerifier()
         
-        let reader = ResidenceCardReader(
+        let reader = RDCReader(
             sessionManager: mockSession,
             threadDispatcher: mockDispatcher,
             signatureVerifier: mockVerifier
         )
         
         // Test that we can set dependencies
-        let newMockSession = MockNFCSessionManager()
+        let newMockSession = MockRDCNFCSessionManager()
         let newMockDispatcher = MockThreadDispatcher()
-        let newMockVerifier = MockSignatureVerifier()
+        let newMockVerifier = MockRDCSignatureVerifier()
         
         reader.setDependencies(
             sessionManager: newMockSession,
@@ -213,7 +213,7 @@ struct ResidenceCardReaderOrchestrationTests {
         )
         
         // Test that command executor can be set
-        let mockExecutor = MockNFCCommandExecutor()
+        let mockExecutor = MockRDCNFCCommandExecutor()
         reader.setCommandExecutor(mockExecutor)
         
         // Test passes if no exceptions are thrown
@@ -222,11 +222,11 @@ struct ResidenceCardReaderOrchestrationTests {
     
     @Test("Published properties initial state")
     func testPublishedPropertiesInitialState() {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
-        let mockVerifier = MockSignatureVerifier()
+        let mockVerifier = MockRDCSignatureVerifier()
         
-        let reader = ResidenceCardReader(
+        let reader = RDCReader(
             sessionManager: mockSession,
             threadDispatcher: mockDispatcher,
             signatureVerifier: mockVerifier

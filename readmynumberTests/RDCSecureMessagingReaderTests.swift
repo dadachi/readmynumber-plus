@@ -1,5 +1,5 @@
 //
-//  SecureMessagingReaderTests.swift
+//  RDCSecureMessagingReaderTests.swift
 //  readmynumberTests
 //
 //  Created on 2025/09/10.
@@ -10,15 +10,15 @@ import Foundation
 import CoreNFC
 @testable import readmynumber
 
-// Mock TDESCryptography for testing
-class MockTDESCryptography: TDESCryptography {
+// Mock RDCTDESCryptography for testing
+class MockRDCTDESCryptography: RDCTDESCryptography {
     var shouldSucceed = true
     var decryptedData = Data([0x01, 0x02, 0x03, 0x04, 0x80, 0x00, 0x00, 0x00]) // Data with ISO7816-4 padding
     var encryptedData = Data([0xFF, 0xFE, 0xFD, 0xFC])
     
     override func performTDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
         guard shouldSucceed else {
-            throw CardReaderError.cryptographyError("Mock decryption failed")
+            throw RDCReaderError.cryptographyError("Mock decryption failed")
         }
         
         return encrypt ? encryptedData : decryptedData
@@ -31,37 +31,37 @@ class MockTDESCryptography: TDESCryptography {
     }
 }
 
-struct SecureMessagingReaderTests {
+struct RDCSecureMessagingReaderTests {
 
-    @Test("SecureMessagingReader initialization with session key")
-    func testSecureMessagingReaderInitialization() {
-        let executor = MockNFCCommandExecutor()
+    @Test("RDCSecureMessagingReader initialization with session key")
+    func testRDCSecureMessagingReaderInitialization() {
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let mockCrypto = MockTDESCryptography()
+        let mockCrypto = MockRDCTDESCryptography()
 
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
 
         // Test passes if initialization succeeds without crash
         #expect(true)
     }
 
-    @Test("SecureMessagingReader initialization without session key")
-    func testSecureMessagingReaderInitializationNoKey() {
-        let executor = MockNFCCommandExecutor()
-        let mockCrypto = MockTDESCryptography()
+    @Test("RDCSecureMessagingReader initialization without session key")
+    func testRDCSecureMessagingReaderInitializationNoKey() {
+        let executor = MockRDCNFCCommandExecutor()
+        let mockCrypto = MockRDCTDESCryptography()
 
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: nil, tdesCryptography: mockCrypto)
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: nil, tdesCryptography: mockCrypto)
 
         // Test passes if initialization succeeds without crash
         #expect(true)
     }
 
-    @Test("SecureMessagingReader successful read with SM")
-    func testSecureMessagingReaderSuccess() async throws {
-        let executor = MockNFCCommandExecutor()
+    @Test("RDCSecureMessagingReader successful read with SM")
+    func testRDCSecureMessagingReaderSuccess() async throws {
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let mockCrypto = MockTDESCryptography()
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
+        let mockCrypto = MockRDCTDESCryptography()
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
         
         // Create mock encrypted TLV response: 0x86 (tag) + 0x05 (length) + 0x01 (padding indicator) + encrypted data (4 bytes)
         let mockEncryptedData = Data([0x86, 0x05, 0x01, 0xFF, 0xFE, 0xFD, 0xFC])
@@ -79,11 +79,11 @@ struct SecureMessagingReaderTests {
         #expect(executor.commandHistory[0].p2Parameter == 0x00)
     }
 
-    @Test("SecureMessagingReader error handling - no session key")
-    func testSecureMessagingReaderNoSessionKey() async {
-        let executor = MockNFCCommandExecutor()
-        let mockCrypto = MockTDESCryptography()
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: nil, tdesCryptography: mockCrypto)
+    @Test("RDCSecureMessagingReader error handling - no session key")
+    func testRDCSecureMessagingReaderNoSessionKey() async {
+        let executor = MockRDCNFCCommandExecutor()
+        let mockCrypto = MockRDCTDESCryptography()
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: nil, tdesCryptography: mockCrypto)
         
         // Create mock encrypted TLV response
         let mockEncryptedData = Data([0x86, 0x05, 0x01, 0xFF, 0xFE, 0xFD, 0xFC])
@@ -92,7 +92,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try await reader.readBinaryWithSM(p1: 0x8A, p2: 0x00)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .cryptographyError(let message) = error {
                 #expect(message == "Session key not available")
             } else {
@@ -103,12 +103,12 @@ struct SecureMessagingReaderTests {
         }
     }
 
-    @Test("SecureMessagingReader error handling - card error")
-    func testSecureMessagingReaderCardError() async {
-        let executor = MockNFCCommandExecutor()
+    @Test("RDCSecureMessagingReader error handling - card error")
+    func testRDCSecureMessagingReaderCardError() async {
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let mockCrypto = MockTDESCryptography()
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
+        let mockCrypto = MockRDCTDESCryptography()
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
 
         executor.shouldSucceed = false
         executor.errorSW1 = 0x6A
@@ -117,7 +117,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try await reader.readBinaryWithSM(p1: 0x8A, p2: 0x00)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x6A)
                 #expect(sw2 == 0x82)
@@ -129,12 +129,12 @@ struct SecureMessagingReaderTests {
         }
     }
 
-    @Test("SecureMessagingReader invalid TLV response")
-    func testSecureMessagingReaderInvalidTLV() async {
-        let executor = MockNFCCommandExecutor()
+    @Test("RDCSecureMessagingReader invalid TLV response")
+    func testRDCSecureMessagingReaderInvalidTLV() async {
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let mockCrypto = MockTDESCryptography()
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
+        let mockCrypto = MockRDCTDESCryptography()
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
         
         // Invalid TLV response (wrong tag)
         let invalidTLVData = Data([0x85, 0x05, 0x01, 0xFF, 0xFE, 0xFD, 0xFC])
@@ -143,7 +143,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try await reader.readBinaryWithSM(p1: 0x8A, p2: 0x00)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .invalidResponse = error {
                 // Expected
             } else {
@@ -154,12 +154,12 @@ struct SecureMessagingReaderTests {
         }
     }
 
-    @Test("SecureMessagingReader BER length parsing")
+    @Test("RDCSecureMessagingReader BER length parsing")
     func testBERLengthParsing() throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let mockCrypto = MockTDESCryptography()
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
+        let mockCrypto = MockRDCTDESCryptography()
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
 
         // Test short form length (≤ 127)
         let shortData = Data([0x7F])
@@ -180,19 +180,19 @@ struct SecureMessagingReaderTests {
         #expect(longNext2 == 3)
     }
 
-    @Test("SecureMessagingReader BER length parsing errors")
+    @Test("RDCSecureMessagingReader BER length parsing errors")
     func testBERLengthParsingErrors() {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let mockCrypto = MockTDESCryptography()
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
+        let mockCrypto = MockRDCTDESCryptography()
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
 
         // Test offset out of bounds
         let data = Data([0x81])
         do {
             _ = try reader.parseBERLength(data: data, offset: 5)
             #expect(Bool(false), "Should have thrown error for out of bounds offset")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .invalidResponse = error {
                 // Expected
             } else {
@@ -207,7 +207,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try reader.parseBERLength(data: incompleteData, offset: 0)
             #expect(Bool(false), "Should have thrown error for incomplete data")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .invalidResponse = error {
                 // Expected
             } else {
@@ -218,12 +218,12 @@ struct SecureMessagingReaderTests {
         }
     }
 
-    @Test("SecureMessagingReader ISO 7816-4 padding removal")
+    @Test("RDCSecureMessagingReader ISO 7816-4 padding removal")
     func testISO7816PaddingRemoval() throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let mockCrypto = MockTDESCryptography()
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
+        let mockCrypto = MockRDCTDESCryptography()
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
 
         // Test valid ISO 7816-4 padding (0x80 followed by zeros)
         let paddedData = Data([0x01, 0x02, 0x03, 0x80, 0x00, 0x00, 0x00, 0x00])
@@ -236,12 +236,12 @@ struct SecureMessagingReaderTests {
         #expect(resultEnd == Data([0x01, 0x02, 0x03, 0x04]))
     }
 
-    @Test("SecureMessagingReader PKCS7 padding removal")
+    @Test("RDCSecureMessagingReader PKCS7 padding removal")
     func testPKCS7PaddingRemoval() throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let mockCrypto = MockTDESCryptography()
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
+        let mockCrypto = MockRDCTDESCryptography()
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
 
         // Test valid PKCS#7 padding - padding value should be 4 (length), not the actual bytes
         let pkcs7Data = Data([0x01, 0x02, 0x03, 0x04, 0x04, 0x04, 0x04, 0x04])
@@ -254,19 +254,19 @@ struct SecureMessagingReaderTests {
         #expect(singleResult == Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]))
     }
 
-    @Test("SecureMessagingReader invalid padding scenarios")
+    @Test("RDCSecureMessagingReader invalid padding scenarios")
     func testInvalidPaddingScenarios() {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let mockCrypto = MockTDESCryptography()
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
+        let mockCrypto = MockRDCTDESCryptography()
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
 
         // Test invalid ISO 7816-4 padding (has non-zero after 0x80)
         let invalidISO = Data([0x01, 0x02, 0x80, 0xFF, 0x00])
         do {
             _ = try reader.removePadding(data: invalidISO)
             #expect(Bool(false), "Should have thrown error for invalid ISO padding")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .invalidResponse = error {
                 // Expected
             } else {
@@ -281,7 +281,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try reader.removePKCS7Padding(data: invalidPKCS7)
             #expect(Bool(false), "Should have thrown error for invalid PKCS7 padding")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .invalidResponse = error {
                 // Expected  
             } else {
@@ -296,7 +296,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try reader.removePadding(data: emptyData)
             #expect(Bool(false), "Should have thrown error for empty data")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .invalidResponse = error {
                 // Expected
             } else {
@@ -307,11 +307,11 @@ struct SecureMessagingReaderTests {
         }
     }
 
-    @Test("SecureMessagingReader reading single chunk")
+    @Test("RDCSecureMessagingReader reading single chunk")
     func testReadBinaryWithSMSingleChunk() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
 
         // Create small single chunk test data using MockTestUtils with real encryption
         let plainData = Data([0x01, 0x02, 0x03, 0x04, 0x80, 0x00, 0x00, 0x00]) // Small data with ISO7816-4 padding
@@ -338,11 +338,11 @@ struct SecureMessagingReaderTests {
         #expect(executor.commandHistory[0].p2Parameter == 0x00)
     }
 
-    @Test("SecureMessagingReader chunked reading single chunk")
+    @Test("RDCSecureMessagingReader chunked reading single chunk")
     func testReadBinaryChunkedWithSMSingleChunk() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
 
         // Create small single chunk test data using MockTestUtils with real encryption
         let plainData = Data([0x01, 0x02, 0x03, 0x04, 0x80, 0x00, 0x00, 0x00]) // Small data with ISO7816-4 padding
@@ -369,11 +369,11 @@ struct SecureMessagingReaderTests {
         #expect(executor.commandHistory[0].p2Parameter == 0x00)
     }
 
-    @Test("SecureMessagingReader chunked reading multiple chunks")
+    @Test("RDCSecureMessagingReader chunked reading multiple chunks")
     func testReadBinaryChunkedWithSMMultipleChunks() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
         
         // Create chunked test data using MockTestUtils with real encryption
         // Need > 512 bytes of plaintext to ensure encrypted TLV exceeds initial read
@@ -422,11 +422,11 @@ struct SecureMessagingReaderTests {
         #expect(executor.commandHistory[1].p2Parameter == offsetP2)
     }
 
-    @Test("SecureMessagingReader automatic chunked reading when response is large")
+    @Test("RDCSecureMessagingReader automatic chunked reading when response is large")
     func testReadBinaryWithSMTriggerChunkedReading() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
         
         // Create test data for chunked reading
         var plainData = Data(repeating: 0xDD, count: 520)
@@ -489,13 +489,13 @@ struct SecureMessagingReaderTests {
         #expect(executor.commandHistory[0].p2Parameter == 0x00)
     }
 
-    @Test("SecureMessagingReader cryptography failure")
+    @Test("RDCSecureMessagingReader cryptography failure")
     func testCryptographyFailure() async {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let mockCrypto = MockTDESCryptography()
+        let mockCrypto = MockRDCTDESCryptography()
         mockCrypto.shouldSucceed = false
-        let reader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
+        let reader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey, tdesCryptography: mockCrypto)
         
         // Create mock encrypted TLV response
         let mockEncryptedData = Data([0x86, 0x05, 0x01, 0xFF, 0xFE, 0xFD, 0xFC])
@@ -504,7 +504,7 @@ struct SecureMessagingReaderTests {
         do {
             _ = try await reader.readBinaryWithSM(p1: 0x8A, p2: 0x00)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .cryptographyError(let message) = error {
                 #expect(message == "Mock decryption failed")
             } else {

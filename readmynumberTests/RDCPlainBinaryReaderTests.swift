@@ -1,5 +1,5 @@
 //
-//  PlainBinaryReaderTests.swift
+//  RDCPlainBinaryReaderTests.swift
 //  readmynumberTests
 //
 //  Created on 2025/09/10.
@@ -10,21 +10,21 @@ import Foundation
 import CoreNFC
 @testable import readmynumber
 
-struct PlainBinaryReaderTests {
+struct RDCPlainBinaryReaderTests {
 
-    @Test("PlainBinaryReader initialization")
-    func testPlainBinaryReaderInitialization() {
-        let executor = MockNFCCommandExecutor()
-        let reader = PlainBinaryReader(commandExecutor: executor)
+    @Test("RDCPlainBinaryReader initialization")
+    func testRDCPlainBinaryReaderInitialization() {
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCPlainBinaryReader(commandExecutor: executor)
 
         // Test passes if initialization succeeds
         #expect(true)
     }
 
-    @Test("PlainBinaryReader successful read")
-    func testPlainBinaryReaderSuccess() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = PlainBinaryReader(commandExecutor: executor)
+    @Test("RDCPlainBinaryReader successful read")
+    func testRDCPlainBinaryReaderSuccess() async throws {
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCPlainBinaryReader(commandExecutor: executor)
         let expectedData = Data([0x30, 0x31, 0x32, 0x33])  // "0123"
 
         executor.configureMockResponse(for: 0xB0, response: expectedData)
@@ -38,10 +38,10 @@ struct PlainBinaryReaderTests {
         #expect(executor.commandHistory[0].p2Parameter == 0x00)
     }
 
-    @Test("PlainBinaryReader error handling")
-    func testPlainBinaryReaderError() async {
-        let executor = MockNFCCommandExecutor()
-        let reader = PlainBinaryReader(commandExecutor: executor)
+    @Test("RDCPlainBinaryReader error handling")
+    func testRDCPlainBinaryReaderError() async {
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCPlainBinaryReader(commandExecutor: executor)
 
         executor.shouldSucceed = false
         executor.errorSW1 = 0x6A
@@ -50,7 +50,7 @@ struct PlainBinaryReaderTests {
         do {
             _ = try await reader.readBinaryPlain(p1: 0x8A, p2: 0x00)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x6A)
                 #expect(sw2 == 0x82)
@@ -62,10 +62,10 @@ struct PlainBinaryReaderTests {
         }
     }
 
-    @Test("PlainBinaryReader with different p1/p2 parameter combinations")
-    func testPlainBinaryReaderParameterCombinations() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = PlainBinaryReader(commandExecutor: executor)
+    @Test("RDCPlainBinaryReader with different p1/p2 parameter combinations")
+    func testRDCPlainBinaryReaderParameterCombinations() async throws {
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCPlainBinaryReader(commandExecutor: executor)
         
         let testCases: [(p1: UInt8, p2: UInt8, data: Data)] = [
             (0x80, 0x00, Data([0x01, 0x02, 0x03])),
@@ -92,10 +92,10 @@ struct PlainBinaryReaderTests {
         }
     }
 
-    @Test("PlainBinaryReader with large response data")
-    func testPlainBinaryReaderLargeResponse() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = PlainBinaryReader(commandExecutor: executor)
+    @Test("RDCPlainBinaryReader with large response data")
+    func testRDCPlainBinaryReaderLargeResponse() async throws {
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCPlainBinaryReader(commandExecutor: executor)
         
         // Create data close to maxAPDUResponseLength (1693 bytes)
         let largeData = Data(repeating: 0xAB, count: 1693)
@@ -110,10 +110,10 @@ struct PlainBinaryReaderTests {
         #expect(executor.commandHistory[0].expectedResponseLength == 1693)
     }
 
-    @Test("PlainBinaryReader with empty response data")
-    func testPlainBinaryReaderEmptyResponse() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = PlainBinaryReader(commandExecutor: executor)
+    @Test("RDCPlainBinaryReader with empty response data")
+    func testRDCPlainBinaryReaderEmptyResponse() async throws {
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCPlainBinaryReader(commandExecutor: executor)
         
         // Configure empty response
         let emptyData = Data()
@@ -127,10 +127,10 @@ struct PlainBinaryReaderTests {
         #expect(executor.commandHistory[0].instructionCode == 0xB0)
     }
 
-    @Test("PlainBinaryReader parameter validation")
-    func testPlainBinaryReaderParameterValidation() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = PlainBinaryReader(commandExecutor: executor)
+    @Test("RDCPlainBinaryReader parameter validation")
+    func testRDCPlainBinaryReaderParameterValidation() async throws {
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCPlainBinaryReader(commandExecutor: executor)
         let testData = Data([0xFF, 0xEE, 0xDD, 0xCC])
         
         executor.configureMockResponse(for: 0xB0, response: testData)
@@ -151,10 +151,10 @@ struct PlainBinaryReaderTests {
         #expect(command.expectedResponseLength == 1693) // maxAPDUResponseLength
     }
 
-    @Test("PlainBinaryReader different status word combinations")
-    func testPlainBinaryReaderDifferentStatusWords() async {
-        let executor = MockNFCCommandExecutor()
-        let reader = PlainBinaryReader(commandExecutor: executor)
+    @Test("RDCPlainBinaryReader different status word combinations")
+    func testRDCPlainBinaryReaderDifferentStatusWords() async {
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCPlainBinaryReader(commandExecutor: executor)
         
         let errorCases: [(sw1: UInt8, sw2: UInt8, description: String)] = [
             (0x6A, 0x82, "File not found"),
@@ -175,7 +175,7 @@ struct PlainBinaryReaderTests {
             do {
                 _ = try await reader.readBinaryPlain(p1: 0x84, p2: 0x00)
                 #expect(Bool(false), "Should have thrown error for \(errorCase.description)")
-            } catch let error as CardReaderError {
+            } catch let error as RDCReaderError {
                 if case .cardError(let sw1, let sw2) = error {
                     #expect(sw1 == errorCase.sw1, "SW1 mismatch for \(errorCase.description)")
                     #expect(sw2 == errorCase.sw2, "SW2 mismatch for \(errorCase.description)")

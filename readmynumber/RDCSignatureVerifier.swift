@@ -2,10 +2,80 @@ import Foundation
 import CryptoKit
 import Security
 
+// MARK: - Verification Result Types
+
+/// Result of signature verification with detailed information
+public struct RDCVerificationResult {
+    public let isValid: Bool
+    public let error: RDCVerificationError?
+    public let details: RDCVerificationDetails?
+
+    public init(isValid: Bool, error: RDCVerificationError?, details: RDCVerificationDetails?) {
+        self.isValid = isValid
+        self.error = error
+        self.details = details
+    }
+}
+
+/// Detailed information about the verification process
+public struct RDCVerificationDetails {
+    public let checkCodeHash: String?
+    public let calculatedHash: String?
+    public let certificateSubject: String?
+    public let certificateIssuer: String?
+    public let certificateNotBefore: Date?
+    public let certificateNotAfter: Date?
+
+    public init(checkCodeHash: String?, calculatedHash: String?, certificateSubject: String?, certificateIssuer: String?, certificateNotBefore: Date?, certificateNotAfter: Date?) {
+        self.checkCodeHash = checkCodeHash
+        self.calculatedHash = calculatedHash
+        self.certificateSubject = certificateSubject
+        self.certificateIssuer = certificateIssuer
+        self.certificateNotBefore = certificateNotBefore
+        self.certificateNotAfter = certificateNotAfter
+    }
+}
+
+/// Errors that can occur during signature verification
+public enum RDCVerificationError: LocalizedError {
+    case missingCheckCode
+    case missingCertificate
+    case invalidCertificate
+    case invalidCheckCodeLength
+    case publicKeyExtractionFailed
+    case rsaDecryptionFailed
+    case hashMismatch
+    case invalidPaddingFormat
+    case missingImageData
+
+    public var errorDescription: String? {
+        switch self {
+        case .missingCheckCode:
+            return "チェックコードが見つかりません"
+        case .missingCertificate:
+            return "公開鍵証明書が見つかりません"
+        case .invalidCertificate:
+            return "無効な公開鍵証明書です"
+        case .invalidCheckCodeLength:
+            return "チェックコードの長さが不正です"
+        case .publicKeyExtractionFailed:
+            return "公開鍵の抽出に失敗しました"
+        case .rsaDecryptionFailed:
+            return "RSA復号に失敗しました"
+        case .hashMismatch:
+            return "ハッシュ値が一致しません"
+        case .invalidPaddingFormat:
+            return "パディング形式が不正です"
+        case .missingImageData:
+            return "画像データが見つかりません"
+        }
+    }
+}
+
 // MARK: - Signature Verifier Protocol
 
 /// Protocol for residence card signature verification
-protocol SignatureVerifier {
+protocol RDCSignatureVerifier {
     /// Verify the digital signature of residence card data
     /// - Parameters:
     ///   - checkCode: The check code (tag 0xDA) - 256 bytes encrypted hash
@@ -18,33 +88,33 @@ protocol SignatureVerifier {
         certificate: Data,
         frontImageData: Data,
         faceImageData: Data
-    ) -> ResidenceCardSignatureVerifier.VerificationResult
+    ) -> RDCVerificationResult
 }
 
 // MARK: - Mock Signature Verifier
 
 /// Mock implementation for testing
-class MockSignatureVerifier: SignatureVerifier {
+class MockRDCSignatureVerifier: RDCSignatureVerifier {
     var shouldReturnValid = true
-    var mockError: ResidenceCardSignatureVerifier.VerificationError?
+    var mockError: RDCVerificationError?
     var verificationCalls: [(signatureData: Data, frontImageData: Data, faceImageData: Data)] = []
-    
+
     func verifySignature(
         checkCode: Data,
         certificate: Data,
         frontImageData: Data,
         faceImageData: Data
-    ) -> ResidenceCardSignatureVerifier.VerificationResult {
+    ) -> RDCVerificationResult {
         // Store simple combined data for backwards compatibility
         let combinedData = checkCode + certificate
         verificationCalls.append((combinedData, frontImageData, faceImageData))
 
         if shouldReturnValid {
-            return ResidenceCardSignatureVerifier.VerificationResult(isValid: true, error: nil, details: nil)
+            return RDCVerificationResult(isValid: true, error: nil, details: nil)
         } else {
-            return ResidenceCardSignatureVerifier.VerificationResult(
+            return RDCVerificationResult(
                 isValid: false,
-                error: mockError ?? .invalidCertificate,
+                error: mockError ?? RDCVerificationError.invalidCertificate,
                 details: nil
             )
         }
@@ -97,74 +167,8 @@ class MockSignatureVerifier: SignatureVerifier {
 // 8. READ BINARY (00 B0 xx xx Le) - Read signature data in blocks
 //
 // The APDU responses contain the TLV-structured data that this verifier processes.
-public class ResidenceCardSignatureVerifier: SignatureVerifier {
-    
-    // MARK: - Types
-    public struct VerificationResult {
-        public let isValid: Bool
-        public let error: VerificationError?
-        public let details: VerificationDetails?
-        
-        public init(isValid: Bool, error: VerificationError?, details: VerificationDetails?) {
-            self.isValid = isValid
-            self.error = error
-            self.details = details
-        }
-    }
-    
-    public struct VerificationDetails {
-        public let checkCodeHash: String?
-        public let calculatedHash: String?
-        public let certificateSubject: String?
-        public let certificateIssuer: String?
-        public let certificateNotBefore: Date?
-        public let certificateNotAfter: Date?
-        
-        public init(checkCodeHash: String?, calculatedHash: String?, certificateSubject: String?, certificateIssuer: String?, certificateNotBefore: Date?, certificateNotAfter: Date?) {
-            self.checkCodeHash = checkCodeHash
-            self.calculatedHash = calculatedHash
-            self.certificateSubject = certificateSubject
-            self.certificateIssuer = certificateIssuer
-            self.certificateNotBefore = certificateNotBefore
-            self.certificateNotAfter = certificateNotAfter
-        }
-    }
-    
-    public enum VerificationError: LocalizedError {
-        case missingCheckCode
-        case missingCertificate
-        case invalidCertificate
-        case invalidCheckCodeLength
-        case publicKeyExtractionFailed
-        case rsaDecryptionFailed
-        case hashMismatch
-        case invalidPaddingFormat
-        case missingImageData
-        
-        public var errorDescription: String? {
-            switch self {
-            case .missingCheckCode:
-                return "チェックコードが見つかりません"
-            case .missingCertificate:
-                return "公開鍵証明書が見つかりません"
-            case .invalidCertificate:
-                return "無効な公開鍵証明書です"
-            case .invalidCheckCodeLength:
-                return "チェックコードの長さが不正です"
-            case .publicKeyExtractionFailed:
-                return "公開鍵の抽出に失敗しました"
-            case .rsaDecryptionFailed:
-                return "RSA復号に失敗しました"
-            case .hashMismatch:
-                return "ハッシュ値が一致しません"
-            case .invalidPaddingFormat:
-                return "パディング形式が不正です"
-            case .missingImageData:
-                return "画像データが見つかりません"
-            }
-        }
-    }
-    
+public class RDCSignatureVerifierImpl: RDCSignatureVerifier {
+
     // MARK: - Constants
     // These constants are defined according to 在留カード等仕様書 specifications
     private enum Constants {
@@ -210,24 +214,24 @@ public class ResidenceCardSignatureVerifier: SignatureVerifier {
         certificate: Data,
         frontImageData: Data,
         faceImageData: Data
-    ) -> VerificationResult {
+    ) -> RDCVerificationResult {
 
         // STEP 1: Validate check code and certificate data
         // The check code should be exactly 256 bytes (RSA-2048 encrypted hash)
         guard checkCode.count == Constants.checkCodeLength else {
-            return VerificationResult(isValid: false, error: .invalidCheckCodeLength, details: nil)
+            return RDCVerificationResult(isValid: false, error: RDCVerificationError.invalidCheckCodeLength, details: nil)
         }
 
         // Certificate should exist and be non-empty
         guard !certificate.isEmpty else {
-            return VerificationResult(isValid: false, error: .missingCertificate, details: nil)
+            return RDCVerificationResult(isValid: false, error: RDCVerificationError.missingCertificate, details: nil)
         }
         
         // STEP 2: Extract RSA-2048 public key from X.509 certificate
         // The certificate is in DER format and contains the issuer's public key
         // used for verifying the digital signature created during card personalization
         guard let publicKey = extractPublicKey(from: certificate) else {
-            return VerificationResult(isValid: false, error: .publicKeyExtractionFailed, details: nil)
+            return RDCVerificationResult(isValid: false, error: RDCVerificationError.publicKeyExtractionFailed, details: nil)
         }
         
         // STEP 3: Decrypt (verify) check code using RSA-2048 public key
@@ -235,14 +239,14 @@ public class ResidenceCardSignatureVerifier: SignatureVerifier {
         // to retrieve the original hash that was encrypted with the private key during signing
         // This implements the mathematical operation: signature^e mod n = padded_hash
         guard let decryptedData = rsaDecrypt(checkCode: checkCode, publicKey: publicKey) else {
-            return VerificationResult(isValid: false, error: .rsaDecryptionFailed, details: nil)
+            return RDCVerificationResult(isValid: false, error: RDCVerificationError.rsaDecryptionFailed, details: nil)
         }
         
         // STEP 4: Extract SHA-256 hash from PKCS#1 v1.5 padded data
         // The decrypted data contains padding in format: 0x00 || 0x01 || PS || 0x00 || DigestInfo
         // where PS is padding string of 0xFF bytes and DigestInfo contains the SHA-256 hash
         guard let extractedHash = extractHashFromPKCS1(decryptedData) else {
-            return VerificationResult(isValid: false, error: .invalidPaddingFormat, details: nil)
+            return RDCVerificationResult(isValid: false, error: RDCVerificationError.invalidPaddingFormat, details: nil)
         }
         
         // STEP 5: Process image data following 3.5 データの読み出し手順
@@ -252,7 +256,7 @@ public class ResidenceCardSignatureVerifier: SignatureVerifier {
         // - Face image must be exactly 3000 bytes (pad with 0x00 if shorter)
         guard let frontImageValue = extractImageValue(from: frontImageData),
               let faceImageValue = extractImageValue(from: faceImageData) else {
-            return VerificationResult(isValid: false, error: .missingImageData, details: nil)
+            return RDCVerificationResult(isValid: false, error: RDCVerificationError.missingImageData, details: nil)
         }
         
         // STEP 6: Create signature target data (署名対象データ)
@@ -273,7 +277,7 @@ public class ResidenceCardSignatureVerifier: SignatureVerifier {
         // Get certificate details for display
         let details = extractCertificateDetails(from: certificate)
         
-        let verificationDetails = VerificationDetails(
+        let verificationDetails = RDCVerificationDetails(
             checkCodeHash: extractedHash.hexString,
             calculatedHash: calculatedHashData.hexString,
             certificateSubject: details.subject,
@@ -282,9 +286,9 @@ public class ResidenceCardSignatureVerifier: SignatureVerifier {
             certificateNotAfter: details.notAfter
         )
         
-        return VerificationResult(
+        return RDCVerificationResult(
             isValid: isValid,
-            error: isValid ? nil : .hashMismatch,
+            error: isValid ? nil : RDCVerificationError.hashMismatch,
             details: verificationDetails
         )
     }

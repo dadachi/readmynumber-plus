@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 import UIKit
 import ImageIO
 
-struct ResidenceCardDetailView: View {
+struct RDCDetailView: View {
     let cardData: ResidenceCardData
     @Environment(\.presentationMode) var presentationMode
     @Environment(\.colorScheme) var colorScheme
@@ -447,7 +447,7 @@ struct ResidenceCardDetailView: View {
     
     // 画像変換処理
     private func convertImages() {
-        let convertedImages = ImageConverter.convertResidenceCardImages(cardData: cardData)
+        let convertedImages = RDCImageConverter.convertResidenceCardImages(cardData: cardData)
         frontImageJPEG = convertedImages.front
         faceImageJPEG = convertedImages.face
     }
@@ -668,7 +668,7 @@ struct ResidenceCardDetailView: View {
     
     // Share raw data functionality
     private func shareRawData() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let dataToShare: ResidenceCardData
         if testModeEnabled {
@@ -690,7 +690,7 @@ struct ResidenceCardDetailView: View {
     
     // Get the raw image URLs for sharing
     private func getRawDataFileURL() -> [URL]? {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         return reader.getLastExportedImageURLs()
     }
 }
@@ -778,7 +778,7 @@ private func loadFaceImageData() -> Data {
         signatureVerificationResult: nil
     )
     
-    ResidenceCardDetailView(cardData: sampleData)
+    RDCDetailView(cardData: sampleData)
 }
 
 // MARK: - CheckerboardPattern for transparency visualization

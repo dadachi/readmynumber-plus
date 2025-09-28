@@ -1,5 +1,5 @@
 //
-//  NFCSessionManager.swift
+//  RDCNFCSessionManager.swift
 //  readmynumber
 //
 //  Created on 2025/09/09.
@@ -9,7 +9,7 @@ import Foundation
 import CoreNFC
 
 /// Protocol for managing NFC tag reader sessions
-protocol NFCSessionManager {
+protocol RDCNFCSessionManager {
     /// Start an NFC reading session
     /// - Parameters:
     ///   - pollingOption: The NFC polling option
@@ -36,8 +36,8 @@ protocol NFCSessionManager {
     var isReadingAvailable: Bool { get }
 }
 
-/// Concrete implementation of NFCSessionManager
-class NFCSessionManagerImpl: NFCSessionManager {
+/// Concrete implementation of RDCNFCSessionManager
+class RDCNFCSessionManagerImpl: RDCNFCSessionManager {
     private var session: NFCTagReaderSession?
     
     var isReadingAvailable: Bool {
@@ -73,7 +73,7 @@ class NFCSessionManagerImpl: NFCSessionManager {
 }
 
 /// Mock implementation for testing
-class MockNFCSessionManager: NFCSessionManager {
+class MockRDCNFCSessionManager: RDCNFCSessionManager {
     var isReadingAvailable: Bool = true
     var shouldFailConnection = false
     var connectionError: Error = NFCSessionError.connectionFailed

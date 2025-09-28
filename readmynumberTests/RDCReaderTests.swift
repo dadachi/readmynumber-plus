@@ -289,50 +289,50 @@ struct ResidenceCardDataTests {
     }
 }
 
-// MARK: - CardReaderError Tests
-struct CardReaderErrorTests {
+// MARK: - RDCReaderError Tests
+struct RDCReaderErrorTests {
     
     @Test("Error descriptions")
     func testErrorDescriptions() {
-        let nfcError = CardReaderError.nfcNotAvailable
+        let nfcError = RDCReaderError.nfcNotAvailable
         #expect(nfcError.errorDescription == "NFCが利用できません")
         
-        let cardNumberError = CardReaderError.invalidCardNumber
+        let cardNumberError = RDCReaderError.invalidCardNumber
         #expect(cardNumberError.errorDescription == "無効な在留カード番号です")
         
-        let responseError = CardReaderError.invalidResponse
+        let responseError = RDCReaderError.invalidResponse
         #expect(responseError.errorDescription == "カードからの応答が不正です")
         
-        let cardError = CardReaderError.cardError(sw1: 0x6A, sw2: 0x82)
+        let cardError = RDCReaderError.cardError(sw1: 0x6A, sw2: 0x82)
         #expect(cardError.errorDescription == "カードエラー: SW1=6A, SW2=82")
         
-        let cryptoError = CardReaderError.cryptographyError("Test error")
+        let cryptoError = RDCReaderError.cryptographyError("Test error")
         #expect(cryptoError.errorDescription == "暗号処理エラー: Test error")
     }
 }
 
 
-// MARK: - ResidenceCardReader Tests
-struct ResidenceCardReaderTests {
+// MARK: - RDCReader Tests
+struct RDCReaderTests {
     
     @Test("Card number validation")
     func testCardNumberValidation() {
-        let reader = ResidenceCardReader()
-        
+        let authProvider = RDCAuthenticationProviderImpl()
+
         // Valid 12-digit card number
         #expect(throws: Never.self) {
-            _ = try reader.generateKeys(from: "AB12345678CD")
+            _ = try authProvider.generateKeys(from: "AB12345678CD")
         }
-        
+
         // Invalid card number (non-ASCII)
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.generateKeys(from: "あいうえお")
+        #expect(throws: RDCReaderError.self) {
+            _ = try authProvider.generateKeys(from: "あいうえお")
         }
     }
     
     @Test("Enhanced card number format validation")
     func testEnhancedCardNumberValidation() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Valid formats
         let validNumbers = [
@@ -360,7 +360,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Invalid card number lengths")
     func testInvalidCardNumberLengths() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let invalidLengths = [
             "",                     // Empty
@@ -372,7 +372,7 @@ struct ResidenceCardReaderTests {
         ]
         
         for cardNumber in invalidLengths {
-            #expect(throws: CardReaderError.invalidCardNumberLength) {
+            #expect(throws: RDCReaderError.invalidCardNumberLength) {
                 _ = try reader.validateCardNumber(cardNumber)
             }
         }
@@ -380,7 +380,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Invalid card number formats")
     func testInvalidCardNumberFormats() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let invalidFormats = [
             "1234567890AB",        // Numbers first
@@ -395,7 +395,7 @@ struct ResidenceCardReaderTests {
         ]
         
         for cardNumber in invalidFormats {
-            #expect(throws: CardReaderError.invalidCardNumberFormat) {
+            #expect(throws: RDCReaderError.invalidCardNumberFormat) {
                 _ = try reader.validateCardNumber(cardNumber)
             }
         }
@@ -403,7 +403,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Invalid card number characters")
     func testInvalidCardNumberCharacters() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test the isValidCharacters method directly to ensure the character validation logic works
         // This tests the same logic used in the guard statement: guard isValidCharacters(trimmedCardNumber)
@@ -431,7 +431,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Card number pattern validation")
     func testCardNumberPatternValidation() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test regex pattern matching
         #expect(reader.isValidResidenceCardFormat("AB12345678CD") == true)
@@ -445,7 +445,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Edge cases and special scenarios")
     func testEdgeCasesAndSpecialScenarios() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test with real-world like card numbers
         let realisticNumbers = [
@@ -472,7 +472,7 @@ struct ResidenceCardReaderTests {
     
     @Test("BER length parsing")
     func testBERLengthParsing() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Short form (0x00 to 0x7F)
         let data1 = Data([0x45, 0xFF, 0xFF])
@@ -493,14 +493,14 @@ struct ResidenceCardReaderTests {
         #expect(offset3 == 3)
         
         // Invalid offset
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: Data([0x01]), offset: 5)
         }
     }
     
     @Test("Padding removal")
     func testPaddingRemoval() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Valid padding
         let paddedData = Data([0x01, 0x02, 0x03, 0x80, 0x00, 0x00])
@@ -514,20 +514,20 @@ struct ResidenceCardReaderTests {
         
         // Invalid padding (non-zero after 0x80)
         let invalidPadding = Data([0x01, 0x02, 0x80, 0x01])
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.removePadding(data: invalidPadding)
         }
         
         // No padding marker
         let noPadding = Data([0x01, 0x02, 0x03])
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.removePadding(data: noPadding)
         }
     }
     
     @Test("Card type detection")
     func testCardTypeDetection() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Residence card (type "1")
         let residenceType = Data([0xC1, 0x01, 0x31]) // "1" in ASCII
@@ -547,7 +547,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Parse card type string")
     func testParseCardTypeString() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Valid type "1"
         let type1 = Data([0xC1, 0x01, 0x31])
@@ -568,7 +568,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Status word checking")
     func testStatusWordChecking() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Success
         #expect(throws: Never.self) {
@@ -576,18 +576,18 @@ struct ResidenceCardReaderTests {
         }
         
         // Various error codes
-        #expect(throws: CardReaderError.cardError(sw1: 0x6A, sw2: 0x82)) {
+        #expect(throws: RDCReaderError.cardError(sw1: 0x6A, sw2: 0x82)) {
             try reader.checkStatusWord(sw1: 0x6A, sw2: 0x82)
         }
         
-        #expect(throws: CardReaderError.cardError(sw1: 0x69, sw2: 0x84)) {
+        #expect(throws: RDCReaderError.cardError(sw1: 0x69, sw2: 0x84)) {
             try reader.checkStatusWord(sw1: 0x69, sw2: 0x84)
         }
     }
 
     @Test("NFC availability check")
     func testNFCAvailability() async {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Since we're in a test environment without real NFC, this should fail
         let result = await withCheckedContinuation { continuation in
@@ -602,11 +602,11 @@ struct ResidenceCardReaderTests {
             #expect(Bool(false), "Expected failure in test environment without real NFC card")
         case .failure(let error):
             // Verify we get the expected NFC unavailable error
-            if let cardReaderError = error as? CardReaderError {
+            if let cardReaderError = error as? RDCReaderError {
                 #expect(cardReaderError == .nfcNotAvailable, "Expected NFC unavailable error, got: \(cardReaderError)")
             } else {
                 // Other NFC-related errors might also occur in test environment
-                #expect(true, "Received non-CardReaderError: \(error)")
+                #expect(true, "Received non-RDCReaderError: \(error)")
             }
         }
     }
@@ -615,7 +615,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Triple-DES encryption and decryption")
     func testTripleDESEncryptionDecryption() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Use minimal test data to avoid simulator timeout
         let plaintext = Data([0x01, 0x02, 0x03, 0x04]) // 4 bytes
@@ -629,13 +629,13 @@ struct ResidenceCardReaderTests {
             #expect(encrypted.count % 8 == 0) // Should be multiple of block size
         } catch {
             // If it fails due to simulator issues, that's acceptable for this test
-            #expect(error is CardReaderError)
+            #expect(error is RDCReaderError)
         }
     }
     
     @Test("Triple-DES with invalid key length")
     func testTripleDESInvalidKeyLength() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let plaintext = Data("Test".utf8)
         
@@ -650,7 +650,7 @@ struct ResidenceCardReaderTests {
         ]
         
         for invalidKey in invalidKeys {
-            #expect(throws: CardReaderError.self) {
+            #expect(throws: RDCReaderError.self) {
                 _ = try reader.tdesCryptography.performTDES(data: plaintext, key: invalidKey, encrypt: true)
             }
         }
@@ -658,7 +658,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Retail MAC calculation")
     func testRetailMACCalculation() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test with simple data
         let data = Data([0x01, 0x02, 0x03, 0x04]) // Simple 4-byte data
@@ -668,22 +668,22 @@ struct ResidenceCardReaderTests {
         ])
         
         // Basic functionality test
-        let mac = try reader.calculateRetailMAC(data: data, key: key)
+        let mac = try RDCCryptoProviderImpl().calculateRetailMAC(data: data, key: key)
         #expect(mac.count == 8) // MAC should be 8 bytes
         
         // MAC should be deterministic
-        let mac2 = try reader.calculateRetailMAC(data: data, key: key)
+        let mac2 = try RDCCryptoProviderImpl().calculateRetailMAC(data: data, key: key)
         #expect(mac == mac2) // Same data and key should produce same MAC
         
         // Different data should produce different MAC
         let differentData = Data([0x05, 0x06, 0x07, 0x08])
-        let differentMAC = try reader.calculateRetailMAC(data: differentData, key: key)
+        let differentMAC = try RDCCryptoProviderImpl().calculateRetailMAC(data: differentData, key: key)
         #expect(mac != differentMAC) // Different data should produce different MAC
     }
     
     @Test("Session key generation")
     func testSessionKeyGeneration() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test data
         let kIFD = Data([
@@ -696,16 +696,16 @@ struct ResidenceCardReaderTests {
         ])
         
         // Generate session key
-        let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         #expect(sessionKey.count == 16) // Should be 16 bytes
         
         // Should be deterministic
-        let sessionKey2 = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey2 = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         #expect(sessionKey == sessionKey2) // Same inputs should produce same result
         
         // Different inputs should produce different results
         let differentKIFD = Data(repeating: 0x12, count: 16)
-        let differentSessionKey = try reader.generateSessionKey(kIFD: differentKIFD, kICC: kICC)
+        let differentSessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: differentKIFD, kICC: kICC)
         #expect(sessionKey != differentSessionKey) // Different kIFD should produce different result
         
         // Test XOR operation correctness
@@ -723,15 +723,15 @@ struct ResidenceCardReaderTests {
     @Test("Authentication data generation")
     #endif
     func testAuthenticationDataGeneration() throws {
-        let reader = ResidenceCardReader()
-        
+        let authProvider = RDCAuthenticationProviderImpl()
+
         // Test data
         let rndICC = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]) // 8 bytes
         let kEnc = Data((0..<16).map { UInt8($0) }) // 16 bytes
         let kMac = Data((16..<32).map { UInt8($0) }) // 16 bytes, different from kEnc
-        
+
         // Generate authentication data
-      let (eIFD, mIFD, rndIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+      let (eIFD, mIFD, rndIFD, kIFD) = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
 
         // Verify data sizes
         // Note: eIFD might be larger than 32 due to PKCS#7 padding in 3DES
@@ -741,7 +741,7 @@ struct ResidenceCardReaderTests {
         #expect(kIFD.count == 16) // Generated key should be 16 bytes
         
         // Generate again - should produce different results due to random components
-        let (eIFD2, mIFD2, rndIFD2, kIFD2) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        let (eIFD2, mIFD2, rndIFD2, kIFD2) = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
 
         // Random components should make results different
         #expect(eIFD != eIFD2) // Different random kIFD and rndIFD should produce different encrypted data
@@ -750,8 +750,8 @@ struct ResidenceCardReaderTests {
         
         // Test that MAC calculation is consistent
         // We calculate MAC for the same data twice to ensure consistency
-        let calculatedMAC = try reader.calculateRetailMAC(data: eIFD, key: kMac)
-        let calculatedMAC2 = try reader.calculateRetailMAC(data: eIFD, key: kMac)
+        let calculatedMAC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eIFD, key: kMac)
+        let calculatedMAC2 = try RDCCryptoProviderImpl().calculateRetailMAC(data: eIFD, key: kMac)
         #expect(calculatedMAC == calculatedMAC2) // MAC should be deterministic
         
         // The MAC from generateAuthenticationData should also be consistent
@@ -765,8 +765,9 @@ struct ResidenceCardReaderTests {
     @Test("Card authentication data verification")
     #endif
     func testCardAuthenticationDataVerification() throws {
-        let reader = ResidenceCardReader()
-        
+        let reader = RDCReader()
+        let authProvider = RDCAuthenticationProviderImpl()
+
         // Simulate the mutual authentication flow
         let rndICC = Data([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11]) // 8 bytes
         let kEnc = Data([
@@ -777,9 +778,9 @@ struct ResidenceCardReaderTests {
             0x10, 0x0F, 0x0E, 0x0D, 0x0C, 0x0B, 0x0A, 0x09,
             0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01
         ])
-        
+
         // Generate IFD authentication data first
-        let (eIFD, mIFD, rndIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        let (eIFD, mIFD, rndIFD, kIFD) = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
 
         // Simulate card response: create ICC authentication data
         // In real scenario, card would generate its own rndIFD echo and kICC
@@ -790,28 +791,28 @@ struct ResidenceCardReaderTests {
         // Create ICC authentication data: rndICC + rndIFD + kICC
         let iccAuthData = rndICC + rndIFD + kICC // 32 bytes total
         let eICC = try reader.tdesCryptography.performTDES(data: iccAuthData, key: kEnc, encrypt: true)
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         // Test verification
-      let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+      let extractedKICC = try reader.authenticationProvider.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         #expect(extractedKICC == kICC) // Should extract the correct kICC
         
         // Test verification failure with wrong MAC
         let wrongMAC = Data(repeating: 0xFF, count: 8)
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: wrongMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+        #expect(throws: RDCReaderError.self) {
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(eICC: eICC, mICC: wrongMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
         
         // Test verification failure with wrong rndICC
         let wrongRndICC = Data(repeating: 0x00, count: 8)
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: wrongRndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+        #expect(throws: RDCReaderError.self) {
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: wrongRndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
         
         // Test verification failure with wrong rndIFD - this tests the guard decrypted.subdata(in: 8..<16) == rndIFD
         let wrongRndIFD = Data(repeating: 0xFF, count: 8)
-        #expect(throws: CardReaderError.cryptographyError("RND.IFD verification failed")) {
-            _ = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: wrongRndIFD, kEnc: kEnc, kMac: kMac)
+        #expect(throws: RDCReaderError.cryptographyError("RND.IFD verification failed")) {
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: wrongRndIFD, kEnc: kEnc, kMac: kMac)
         }
     }
     
@@ -821,7 +822,7 @@ struct ResidenceCardReaderTests {
     @Test("Card number encryption")
     #endif
     func testCardNumberEncryption() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test data
         let cardNumber = "AB12345678CD"
@@ -831,19 +832,19 @@ struct ResidenceCardReaderTests {
         ])
         
         // Encrypt card number
-        let encryptedCardNumber = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let encryptedCardNumber = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         
         // Verify encryption properties
         #expect(encryptedCardNumber.count == 16) // Should be 16 bytes (padded to block boundary)
         #expect(encryptedCardNumber != Data(cardNumber.utf8)) // Should be different from plaintext
         
         // Test deterministic encryption
-        let encryptedCardNumber2 = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let encryptedCardNumber2 = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         #expect(encryptedCardNumber == encryptedCardNumber2) // Should be deterministic with same inputs
         
         // Test different session keys produce different results
         let differentSessionKey = Data(repeating: 0x42, count: 16)
-        let encryptedWithDifferentKey = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: differentSessionKey)
+        let encryptedWithDifferentKey = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: differentSessionKey)
         #expect(encryptedCardNumber != encryptedWithDifferentKey) // Different key should produce different result
         
         // Test decryption to verify round-trip
@@ -861,7 +862,7 @@ struct ResidenceCardReaderTests {
     @Test("Triple-DES with empty data")
     #endif
     func testTripleDESWithEmptyData() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         let key = Data(repeating: 0x42, count: 16)
         
         // Empty data should still work (will be padded)
@@ -881,7 +882,7 @@ struct ResidenceCardReaderTests {
     @Test("Triple-DES with large data")
     #endif
     func testTripleDESWithLargeData() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         let key = Data(repeating: 0x33, count: 16)
         
         // Test with small data instead of large data to avoid timeout
@@ -897,25 +898,25 @@ struct ResidenceCardReaderTests {
     @Test("Retail MAC with empty data")
     #endif
     func testRetailMACWithEmptyData() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         let key = Data(repeating: 0x55, count: 16)
         
         // MAC of empty data should still work
-        let mac = try reader.calculateRetailMAC(data: Data(), key: key)
+        let mac = try RDCCryptoProviderImpl().calculateRetailMAC(data: Data(), key: key)
         #expect(mac.count == 8) // Should still produce 8-byte MAC
         
         // Should be deterministic
-        let mac2 = try reader.calculateRetailMAC(data: Data(), key: key)
+        let mac2 = try RDCCryptoProviderImpl().calculateRetailMAC(data: Data(), key: key)
         #expect(mac == mac2)
     }
     
     @Test("Session key generation with identical keys")
     func testSessionKeyGenerationWithIdenticalKeys() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test with identical kIFD and kICC
         let identicalKey = Data(repeating: 0x77, count: 16)
-        let sessionKey = try reader.generateSessionKey(kIFD: identicalKey, kICC: identicalKey)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: identicalKey, kICC: identicalKey)
         
         #expect(sessionKey.count == 16)
         // XOR of identical data should be all zeros, but SHA-1 will still produce valid output
@@ -925,10 +926,10 @@ struct ResidenceCardReaderTests {
     
     @Test("Session key generation with all zeros")
     func testSessionKeyGenerationWithAllZeros() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let zeroKey = Data(repeating: 0x00, count: 16)
-        let sessionKey = try reader.generateSessionKey(kIFD: zeroKey, kICC: zeroKey)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: zeroKey, kICC: zeroKey)
         
         #expect(sessionKey.count == 16)
         #expect(sessionKey != zeroKey) // Should be different due to SHA-1 processing
@@ -936,23 +937,23 @@ struct ResidenceCardReaderTests {
     
     @Test("Authentication data with wrong key lengths")
     func testAuthenticationDataWithWrongKeyLengths() {
-        let reader = ResidenceCardReader()
+        let authProvider = RDCAuthenticationProviderImpl()
         let rndICC = Data(repeating: 0x11, count: 8)
-        
+
         // Test with wrong kEnc length
         let wrongKEnc = Data(repeating: 0x22, count: 15) // 15 bytes instead of 16
         let correctKMac = Data(repeating: 0x33, count: 16)
-        
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: wrongKEnc, kMac: correctKMac)
+
+        #expect(throws: (any Error).self) {
+            _ = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: wrongKEnc, kMac: correctKMac)
         }
-        
+
         // Test with wrong kMac length
         let correctKEnc = Data(repeating: 0x44, count: 16)
         let wrongKMac = Data(repeating: 0x55, count: 17) // 17 bytes instead of 16
-        
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: correctKEnc, kMac: wrongKMac)
+
+        #expect(throws: (any Error).self) {
+            _ = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: correctKEnc, kMac: wrongKMac)
         }
     }
     
@@ -962,7 +963,7 @@ struct ResidenceCardReaderTests {
     @Test("Card authentication verification with corrupted data")
     #endif
     func testCardAuthenticationVerificationWithCorruptedData() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let rndICC = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
         let kEnc = Data(repeating: 0x11, count: 16)
@@ -973,80 +974,80 @@ struct ResidenceCardReaderTests {
         let kICC = Data(repeating: 0x99, count: 16)
         let iccAuthData = rndICC + rndIFD + kICC
         let eICC = try reader.tdesCryptography.performTDES(data: iccAuthData, key: kEnc, encrypt: true)
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         // Test with corrupted encrypted data
         var corruptedEICC = eICC
         corruptedEICC[0] = corruptedEICC[0] ^ 0xFF // Flip bits in first byte
         
-        #expect(throws: CardReaderError.self) {
-          _ = try reader.verifyAndExtractKICC(eICC: corruptedEICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+        #expect(throws: RDCReaderError.self) {
+          _ = try reader.authenticationProvider.verifyAndExtractKICC(eICC: corruptedEICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
         
         // Test with wrong encrypted data size
         let wrongSizeEICC = Data(repeating: 0xAA, count: 16) // Too small (16 bytes instead of 32)
-        let wrongSizeMAC = try reader.calculateRetailMAC(data: wrongSizeEICC, key: kMac)
+        let wrongSizeMAC = try RDCCryptoProviderImpl().calculateRetailMAC(data: wrongSizeEICC, key: kMac)
         
         // This should fail during RND.ICC verification because decrypted data structure is wrong
-        #expect(throws: CardReaderError.self) {
-          _ = try reader.verifyAndExtractKICC(eICC: wrongSizeEICC, mICC: wrongSizeMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+        #expect(throws: RDCReaderError.self) {
+          _ = try reader.authenticationProvider.verifyAndExtractKICC(eICC: wrongSizeEICC, mICC: wrongSizeMAC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         }
     }
     
     @Test("Card number encryption with invalid session key")
     func testCardNumberEncryptionWithInvalidSessionKey() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         let cardNumber = "AB12345678CD"
         
         // Test with wrong session key length
         let wrongSizeKey = Data(repeating: 0x42, count: 8) // 8 bytes instead of 16
         
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: wrongSizeKey)
+        #expect(throws: RDCReaderError.self) {
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: wrongSizeKey)
         }
         
         // Test with empty session key
         let emptyKey = Data()
         
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: emptyKey)
+        #expect(throws: RDCReaderError.self) {
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: emptyKey)
         }
     }
     
     @Test("Card number encryption with invalid card number")
     func testCardNumberEncryptionWithInvalidCardNumber() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         let validSessionKey = Data(repeating: 0x01, count: 16)
         
         // Test with card number that's too short
-        #expect(throws: CardReaderError.invalidCardNumber) {
-            _ = try reader.encryptCardNumber(cardNumber: "AB12345678C", sessionKey: validSessionKey)
+        #expect(throws: RDCReaderError.invalidCardNumber) {
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: "AB12345678C", sessionKey: validSessionKey)
         }
         
         // Test with card number that's too long
-        #expect(throws: CardReaderError.invalidCardNumber) {
-            _ = try reader.encryptCardNumber(cardNumber: "AB12345678CDE", sessionKey: validSessionKey)
+        #expect(throws: RDCReaderError.invalidCardNumber) {
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: "AB12345678CDE", sessionKey: validSessionKey)
         }
         
         // Test with card number containing non-ASCII characters
-        #expect(throws: CardReaderError.invalidCardNumber) {
-            _ = try reader.encryptCardNumber(cardNumber: "AB1234567あCD", sessionKey: validSessionKey)
+        #expect(throws: RDCReaderError.invalidCardNumber) {
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: "AB1234567あCD", sessionKey: validSessionKey)
         }
         
         // Test with empty card number
-        #expect(throws: CardReaderError.invalidCardNumber) {
-            _ = try reader.encryptCardNumber(cardNumber: "", sessionKey: validSessionKey)
+        #expect(throws: RDCReaderError.invalidCardNumber) {
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: "", sessionKey: validSessionKey)
         }
         
         // Test with card number containing extended ASCII characters
-        #expect(throws: CardReaderError.invalidCardNumber) {
-            _ = try reader.encryptCardNumber(cardNumber: "AB12345678C\u{00FF}", sessionKey: validSessionKey)
+        #expect(throws: RDCReaderError.invalidCardNumber) {
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: "AB12345678C\u{00FF}", sessionKey: validSessionKey)
         }
     }
     
     @Test("Padding removal edge cases")
     func testPaddingRemovalEdgeCases() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test with minimal valid padding
         let minimalPadding = Data([0x80]) // Just the padding marker
@@ -1064,22 +1065,22 @@ struct ResidenceCardReaderTests {
         #expect(unpadded3 == Data([0x01]))
         
         // Test error cases
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.removePadding(data: Data()) // Empty data
         }
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.removePadding(data: Data([0x01, 0x02])) // No padding marker
         }
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.removePadding(data: Data([0x01, 0x80, 0x01])) // Invalid padding (non-zero after 0x80)
         }
     }
     
     @Test("BER length parsing edge cases")
     func testBERLengthParsingEdgeCases() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test boundary values for short form
         let shortForm127 = Data([0x7F, 0xFF])
@@ -1100,15 +1101,15 @@ struct ResidenceCardReaderTests {
         #expect(maxOffset == 3)
         
         // Test error cases
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: Data([0x81]), offset: 0) // Incomplete extended form
         }
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: Data([0x82, 0x01]), offset: 0) // Incomplete 0x82 form
         }
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: Data([0x01]), offset: 10) // Offset beyond data
         }
     }
@@ -1119,15 +1120,16 @@ struct ResidenceCardReaderTests {
     @Test("Complete mutual authentication simulation")
     #endif
     func testCompleteMutualAuthenticationSimulation() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Simulate complete mutual authentication flow
         let cardNumber = "AB12345678CD"
-        let (kEnc, kMac) = try reader.generateKeys(from: cardNumber)
+        let authProvider = RDCAuthenticationProviderImpl()
+        let (kEnc, kMac) = try authProvider.generateKeys(from: cardNumber)
         
         // Step 1: IFD generates challenge response
         let rndICC = Data((0..<8).map { _ in UInt8.random(in: 0...255) }) // Card challenge
-        let (eIFD, mIFD, rndIFD, kIFD) = try reader.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
+        let (eIFD, mIFD, rndIFD, kIFD) = try authProvider.generateAuthenticationData(rndICC: rndICC, kEnc: kEnc, kMac: kMac)
 
         // Step 2: Simulate card processing and response
         // Card verifies IFD authentication data (we'll skip this)
@@ -1137,18 +1139,18 @@ struct ResidenceCardReaderTests {
         
         let iccAuthData = rndICC + rndIFD + kICC // Card's authentication data
         let eICC = try reader.tdesCryptography.performTDES(data: iccAuthData, key: kEnc, encrypt: true)
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         // Step 3: IFD verifies card response
-      let extractedKICC = try reader.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+      let extractedKICC = try reader.authenticationProvider.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
         #expect(extractedKICC == kICC)
         
         // Step 4: Generate session key
-        let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         #expect(sessionKey.count == 16)
         
         // Step 5: Use session key for card number encryption
-        let encryptedCardNumber = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let encryptedCardNumber = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         #expect(encryptedCardNumber.count == 16)
         
         // Verify round-trip
@@ -1160,7 +1162,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Key generation with various card number formats")
     func testKeyGenerationWithVariousCardNumberFormats() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test with different valid card numbers
         let cardNumbers = [
@@ -1173,7 +1175,8 @@ struct ResidenceCardReaderTests {
         var generatedKeys: [Data] = []
         
         for cardNumber in cardNumbers {
-            let (kEnc, kMac) = try reader.generateKeys(from: cardNumber)
+            let authProvider = RDCAuthenticationProviderImpl()
+            let (kEnc, kMac) = try authProvider.generateKeys(from: cardNumber)
             #expect(kEnc.count == 16)
             #expect(kMac.count == 16)
             #expect(kEnc == kMac) // Should be identical for this implementation
@@ -1193,7 +1196,7 @@ struct ResidenceCardReaderTests {
     @Test("Cryptographic operations stress test")
     #endif
     func testCryptographicOperationsStressTest() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Generate multiple random keys and test operations
         for i in 0..<10 {
@@ -1206,13 +1209,13 @@ struct ResidenceCardReaderTests {
             #expect(decrypted.prefix(data.count) == data)
             
             // Test MAC calculation
-            let mac = try reader.calculateRetailMAC(data: data, key: key)
+            let mac = try RDCCryptoProviderImpl().calculateRetailMAC(data: data, key: key)
             #expect(mac.count == 8)
             
             // Test session key generation
             let kIFD = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
             let kICC = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
-            let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+            let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
             #expect(sessionKey.count == 16)
         }
     }
@@ -1221,7 +1224,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Decrypt SM response with valid TLV structure")
     func testDecryptSMResponseValidTLV() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Set up a session key first
         let sessionKey = Data([
@@ -1260,7 +1263,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Decrypt SM response with invalid TLV tag")
     func testDecryptSMResponseInvalidTag() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         reader.sessionKey = Data(repeating: 0x01, count: 16)
         
         // Create TLV with wrong tag
@@ -1269,14 +1272,14 @@ struct ResidenceCardReaderTests {
         tlvData.append(0x05) // Length
         tlvData.append(contentsOf: [0x01, 0x02, 0x03, 0x04, 0x05])
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.decryptSMResponse(encryptedData: tlvData)
         }
     }
     
     @Test("Decrypt SM response with missing padding indicator")
     func testDecryptSMResponseMissingPaddingIndicator() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         reader.sessionKey = Data(repeating: 0x01, count: 16)
         
         // Create TLV without padding indicator (0x01)
@@ -1285,14 +1288,14 @@ struct ResidenceCardReaderTests {
         tlvData.append(0x08) // Length
         tlvData.append(contentsOf: Data(repeating: 0x02, count: 8)) // No 0x01 prefix
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.decryptSMResponse(encryptedData: tlvData)
         }
     }
     
     @Test("Decrypt SM response with no session key")
     func testDecryptSMResponseNoSessionKey() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         // Don't set session key
         
         var tlvData = Data()
@@ -1309,21 +1312,21 @@ struct ResidenceCardReaderTests {
     
     @Test("Decrypt SM response with short data")
     func testDecryptSMResponseShortData() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         let sessionKey = Data(repeating: 0x01, count: 16)
         reader.sessionKey = sessionKey
         
         // Data too short (less than 3 bytes)
         let shortData = Data([0x86, 0x01])
         
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.decryptSMResponse(encryptedData: shortData)
         }
     }
     
     @Test("Decrypt SM response with long form BER length")
     func testDecryptSMResponseLongFormBER() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         let sessionKey = Data(repeating: 0x01, count: 16)
         reader.sessionKey = sessionKey
         
@@ -1357,7 +1360,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Master File (MF) with successful response")
     func testSelectMFSuccess() async throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Create a mock tag
         let mockTag = MockNFCISO7816Tag()
@@ -1382,7 +1385,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Master File (MF) with error response")
     func testSelectMFError() async throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Create a mock tag that will return an error
         let mockTag = MockNFCISO7816Tag()
@@ -1394,7 +1397,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.testSelectMF(mockTag: mockTag)
             #expect(Bool(false), "Should have thrown an error")
-        } catch CardReaderError.cardError(let sw1, let sw2) {
+        } catch RDCReaderError.cardError(let sw1, let sw2) {
             #expect(sw1 == 0x6A)
             #expect(sw2 == 0x82)
         } catch {
@@ -1404,7 +1407,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Master File (MF) with various status words")
     func testSelectMFVariousStatusWords() async throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test various error status words
         let errorCases: [(UInt8, UInt8, String)] = [
@@ -1423,7 +1426,7 @@ struct ResidenceCardReaderTests {
             do {
                 try await reader.testSelectMF(mockTag: mockTag)
                 #expect(Bool(false), "Should have thrown error for \(description)")
-            } catch CardReaderError.cardError(let receivedSW1, let receivedSW2) {
+            } catch RDCReaderError.cardError(let receivedSW1, let receivedSW2) {
                 #expect(receivedSW1 == sw1)
                 #expect(receivedSW2 == sw2)
             } catch {
@@ -1434,18 +1437,18 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Master File (MF) with executor delegation")
     func testSelectMFWithExecutorDelegation() async throws {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
-        let mockVerifier = MockSignatureVerifier()
+        let mockVerifier = MockRDCSignatureVerifier()
         
-        let reader = ResidenceCardReader(
+        let reader = RDCReader(
             sessionManager: mockSession,
             threadDispatcher: mockDispatcher,
             signatureVerifier: mockVerifier
         )
         
         // Set up mock executor
-        let mockExecutor = MockNFCCommandExecutor()
+        let mockExecutor = MockRDCNFCCommandExecutor()
         mockExecutor.configureMockResponse(for: 0xA4, response: Data())
         
         // Test the executor version directly (which is what selectMF(tag:) calls internally)
@@ -1463,18 +1466,18 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Master File (MF) with executor error handling")
     func testSelectMFWithExecutorErrorHandling() async {
-        let mockSession = MockNFCSessionManager()
+        let mockSession = MockRDCNFCSessionManager()
         let mockDispatcher = MockThreadDispatcher()
-        let mockVerifier = MockSignatureVerifier()
+        let mockVerifier = MockRDCSignatureVerifier()
         
-        let reader = ResidenceCardReader(
+        let reader = RDCReader(
             sessionManager: mockSession,
             threadDispatcher: mockDispatcher,
             signatureVerifier: mockVerifier
         )
         
         // Set up mock executor to fail
-        let mockExecutor = MockNFCCommandExecutor()
+        let mockExecutor = MockRDCNFCCommandExecutor()
         mockExecutor.shouldSucceed = false
         mockExecutor.errorSW1 = 0x6A
         mockExecutor.errorSW2 = 0x82
@@ -1483,7 +1486,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.selectMF(executor: mockExecutor)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x6A)
                 #expect(sw2 == 0x82)
@@ -1495,13 +1498,13 @@ struct ResidenceCardReaderTests {
         }
     }
     
-    @Test("SecureMessagingReader with missing session key")
-    func testSecureMessagingReaderMissingSessionKey() async {
-        let mockExecutor = MockNFCCommandExecutor()
+    @Test("RDCSecureMessagingReader with missing session key")
+    func testRDCSecureMessagingReaderMissingSessionKey() async {
+        let mockExecutor = MockRDCNFCCommandExecutor()
         
         // Try to create reader without session key (nil)
         // This test verifies the reader handles missing session key appropriately
-        let reader = SecureMessagingReader(commandExecutor: mockExecutor, sessionKey: nil)
+        let reader = RDCSecureMessagingReader(commandExecutor: mockExecutor, sessionKey: nil)
         
         do {
             _ = try await reader.readBinaryWithSM(p1: 0x85, p2: 0x00)
@@ -1518,7 +1521,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Data File (DF) with successful response")
     func testSelectDFSuccess() async throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Create a mock tag
         let mockTag = MockNFCISO7816Tag()
@@ -1544,7 +1547,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Data File (DF) with different AIDs")
     func testSelectDFWithDifferentAIDs() async throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test with different DF AIDs
         let aidTestCases = [
@@ -1570,7 +1573,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Data File (DF) with error response")
     func testSelectDFError() async throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Create a mock tag that will return an error
         let mockTag = MockNFCISO7816Tag()
@@ -1583,7 +1586,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.testSelectDF(mockTag: mockTag, aid: testAID)
             #expect(Bool(false), "Should have thrown an error")
-        } catch CardReaderError.cardError(let sw1, let sw2) {
+        } catch RDCReaderError.cardError(let sw1, let sw2) {
             #expect(sw1 == 0x6A)
             #expect(sw2 == 0x82)
         } catch {
@@ -1593,7 +1596,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Data File (DF) with various error status words")
     func testSelectDFVariousStatusWords() async throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test various error status words
         let errorCases: [(UInt8, UInt8, String)] = [
@@ -1616,7 +1619,7 @@ struct ResidenceCardReaderTests {
             do {
                 try await reader.testSelectDF(mockTag: mockTag, aid: testAID)
                 #expect(Bool(false), "Should have thrown error for \(description)")
-            } catch CardReaderError.cardError(let receivedSW1, let receivedSW2) {
+            } catch RDCReaderError.cardError(let receivedSW1, let receivedSW2) {
                 #expect(receivedSW1 == sw1)
                 #expect(receivedSW2 == sw2)
             } catch {
@@ -1627,7 +1630,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Data File (DF) with empty AID")
     func testSelectDFWithEmptyAID() async throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Create a mock tag
         let mockTag = MockNFCISO7816Tag()
@@ -1646,7 +1649,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Select Data File (DF) with custom AID")
     func testSelectDFWithCustomAID() async throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Create a mock tag
         let mockTag = MockNFCISO7816Tag()
@@ -1667,79 +1670,79 @@ struct ResidenceCardReaderTests {
     }
 
     // MARK: - Tests for performSingleDES
-    
+
     @Test("Single DES encryption and decryption")
     func testSingleDESEncryptionDecryption() throws {
-        let reader = ResidenceCardReader()
-        
+        let cryptoProvider = RDCCryptoProviderImpl()
+
         let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
         let plaintext = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
-        
+
         // Encrypt
-        let encrypted = try reader.performSingleDES(data: plaintext, key: key, encrypt: true)
+        let encrypted = try cryptoProvider.performSingleDES(data: plaintext, key: key, encrypt: true)
         #expect(encrypted.count == 8)
         #expect(encrypted != plaintext)
-        
+
         // Decrypt
-        let decrypted = try reader.performSingleDES(data: encrypted, key: key, encrypt: false)
+        let decrypted = try cryptoProvider.performSingleDES(data: encrypted, key: key, encrypt: false)
         #expect(decrypted == plaintext)
     }
-    
+
     @Test("Single DES with invalid key length")
     func testSingleDESInvalidKeyLength() throws {
-        let reader = ResidenceCardReader()
-        
+        let cryptoProvider = RDCCryptoProviderImpl()
+
         let shortKey = Data([0x01, 0x02, 0x03]) // Too short
         let data = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
-        
-        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
-            _ = try reader.performSingleDES(data: data, key: shortKey, encrypt: true)
+
+        #expect(throws: RDCReaderError.self) {
+            _ = try cryptoProvider.performSingleDES(data: data, key: shortKey, encrypt: true)
         }
-        
+
         let longKey = Data(repeating: 0x01, count: 16) // Too long
-        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
-            _ = try reader.performSingleDES(data: data, key: longKey, encrypt: true)
+        #expect(throws: RDCReaderError.self) {
+            _ = try cryptoProvider.performSingleDES(data: data, key: longKey, encrypt: true)
         }
     }
-    
+
     @Test("Single DES with invalid data length")
     func testSingleDESInvalidDataLength() throws {
-        let reader = ResidenceCardReader()
-        
+        let cryptoProvider = RDCCryptoProviderImpl()
+
         let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
         let shortData = Data([0x11, 0x22, 0x33]) // Too short
-        
-        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
-            _ = try reader.performSingleDES(data: shortData, key: key, encrypt: true)
+
+        #expect(throws: RDCReaderError.self) {
+            _ = try cryptoProvider.performSingleDES(data: shortData, key: key, encrypt: true)
         }
-        
+
         let longData = Data(repeating: 0x11, count: 16) // Too long
-        #expect(throws: CardReaderError.cryptographyError("Invalid data or key length for single DES")) {
-            _ = try reader.performSingleDES(data: longData, key: key, encrypt: true)
+        #expect(throws: RDCReaderError.self) {
+            _ = try cryptoProvider.performSingleDES(data: longData, key: key, encrypt: true)
         }
     }
-    
+
     @Test("Single DES with known test vector")
     func testSingleDESKnownVector() throws {
-        let reader = ResidenceCardReader()
-        
+        let cryptoProvider = RDCCryptoProviderImpl()
+
         // Known DES test vector
         let key = Data([0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01])
         let plaintext = Data([0x95, 0xF8, 0xA5, 0xE5, 0xDD, 0x31, 0xD9, 0x00])
-        
-        let encrypted = try reader.performSingleDES(data: plaintext, key: key, encrypt: true)
+
+        let encrypted = try cryptoProvider.performSingleDES(data: plaintext, key: key, encrypt: true)
         #expect(encrypted.count == 8)
-        
+
         // Verify it's reversible
-        let decrypted = try reader.performSingleDES(data: encrypted, key: key, encrypt: false)
+        let decrypted = try cryptoProvider.performSingleDES(data: encrypted, key: key, encrypt: false)
         #expect(decrypted == plaintext)
     }
-    
+
     // MARK: - Tests for private validation methods (now internal)
     
     @Test("Valid characters check")
     func testIsValidCharacters() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Valid format: 2 letters + 8 digits + 2 letters = 12 characters total
         #expect(reader.isValidCharacters("AB12345678CD") == true)
@@ -1756,7 +1759,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Invalid patterns check")
     func testHasInvalidPatterns() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test sequential patterns (format: 2 letters + 8 digits + 2 letters)
         #expect(reader.hasInvalidPatterns("AB12345678CD") == true) // Sequential
@@ -1775,7 +1778,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Sequential pattern detection")
     func testIsSequentialPattern() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Ascending sequences
         #expect(reader.isSequentialPattern("12345678") == true)  // 1→2→3→4→5→6→7→8
@@ -1800,7 +1803,7 @@ struct ResidenceCardReaderTests {
     
     @Test("PKCS7 padding removal")
     func testRemovePKCS7Padding() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Valid PKCS#7 padding
         let data1 = Data([0x01, 0x02, 0x03, 0x04, 0x04, 0x04, 0x04])
@@ -1819,18 +1822,18 @@ struct ResidenceCardReaderTests {
         
         // Invalid padding - inconsistent bytes
         let invalidData1 = Data([0x01, 0x02, 0x03, 0x04, 0x03, 0x04, 0x04])
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.removePKCS7Padding(data: invalidData1)
         }
         
         // Invalid padding - padding length > data length
         let invalidData2 = Data([0x01, 0x02, 0x09])
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.removePKCS7Padding(data: invalidData2)
         }
         
         // Empty data
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.removePKCS7Padding(data: Data())
         }
     }
@@ -1839,7 +1842,7 @@ struct ResidenceCardReaderTests {
     
     @Test("NFC session did become active")
     func testTagReaderSessionDidBecomeActive() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Call the test helper
         reader.testTagReaderSessionDidBecomeActive()
@@ -1850,7 +1853,7 @@ struct ResidenceCardReaderTests {
     
     @Test("NFC session invalidated with error")
     func testTagReaderSessionDidInvalidateWithError() async {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         var completionCalled = false
         var receivedError: Error?
@@ -1886,7 +1889,7 @@ struct ResidenceCardReaderTests {
     
     @Test("BER length parsing with various edge cases")
     func testBERLengthParsingCompleteEdgeCases() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test all valid short form lengths (0-127)
         for length in 0...127 {
@@ -1916,20 +1919,20 @@ struct ResidenceCardReaderTests {
         
         // Test invalid long form (unsupported)
         let invalidLongForm = Data([0x83, 0x00, 0x01, 0x00]) // 3-byte length not supported
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: invalidLongForm, offset: 0)
         }
         
         // Test insufficient data for long form
         let insufficientData = Data([0x82, 0x01]) // Missing second length byte
-        #expect(throws: CardReaderError.invalidResponse) {
+        #expect(throws: RDCReaderError.invalidResponse) {
             _ = try reader.parseBERLength(data: insufficientData, offset: 0)
         }
     }
     
     @Test("Test all card validation edge cases")
     func testCompleteCardValidation() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test all invalid patterns systematically (format: 2 letters + 8 digits + 2 letters)
         let sequentialPatterns = [
@@ -1981,7 +1984,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Test error codes comprehensively")
     func testAllStatusWordCombinations() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Success case
         #expect(throws: Never.self) {
@@ -2006,7 +2009,7 @@ struct ResidenceCardReaderTests {
             do {
                 try reader.checkStatusWord(sw1: sw1, sw2: sw2)
                 #expect(Bool(false)) // Should throw
-            } catch CardReaderError.cardError(let receivedSW1, let receivedSW2) {
+            } catch RDCReaderError.cardError(let receivedSW1, let receivedSW2) {
                 #expect(receivedSW1 == sw1)
                 #expect(receivedSW2 == sw2)
             } catch {
@@ -2017,7 +2020,7 @@ struct ResidenceCardReaderTests {
     
     @Test("Test cryptographic operations with boundary conditions")
     func testCryptoBoundaryConditions() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test Triple-DES with minimum data size (8 bytes)
         let key = Data(repeating: 0x01, count: 16)
@@ -2035,32 +2038,32 @@ struct ResidenceCardReaderTests {
         #expect(largeEncrypted.count >= largeData.count) // Should be padded
         
         // Test Retail MAC with various data sizes
-        let emptyMAC = try reader.calculateRetailMAC(data: Data(), key: key)
+        let emptyMAC = try RDCCryptoProviderImpl().calculateRetailMAC(data: Data(), key: key)
         #expect(emptyMAC.count == 8)
         
-        let singleByteMAC = try reader.calculateRetailMAC(data: Data([0x01]), key: key)
+        let singleByteMAC = try RDCCryptoProviderImpl().calculateRetailMAC(data: Data([0x01]), key: key)
         #expect(singleByteMAC.count == 8)
         #expect(singleByteMAC != emptyMAC) // Should be different
         
         // Test session key generation edge cases
         let zeroKey1 = Data(repeating: 0x00, count: 16)
         let zeroKey2 = Data(repeating: 0x00, count: 16)
-        let sessionKey1 = try reader.generateSessionKey(kIFD: zeroKey1, kICC: zeroKey2)
+        let sessionKey1 = try reader.authenticationProvider.generateSessionKey(kIFD: zeroKey1, kICC: zeroKey2)
         #expect(sessionKey1.count == 16)
         
         // Use different keys to ensure different XOR result: 0xFF XOR 0x00 = 0xFF
         let maxKey1 = Data(repeating: 0xFF, count: 16)
         let zeroKey3 = Data(repeating: 0x00, count: 16)
-        let sessionKey2 = try reader.generateSessionKey(kIFD: maxKey1, kICC: zeroKey3)
+        let sessionKey2 = try reader.authenticationProvider.generateSessionKey(kIFD: maxKey1, kICC: zeroKey3)
         #expect(sessionKey2.count == 16)
         #expect(sessionKey1 != sessionKey2) // Should be different
     }
     
-    // MARK: - TDESCryptography Tests
+    // MARK: - RDCTDESCryptography Tests
     
-    @Test("Test TDESCryptography basic functionality")
-    func testTDESCryptographyBasic() throws {
-        let tdesCrypto = TDESCryptography()
+    @Test("Test RDCTDESCryptography basic functionality")
+    func testRDCTDESCryptographyBasic() throws {
+        let tdesCrypto = RDCTDESCryptography()
         let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
                        0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10])
         let plaintext = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
@@ -2097,9 +2100,9 @@ struct ResidenceCardReaderTests {
         #expect(decryptedShort.suffix(5) == Data(repeating: 0x05, count: 5)) // PKCS7 padding
     }
     
-    @Test("Test TDESCryptography key validation")
-    func testTDESCryptographyKeyValidation() throws {
-        let tdesCrypto = TDESCryptography()
+    @Test("Test RDCTDESCryptography key validation")
+    func testRDCTDESCryptographyKeyValidation() throws {
+        let tdesCrypto = RDCTDESCryptography()
         let plaintext = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88])
         
         // Test invalid key lengths
@@ -2107,22 +2110,22 @@ struct ResidenceCardReaderTests {
         let longKey = Data(repeating: 0x01, count: 17) // 17 bytes
         let emptyKey = Data()
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: RDCReaderError.self) {
             _ = try tdesCrypto.performTDES(data: plaintext, key: shortKey, encrypt: true)
         }
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: RDCReaderError.self) {
             _ = try tdesCrypto.performTDES(data: plaintext, key: longKey, encrypt: true)
         }
         
-        #expect(throws: CardReaderError.self) {
+        #expect(throws: RDCReaderError.self) {
             _ = try tdesCrypto.performTDES(data: plaintext, key: emptyKey, encrypt: true)
         }
     }
     
-    @Test("Test TDESCryptography with block-aligned data")
-    func testTDESCryptographyBlockAligned() throws {
-        let tdesCrypto = TDESCryptography()
+    @Test("Test RDCTDESCryptography with block-aligned data")
+    func testRDCTDESCryptographyBlockAligned() throws {
+        let tdesCrypto = RDCTDESCryptography()
         let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
                        0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10])
         
@@ -2154,9 +2157,9 @@ struct ResidenceCardReaderTests {
         #expect(decryptedThree == threeBlocks)
     }
     
-    @Test("Test TDESCryptography with various data sizes")
-    func testTDESCryptographyVariousSizes() throws {
-        let tdesCrypto = TDESCryptography()
+    @Test("Test RDCTDESCryptography with various data sizes")
+    func testRDCTDESCryptographyVariousSizes() throws {
+        let tdesCrypto = RDCTDESCryptography()
         let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
                        0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10])
         
@@ -2176,9 +2179,9 @@ struct ResidenceCardReaderTests {
         }
     }
     
-    @Test("Test TDESCryptography decrypt operation with various inputs")
-    func testTDESCryptographyDecrypt() throws {
-        let tdesCrypto = TDESCryptography()
+    @Test("Test RDCTDESCryptography decrypt operation with various inputs")
+    func testRDCTDESCryptographyDecrypt() throws {
+        let tdesCrypto = RDCTDESCryptography()
         let key = Data([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
                        0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10])
         
@@ -2204,9 +2207,9 @@ struct ResidenceCardReaderTests {
         #expect(decryptedSixteen == sixteenBytes)
     }
     
-    @Test("Test TDESCryptography edge cases")
-    func testTDESCryptographyEdgeCases() throws {
-        let tdesCrypto = TDESCryptography()
+    @Test("Test RDCTDESCryptography edge cases")
+    func testRDCTDESCryptographyEdgeCases() throws {
+        let tdesCrypto = RDCTDESCryptography()
         let key = Data([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
         
@@ -2240,9 +2243,9 @@ struct ResidenceCardReaderTests {
         #expect(decryptedLarge.prefix(100) == largeData)
     }
     
-    @Test("Test TDESCryptography comprehensive coverage")
-    func testTDESCryptographyComprehensiveCoverage() throws {
-        let tdesCrypto = TDESCryptography()
+    @Test("Test RDCTDESCryptography comprehensive coverage")
+    func testRDCTDESCryptographyComprehensiveCoverage() throws {
+        let tdesCrypto = RDCTDESCryptography()
         let key = Data(repeating: 0x01, count: 16)
         
         // Test various scenarios to ensure comprehensive code coverage
@@ -2295,8 +2298,8 @@ struct ResidenceCardReaderTests {
     
     @Test("performAuthentication basic flow")
     func testPerformAuthentication() async {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Test card number for authentication
         reader.cardNumber = "AB1234567890"
@@ -2310,7 +2313,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.performAuthentication(executor: executor)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .cryptographyError(let message) = error {
                 // MAC verification fails with empty default response
                 #expect(message == "MAC verification failed")
@@ -2329,8 +2332,8 @@ struct ResidenceCardReaderTests {
     
     @Test("performAuthentication GET CHALLENGE failure")
     func testPerformAuthenticationGetChallengeFailure() async {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         reader.cardNumber = "AB1234567890"
         
         // Configure GET CHALLENGE to fail
@@ -2341,7 +2344,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.performAuthentication(executor: executor)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x6A)
                 #expect(sw2 == 0x82)
@@ -2359,8 +2362,8 @@ struct ResidenceCardReaderTests {
     
     @Test("performAuthentication MUTUAL AUTHENTICATE failure")
     func testPerformAuthenticationMutualAuthenticateFailure() async {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         reader.cardNumber = "AB1234567890"
         
         // STEP 1: Mock successful GET CHALLENGE
@@ -2373,7 +2376,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.performAuthentication(executor: executor)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x63)
                 #expect(sw2 == 0x00)
@@ -2392,8 +2395,8 @@ struct ResidenceCardReaderTests {
     
     @Test("performAuthentication cryptographic validation failure")
     func testPerformAuthenticationCryptographicFailure() async {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         reader.cardNumber = "AB1234567890"
         
         // Mock successful GET CHALLENGE
@@ -2410,7 +2413,7 @@ struct ResidenceCardReaderTests {
         do {
             try await reader.performAuthentication(executor: executor)
             #expect(Bool(false), "Should have thrown a cryptography error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .cryptographyError(let message) = error {
                 // Should fail at MAC verification step
                 #expect(message == "MAC verification failed")
@@ -2429,8 +2432,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain successful operation")
     func testReadBinaryPlainSuccess() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Configure successful response with mock data
         let expectedData = Data([0xCA, 0xFE, 0xBA, 0xBE, 0xDE, 0xAD, 0xBE, 0xEF])
@@ -2455,8 +2458,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain with custom P2 parameter")
     func testReadBinaryPlainCustomP2() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Configure successful response
         let expectedData = Data([0x01, 0x02, 0x03, 0x04])
@@ -2480,8 +2483,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain card error handling")
     func testReadBinaryPlainCardError() async {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Configure executor to fail when no mock response is found
         executor.shouldSucceed = false
@@ -2491,7 +2494,7 @@ struct ResidenceCardReaderTests {
         do {
             _ = try await reader.readBinaryPlain(executor: executor, p1: 0x86)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x63)
                 #expect(sw2 == 0x00)
@@ -2509,8 +2512,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain command delegation verification")
     func testReadBinaryPlainDelegation() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Configure response for different file selections
         executor.configureMockResponse(for: 0xB0, p1: 0x8A, p2: 0x00, response: Data([0x8A])) // Card type
@@ -2543,8 +2546,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain empty response handling")
     func testReadBinaryPlainEmptyResponse() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Configure empty but successful response
         executor.configureMockResponse(for: 0xB0, p1: 0x85, p2: 0x00, response: Data())
@@ -2563,8 +2566,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain large data response")
     func testReadBinaryPlainLargeData() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Create large data response (close to APDU limit)
         let largeData = Data(repeating: 0x42, count: 1500)
@@ -2585,8 +2588,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryPlain different file selections")
     func testReadBinaryPlainFileSelections() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Test common residence card file selections with realistic data
         struct FileTest {
@@ -2630,9 +2633,9 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM successful operation")
     func testReadBinaryWithSMSuccess() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         reader.sessionKey = sessionKey
 
         // Create small single chunk test data using MockTestUtils with real encryption
@@ -2661,8 +2664,8 @@ struct ResidenceCardReaderTests {
 
     @Test("readBinaryWithSM custom P2 parameter")
     func testReadBinaryWithSMCustomP2() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Set up session key
         let sessionKey = Data(repeating: 0x33, count: 16)
@@ -2685,8 +2688,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM session key propagation")
     func testReadBinaryWithSMSessionKeyPropagation() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Set up specific session key
         let sessionKey = Data([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
@@ -2707,8 +2710,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM command delegation verification")
     func testReadBinaryWithSMDelegation() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Set up session key
         let sessionKey = Data(repeating: 0xAA, count: 16)
@@ -2722,7 +2725,7 @@ struct ResidenceCardReaderTests {
         
         _ = try await reader.readBinaryWithSM(executor: executor, p1: 0x82, p2: 0x03)
         
-        // Verify delegation to SecureMessagingReader occurred
+        // Verify delegation to RDCSecureMessagingReader occurred
         #expect(executor.commandHistory.count >= 1)
         
         // Check that secure messaging parameters were used
@@ -2735,8 +2738,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM error handling")
     func testReadBinaryWithSMError() async {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Set up session key
         let sessionKey = Data(repeating: 0x77, count: 16)
@@ -2750,7 +2753,7 @@ struct ResidenceCardReaderTests {
         do {
             _ = try await reader.readBinaryWithSM(executor: executor, p1: 0x86)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as CardReaderError {
+        } catch let error as RDCReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x6A)
                 #expect(sw2 == 0x82)
@@ -2768,8 +2771,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM empty response handling")
     func testReadBinaryWithSMEmptyResponse() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Set up session key
         let sessionKey = Data(repeating: 0x99, count: 16)
@@ -2789,9 +2792,9 @@ struct ResidenceCardReaderTests {
     
     @Test("readBinaryWithSM large data response")
     func testReadBinaryWithSMLargeData() async throws {
-        let executor = MockNFCCommandExecutor()
+        let executor = MockRDCNFCCommandExecutor()
         let sessionKey = Data(repeating: 0xAA, count: 16)
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         reader.sessionKey = sessionKey
 
         // Create test data for chunked reading
@@ -2858,8 +2861,8 @@ struct ResidenceCardReaderTests {
 
 //    @Test("readBinaryWithSM different file selections for residence card")
 //    func testReadBinaryWithSMFileSelections() async throws {
-//        let executor = MockNFCCommandExecutor()
-//        let reader = ResidenceCardReader()
+//        let executor = MockRDCNFCCommandExecutor()
+//        let reader = RDCReader()
 //        
 //        // Set up session key
 //        let sessionKey = Data(repeating: 0xCC, count: 16)
@@ -2903,8 +2906,8 @@ struct ResidenceCardReaderTests {
     
     @Test("readCard individual operations without authentication")
     func testReadCardOperations() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         
         // Set up the reader with mock executor and session key
@@ -3210,7 +3213,7 @@ struct ResidenceCardReaderIntegrationTests {
     
     @Test("Error recovery scenarios")
     func testErrorRecoveryScenarios() async {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test with various invalid card numbers that should cause immediate errors
         let invalidCardNumbers = [
@@ -3233,7 +3236,7 @@ struct ResidenceCardReaderIntegrationTests {
                         #expect(Bool(false), "Expected failure for invalid card number: '\(cardNumber)'")
                     case .failure(let error):
                         // Verify we get appropriate error types
-                        if let cardReaderError = error as? CardReaderError {
+                        if let cardReaderError = error as? RDCReaderError {
                             switch cardReaderError {
                             case .nfcNotAvailable:
                                 // This is expected in simulator environment
@@ -3266,7 +3269,7 @@ struct ResidenceCardReaderIntegrationTests {
                     // Should not succeed in test environment due to no real NFC card
                     #expect(Bool(false), "Unexpected success in test environment")
                 case .failure(let error):
-                    if let cardReaderError = error as? CardReaderError {
+                    if let cardReaderError = error as? RDCReaderError {
                         // Should only fail due to NFC not being available in test environment
                         #expect(cardReaderError == .nfcNotAvailable, "Expected NFC unavailable error for valid card number")
                     } else {
@@ -3364,13 +3367,13 @@ struct FrontImageLoadingTests {
         }
     }
     
-    @Test("Test ResidenceCardDetailView image conversion")
-    func testResidenceCardDetailViewImageConversion() {
-        // Test the helper functions used in ResidenceCardDetailView
+    @Test("Test RDCDetailView image conversion")
+    func testRDCDetailViewImageConversion() {
+        // Test the helper functions used in RDCDetailView
         let frontImageData = loadFrontImageDataForTest()
         #expect(frontImageData.count > 0, "Front image data should not be empty")
         
-        // Test image conversion similar to ResidenceCardDetailView.convertImages()
+        // Test image conversion similar to RDCDetailView.convertImages()
         let convertedImage = convertTIFFToUIImage(data: frontImageData)
         
         if let image = convertedImage {
@@ -3442,7 +3445,7 @@ struct FrontImageLoadingTests {
     
     // Helper functions for testing
     private func loadFrontImageDataForTest() -> Data {
-        // Replicate the logic from ResidenceCardDetailView
+        // Replicate the logic from RDCDetailView
         if let uiImage = UIImage(named: "front_image_mmr") {
             if let cgImage = uiImage.cgImage {
                 let bitmap = NSMutableData()
@@ -3470,7 +3473,7 @@ struct FrontImageLoadingTests {
     }
     
     private func loadFaceImageDataForTest() -> Data {
-        // Replicate the logic from ResidenceCardDetailView
+        // Replicate the logic from RDCDetailView
         if let uiImage = UIImage(named: "face_image") {
             if let jpegData = uiImage.jpegData(compressionQuality: 1.0) {
                 return jpegData
@@ -3813,7 +3816,7 @@ struct SignatureVerificationTests {
 
     @Test("TLV parsing for signature data")
     func testTLVParsingForSignatureData() {
-        let verifier = ResidenceCardSignatureVerifier()
+        let verifier = RDCSignatureVerifierImpl()
 
         // Create test signature data with check code and certificate
         var signatureData = Data()
@@ -3842,7 +3845,7 @@ struct SignatureVerificationTests {
 
     @Test("Image value extraction from TLV")
     func testImageValueExtraction() {
-        let verifier = ResidenceCardSignatureVerifier()
+        let verifier = RDCSignatureVerifierImpl()
 
         // Create front image TLV data (tag 0xD0)
         var frontImageTLV = Data()
@@ -3868,7 +3871,7 @@ struct SignatureVerificationTests {
 
     @Test("Verification with mock data")
     func testVerificationWithMockData() {
-        let verifier = ResidenceCardSignatureVerifier()
+        let verifier = RDCSignatureVerifierImpl()
 
         // Create mock signature data (simplified)
         var mockSignature = Data()
@@ -3903,7 +3906,7 @@ struct SignatureVerificationTests {
 
     @Test("Error handling for missing data")
     func testErrorHandlingForMissingData() {
-        let verifier = ResidenceCardSignatureVerifier()
+        let verifier = RDCSignatureVerifierImpl()
 
         // Test with empty check code and certificate
         let emptyResult = verifier.verifySignature(
@@ -3986,7 +3989,7 @@ struct SignatureVerificationTests {
 
     @Test("Signature verification structure validation")
     func testSignatureVerificationStructureValidation() {
-        let verifier = ResidenceCardSignatureVerifier()
+        let verifier = RDCSignatureVerifierImpl()
 
         // Test with properly structured signature data (but without valid crypto)
         var signatureData = Data()
@@ -4028,13 +4031,13 @@ struct SignatureVerificationTests {
         #expect(result.error != nil)
     }
 
-    @Test("VerificationResult can be valid")
-    func testVerificationResultCanBeValid() {
-        // Test that VerificationResult.isValid can be true
-        let validResult = ResidenceCardSignatureVerifier.VerificationResult(
+    @Test("RDCVerificationResult can be valid")
+    func testRDCVerificationResultCanBeValid() {
+        // Test that RDCVerificationResult.isValid can be true
+        let validResult = RDCVerificationResult(
             isValid: true,
             error: nil,
-            details: ResidenceCardSignatureVerifier.VerificationDetails(
+            details: RDCVerificationDetails(
                 checkCodeHash: "ABCDEF1234567890",
                 calculatedHash: "ABCDEF1234567890",
                 certificateSubject: "Test Certificate",
@@ -4052,17 +4055,17 @@ struct SignatureVerificationTests {
     }
 
     // Helper functions to access private methods for testing
-    private func extractCheckCodeForTest(verifier: ResidenceCardSignatureVerifier, data: Data) -> Data? {
+    private func extractCheckCodeForTest(verifier: RDCSignatureVerifier, data: Data) -> Data? {
         // This would normally require making the method internal or using @testable
         // For now, we simulate the TLV parsing logic
         return parseTLVForTest(data: data, tag: 0xDA)
     }
 
-    private func extractCertificateForTest(verifier: ResidenceCardSignatureVerifier, data: Data) -> Data? {
+    private func extractCertificateForTest(verifier: RDCSignatureVerifier, data: Data) -> Data? {
         return parseTLVForTest(data: data, tag: 0xDB)
     }
 
-    private func extractImageValueForTest(verifier: ResidenceCardSignatureVerifier, data: Data) -> Data? {
+    private func extractImageValueForTest(verifier: RDCSignatureVerifier, data: Data) -> Data? {
         if let value = parseTLVForTest(data: data, tag: 0xD0) {
             return value
         } else if let value = parseTLVForTest(data: data, tag: 0xD1) {
@@ -4136,7 +4139,7 @@ struct PerformAuthenticationLinesTests {
     
     @Test("verifyAndExtractKICC with valid input")
     func testVerifyAndExtractKICCSuccess() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test data - mocking authentic mutual authentication data
         let kEnc = Data([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 
@@ -4155,10 +4158,10 @@ struct PerformAuthenticationLinesTests {
         let eICC = try reader.tdesCryptography.performTDES(data: expectedDecrypted, key: kEnc, encrypt: true)
         
         // Calculate MAC for eICC
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
         // Test the method
-        let extractedKICC = try reader.verifyAndExtractKICC(
+        let extractedKICC = try reader.authenticationProvider.verifyAndExtractKICC(
             eICC: eICC,
             mICC: mICC,
             rndICC: rndICC,
@@ -4172,7 +4175,7 @@ struct PerformAuthenticationLinesTests {
     
     @Test("verifyAndExtractKICC with invalid MAC")
     func testVerifyAndExtractKICCInvalidMAC() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let kEnc = Data(repeating: 0x01, count: 16)
         let kMac = Data(repeating: 0x02, count: 16)
@@ -4186,8 +4189,8 @@ struct PerformAuthenticationLinesTests {
         // Use wrong MAC
         let wrongMAC = Data(repeating: 0xFF, count: 8)
         
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(
+        #expect(throws: RDCReaderError.self) {
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(
                 eICC: eICC,
                 mICC: wrongMAC,
                 rndICC: rndICC,
@@ -4200,7 +4203,7 @@ struct PerformAuthenticationLinesTests {
     
     @Test("verifyAndExtractKICC with mismatched RND.ICC")
     func testVerifyAndExtractKICCMismatchedRNDICC() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let kEnc = Data(repeating: 0x01, count: 16)
         let kMac = Data(repeating: 0x02, count: 16)
@@ -4212,10 +4215,10 @@ struct PerformAuthenticationLinesTests {
         let wrongRNDICC = Data(repeating: 0xFF, count: 8)
         let invalidData = wrongRNDICC + rndIFD + kICC
         let eICC = try reader.tdesCryptography.performTDES(data: invalidData, key: kEnc, encrypt: true)
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(
+        #expect(throws: RDCReaderError.self) {
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(
                 eICC: eICC,
                 mICC: mICC,
                 rndICC: rndICC,  // Expecting correct RND.ICC
@@ -4228,7 +4231,7 @@ struct PerformAuthenticationLinesTests {
     
     @Test("verifyAndExtractKICC with mismatched RND.IFD")
     func testVerifyAndExtractKICCMismatchedRNDIFD() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let kEnc = Data(repeating: 0x01, count: 16)
         let kMac = Data(repeating: 0x02, count: 16)
@@ -4240,10 +4243,10 @@ struct PerformAuthenticationLinesTests {
         let wrongRNDIFD = Data(repeating: 0xFF, count: 8)
         let invalidData = rndICC + wrongRNDIFD + kICC
         let eICC = try reader.tdesCryptography.performTDES(data: invalidData, key: kEnc, encrypt: true)
-        let mICC = try reader.calculateRetailMAC(data: eICC, key: kMac)
+        let mICC = try RDCCryptoProviderImpl().calculateRetailMAC(data: eICC, key: kMac)
         
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.verifyAndExtractKICC(
+        #expect(throws: RDCReaderError.self) {
+            _ = try reader.authenticationProvider.verifyAndExtractKICC(
                 eICC: eICC,
                 mICC: mICC,
                 rndICC: rndICC,
@@ -4256,31 +4259,31 @@ struct PerformAuthenticationLinesTests {
     
     @Test("generateSessionKey with standard keys")
     func testGenerateSessionKey() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let kIFD = Data([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
                         0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10])
         let kICC = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
                         0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00])
         
-        let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         
         // Session key should be 16 bytes (from first 16 bytes of SHA-1)
         #expect(sessionKey.count == 16)
         
         // Verify it's deterministic - same input should produce same output
-        let sessionKey2 = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey2 = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         #expect(sessionKey == sessionKey2)
         
         // Different keys should produce different session key
         let differentKICC = Data(repeating: 0xFF, count: 16)
-        let sessionKey3 = try reader.generateSessionKey(kIFD: kIFD, kICC: differentKICC)
+        let sessionKey3 = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: differentKICC)
         #expect(sessionKey != sessionKey3)
     }
     
     @Test("generateSessionKey follows specification")
     func testGenerateSessionKeySpecification() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         // Test with known values to verify algorithm
         let kIFD = Data([0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
@@ -4288,7 +4291,7 @@ struct PerformAuthenticationLinesTests {
         let kICC = Data([0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88,
                         0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00])
         
-        let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         
         // Manually verify XOR result
         let expectedXOR = Data([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -4303,12 +4306,12 @@ struct PerformAuthenticationLinesTests {
     
     @Test("generateSessionKey with identical keys")
     func testGenerateSessionKeyIdenticalKeys() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let identicalKey = Data([0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0,
                                 0x0F, 0xED, 0xCB, 0xA9, 0x87, 0x65, 0x43, 0x21])
         
-        let sessionKey = try reader.generateSessionKey(kIFD: identicalKey, kICC: identicalKey)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: identicalKey, kICC: identicalKey)
         
         // XOR of identical keys should be all zeros
         #expect(sessionKey.count == 16)
@@ -4326,60 +4329,60 @@ struct PerformAuthenticationLinesTests {
     
     @Test("encryptCardNumber with valid 12-digit number")
     func testEncryptCardNumberValid() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let cardNumber = "123456789012"
         let sessionKey = Data([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
                               0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10])
         
-        let encryptedData = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let encryptedData = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         
         // Encrypted data should be 16 bytes (TDES block size)
         #expect(encryptedData.count == 16)
         
         // Should be deterministic
-        let encryptedData2 = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let encryptedData2 = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         #expect(encryptedData == encryptedData2)
         
         // Different card numbers should produce different encrypted data
         let differentCardNumber = "987654321098"
-        let encryptedData3 = try reader.encryptCardNumber(cardNumber: differentCardNumber, sessionKey: sessionKey)
+        let encryptedData3 = try reader.authenticationProvider.encryptCardNumber(cardNumber: differentCardNumber, sessionKey: sessionKey)
         #expect(encryptedData != encryptedData3)
     }
     
     @Test("encryptCardNumber with invalid length")
     func testEncryptCardNumberInvalidLength() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         let sessionKey = Data(repeating: 0x01, count: 16)
         
         // Test various invalid lengths
         let shortNumber = "12345"
         let longNumber = "1234567890123"
         
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.encryptCardNumber(cardNumber: shortNumber, sessionKey: sessionKey)
+        #expect(throws: RDCReaderError.self) {
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: shortNumber, sessionKey: sessionKey)
         }
         
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.encryptCardNumber(cardNumber: longNumber, sessionKey: sessionKey)
+        #expect(throws: RDCReaderError.self) {
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: longNumber, sessionKey: sessionKey)
         }
     }
     
     @Test("encryptCardNumber with non-ASCII characters")
     func testEncryptCardNumberNonASCII() {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         let sessionKey = Data(repeating: 0x01, count: 16)
         
         let unicodeNumber = "１２３４５６７８９０１２"  // Full-width digits
         
-        #expect(throws: CardReaderError.self) {
-            _ = try reader.encryptCardNumber(cardNumber: unicodeNumber, sessionKey: sessionKey)
+        #expect(throws: RDCReaderError.self) {
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: unicodeNumber, sessionKey: sessionKey)
         }
     }
     
     @Test("encryptCardNumber verifies padding")
     func testEncryptCardNumberPadding() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         
         let cardNumber = "000000000000"
         let sessionKey = Data(repeating: 0x00, count: 16)  // All zeros for predictable result
@@ -4391,14 +4394,14 @@ struct PerformAuthenticationLinesTests {
         // Encrypt manually to compare
         let expectedEncrypted = try reader.tdesCryptography.performTDES(data: expectedPaddedData, key: sessionKey, encrypt: true)
         
-        let actualEncrypted = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let actualEncrypted = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         
         #expect(actualEncrypted == expectedEncrypted)
     }
     
     @Test("encryptCardNumber with various session keys")
     func testEncryptCardNumberVariousKeys() throws {
-        let reader = ResidenceCardReader()
+        let reader = RDCReader()
         let cardNumber = "123456789012"
         
         let key1 = Data(repeating: 0x01, count: 16)
@@ -4406,9 +4409,9 @@ struct PerformAuthenticationLinesTests {
         let key3 = Data([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
                         0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10])
         
-        let encrypted1 = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: key1)
-        let encrypted2 = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: key2)
-        let encrypted3 = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: key3)
+        let encrypted1 = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: key1)
+        let encrypted2 = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: key2)
+        let encrypted3 = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: key3)
         
         // Different keys should produce different encrypted results
         #expect(encrypted1 != encrypted2)
@@ -4423,8 +4426,8 @@ struct PerformAuthenticationLinesTests {
     
     @Test("performAuthentication executes through lines 237-270")
     func testPerformAuthenticationExecutesLines237to270() async {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         
         // Set up test card number
         reader.cardNumber = "AB1234567890"
@@ -4550,8 +4553,8 @@ struct PerformAuthenticationLinesTests {
     
     @Test("readCard operations with large images (1694+ bytes)")
     func testReadCardOperationsWithLargeImages() async throws {
-        let executor = MockNFCCommandExecutor()
-        let reader = ResidenceCardReader()
+        let executor = MockRDCNFCCommandExecutor()
+        let reader = RDCReader()
         let sessionKey = Data(repeating: 0xAA, count: 16)
         
         // Set up the reader with mock executor and session key

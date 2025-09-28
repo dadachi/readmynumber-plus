@@ -1,7 +1,7 @@
 import Foundation
 import CoreNFC
 
-class SignatureCertificateReader: NSObject {
+class RDCSignatureCertificateReader: NSObject {
     private var completionHandler: ((Bool, String) -> Void)?
     private var pin: String = ""
     

@@ -69,7 +69,7 @@ class MockNFCISO7816Tag {
                     return (mockData, 0x90, 0x00)
                 }
             } else {
-                throw CardReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
+                throw RDCReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
             }
         }
         
@@ -77,8 +77,8 @@ class MockNFCISO7816Tag {
         if shouldSucceed {
             return (Data(), 0x90, 0x00)
         } else {
-            // Simulate CardReaderError.cardError
-            throw CardReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
+            // Simulate RDCReaderError.cardError
+            throw RDCReaderError.cardError(sw1: errorSW1, sw2: errorSW2)
         }
     }
 }
@@ -103,7 +103,7 @@ struct MockAPDUCommand {
 }
 
 // Test-specific extension to ResidenceCardReader for testing internal methods
-extension ResidenceCardReader {
+extension RDCReader {
     
     // Test helper for NFC delegate methods
     func testTagReaderSessionDidBecomeActive() {
@@ -170,7 +170,7 @@ struct MockTestUtils {
     
     static func createRealEncryptedSMResponse(plaintext: Data, sessionKey: Data) throws -> Data {
         // Create real encrypted secure messaging response using TDES
-        let realTDES = TDESCryptography()
+        let realTDES = RDCTDESCryptography()
         let encryptedData = try realTDES.performTDES(data: plaintext, key: sessionKey, encrypt: true)
         
         var response = Data()
@@ -183,7 +183,7 @@ struct MockTestUtils {
     
     static func createChunkedTestData(plaintext: Data, sessionKey: Data, firstChunkSize: Int) throws -> (firstChunk: Data, secondChunk: Data, offsetP1: UInt8, offsetP2: UInt8) {
         // Create real encrypted data
-        let realTDES = TDESCryptography()
+        let realTDES = RDCTDESCryptography()
         let encryptedData = try realTDES.performTDES(data: plaintext, key: sessionKey, encrypt: true)
         
         // Create TLV structure indicating large total size
@@ -196,7 +196,7 @@ struct MockTestUtils {
         // Ensure we don't try to read more data than we have
         let firstPartSize = min(availableSpaceInFirstChunk, encryptedData.count)
         guard firstPartSize > 0 else {
-            throw CardReaderError.invalidResponse
+            throw RDCReaderError.invalidResponse
         }
         
         // First chunk: TLV header + prefix + partial encrypted data
@@ -216,7 +216,7 @@ struct MockTestUtils {
     
     static func createSingleChunkTestData(plaintext: Data, sessionKey: Data) throws -> Data {
         // Create small TLV data that fits in a single chunk
-        let realTDES = TDESCryptography()
+        let realTDES = RDCTDESCryptography()
         let encryptedData = try realTDES.performTDES(data: plaintext, key: sessionKey, encrypt: true)
         
         // Create proper TLV structure: Tag (0x86) + Length + Value (0x01 + encrypted data)
