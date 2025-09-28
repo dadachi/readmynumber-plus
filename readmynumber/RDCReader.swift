@@ -249,7 +249,7 @@ class RDCReader: NSObject, ObservableObject {
 
         // セッション鍵生成: K.Session = SHA-1((K.IFD ⊕ K.ICC) || 00000001)[0..15]
         // この鍵は以降のセキュアメッセージング通信で使用されます
-        let generatedSessionKey = try self.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let generatedSessionKey = try authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         sessionKey = generatedSessionKey
 
         // STEP 5: VERIFY - 在留カード番号による認証実行
@@ -927,56 +927,6 @@ extension RDCReader {
 
 // MARK: - Cryptography Extensions
 extension RDCReader {
-
-
-
-
-    /// セッション鍵生成（在留カード等仕様書 3.5.2.3）
-    ///
-    /// 相互認証の完了後に、端末鍵（K.IFD）とカード鍵（K.ICC）から
-    /// セキュアメッセージング用のセッション鍵を生成します。
-    ///
-    /// 鍵生成手順（在留カード等仕様書準拠）:
-    /// 1. K.IFD ⊕ K.ICC （16バイト）- XOR演算による鍵の合成
-    /// 2. 連結: (K.IFD ⊕ K.ICC) || 00 00 00 01 （20バイト）
-    /// 3. SHA-1ハッシュ化（20バイト出力）
-    /// 4. 先頭16バイトをセッション鍵として採用
-    ///
-    /// セキュリティ特性:
-    /// - 端末とカードの両方が鍵生成に寄与（相互制御）
-    /// - XOR演算により鍵の独立性を確保
-    /// - SHA-1による鍵の均一分布
-    /// - セッション固有の鍵（リプレイ攻撃防止）
-    ///
-    /// 生成される鍵の用途:
-    /// - セキュアメッセージング暗号化（3DES）
-    /// - データの機密性保護
-    /// - 通信セッション全体で使用
-    ///
-    /// - Parameters:
-    ///   - kIFD: 端末鍵（16バイト）
-    ///   - kICC: カード鍵（16バイト）
-    /// - Returns: セッション鍵（16バイト）
-    /// - Throws: なし（内部処理エラーなし）
-    internal func generateSessionKey(kIFD: Data, kICC: Data) throws -> Data {
-        // STEP 1: XOR演算による鍵の合成
-        // K.IFD ⊕ K.ICC - 両方の鍵が寄与する複合鍵を作成
-        let xorData = Data(zip(kIFD, kICC).map { $0 ^ $1 })
-
-        // STEP 2: 仕様書規定の定数追加
-        // 在留カード等仕様書で規定された固定値 "00000001" を連結
-        let input = xorData + Data([0x00, 0x00, 0x00, 0x01])
-
-        // STEP 3: SHA-1ハッシュ化による鍵導出
-        var hash = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
-        input.withUnsafeBytes { bytes in
-            _ = CC_SHA1(bytes.bindMemory(to: UInt8.self).baseAddress, CC_LONG(input.count), &hash)
-        }
-
-        // STEP 4: 先頭16バイトをセッション鍵として採用
-        // SHA-1出力（20バイト）の先頭16バイトが最終的なセッション鍵
-        return Data(hash.prefix(16))
-    }
 
     /// ICC（カード）認証データの検証とカード鍵抽出
     ///

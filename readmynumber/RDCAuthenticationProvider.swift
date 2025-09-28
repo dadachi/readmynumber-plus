@@ -6,6 +6,7 @@ protocol RDCAuthenticationProvider {
     func generateKeys(from cardNumber: String) throws -> (kEnc: Data, kMac: Data)
     func generateAuthenticationData(rndICC: Data, kEnc: Data, kMac: Data) throws -> (eIFD: Data, mIFD: Data, rndIFD: Data, kIFD: Data)
     func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, rndIFD: Data, kEnc: Data, kMac: Data) throws -> Data
+    func generateSessionKey(kIFD: Data, kICC: Data) throws -> Data
 }
 
 class RDCAuthenticationProviderImpl: RDCAuthenticationProvider {
@@ -88,5 +89,25 @@ class RDCAuthenticationProviderImpl: RDCAuthenticationProvider {
         // 復号データの最後16バイトがK.ICC（カードセッション鍵素材）
         // この鍵はK.IFDとXORされて最終セッション鍵を生成
         return decrypted.suffix(16)
+    }
+
+    func generateSessionKey(kIFD: Data, kICC: Data) throws -> Data {
+        // STEP 1: XOR演算による鍵の合成
+        // K.IFD ⊕ K.ICC - 両方の鍵が寄与する複合鍵を作成
+        let xorData = Data(zip(kIFD, kICC).map { $0 ^ $1 })
+
+        // STEP 2: 仕様書規定の定数追加
+        // 在留カード等仕様書で規定された固定値 "00000001" を連結
+        let input = xorData + Data([0x00, 0x00, 0x00, 0x01])
+
+        // STEP 3: SHA-1ハッシュ化による鍵導出
+        var hash = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
+        input.withUnsafeBytes { bytes in
+            _ = CC_SHA1(bytes.bindMemory(to: UInt8.self).baseAddress, CC_LONG(input.count), &hash)
+        }
+
+        // STEP 4: 先頭16バイトをセッション鍵として採用
+        // SHA-1出力（20バイト）の先頭16バイトが最終的なセッション鍵
+        return Data(hash.prefix(16))
     }
 }

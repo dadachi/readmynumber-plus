@@ -696,16 +696,16 @@ struct RDCReaderTests {
         ])
         
         // Generate session key
-        let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         #expect(sessionKey.count == 16) // Should be 16 bytes
         
         // Should be deterministic
-        let sessionKey2 = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey2 = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         #expect(sessionKey == sessionKey2) // Same inputs should produce same result
         
         // Different inputs should produce different results
         let differentKIFD = Data(repeating: 0x12, count: 16)
-        let differentSessionKey = try reader.generateSessionKey(kIFD: differentKIFD, kICC: kICC)
+        let differentSessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: differentKIFD, kICC: kICC)
         #expect(sessionKey != differentSessionKey) // Different kIFD should produce different result
         
         // Test XOR operation correctness
@@ -916,7 +916,7 @@ struct RDCReaderTests {
         
         // Test with identical kIFD and kICC
         let identicalKey = Data(repeating: 0x77, count: 16)
-        let sessionKey = try reader.generateSessionKey(kIFD: identicalKey, kICC: identicalKey)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: identicalKey, kICC: identicalKey)
         
         #expect(sessionKey.count == 16)
         // XOR of identical data should be all zeros, but SHA-1 will still produce valid output
@@ -929,7 +929,7 @@ struct RDCReaderTests {
         let reader = RDCReader()
         
         let zeroKey = Data(repeating: 0x00, count: 16)
-        let sessionKey = try reader.generateSessionKey(kIFD: zeroKey, kICC: zeroKey)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: zeroKey, kICC: zeroKey)
         
         #expect(sessionKey.count == 16)
         #expect(sessionKey != zeroKey) // Should be different due to SHA-1 processing
@@ -1146,7 +1146,7 @@ struct RDCReaderTests {
         #expect(extractedKICC == kICC)
         
         // Step 4: Generate session key
-        let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         #expect(sessionKey.count == 16)
         
         // Step 5: Use session key for card number encryption
@@ -1215,7 +1215,7 @@ struct RDCReaderTests {
             // Test session key generation
             let kIFD = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
             let kICC = Data((0..<16).map { _ in UInt8.random(in: 0...255) })
-            let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+            let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
             #expect(sessionKey.count == 16)
         }
     }
@@ -2048,13 +2048,13 @@ struct RDCReaderTests {
         // Test session key generation edge cases
         let zeroKey1 = Data(repeating: 0x00, count: 16)
         let zeroKey2 = Data(repeating: 0x00, count: 16)
-        let sessionKey1 = try reader.generateSessionKey(kIFD: zeroKey1, kICC: zeroKey2)
+        let sessionKey1 = try reader.authenticationProvider.generateSessionKey(kIFD: zeroKey1, kICC: zeroKey2)
         #expect(sessionKey1.count == 16)
         
         // Use different keys to ensure different XOR result: 0xFF XOR 0x00 = 0xFF
         let maxKey1 = Data(repeating: 0xFF, count: 16)
         let zeroKey3 = Data(repeating: 0x00, count: 16)
-        let sessionKey2 = try reader.generateSessionKey(kIFD: maxKey1, kICC: zeroKey3)
+        let sessionKey2 = try reader.authenticationProvider.generateSessionKey(kIFD: maxKey1, kICC: zeroKey3)
         #expect(sessionKey2.count == 16)
         #expect(sessionKey1 != sessionKey2) // Should be different
     }
@@ -4266,18 +4266,18 @@ struct PerformAuthenticationLinesTests {
         let kICC = Data([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
                         0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00])
         
-        let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         
         // Session key should be 16 bytes (from first 16 bytes of SHA-1)
         #expect(sessionKey.count == 16)
         
         // Verify it's deterministic - same input should produce same output
-        let sessionKey2 = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey2 = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         #expect(sessionKey == sessionKey2)
         
         // Different keys should produce different session key
         let differentKICC = Data(repeating: 0xFF, count: 16)
-        let sessionKey3 = try reader.generateSessionKey(kIFD: kIFD, kICC: differentKICC)
+        let sessionKey3 = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: differentKICC)
         #expect(sessionKey != sessionKey3)
     }
     
@@ -4291,7 +4291,7 @@ struct PerformAuthenticationLinesTests {
         let kICC = Data([0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88,
                         0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00])
         
-        let sessionKey = try reader.generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: kIFD, kICC: kICC)
         
         // Manually verify XOR result
         let expectedXOR = Data([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -4311,7 +4311,7 @@ struct PerformAuthenticationLinesTests {
         let identicalKey = Data([0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0,
                                 0x0F, 0xED, 0xCB, 0xA9, 0x87, 0x65, 0x43, 0x21])
         
-        let sessionKey = try reader.generateSessionKey(kIFD: identicalKey, kICC: identicalKey)
+        let sessionKey = try reader.authenticationProvider.generateSessionKey(kIFD: identicalKey, kICC: identicalKey)
         
         // XOR of identical keys should be all zeros
         #expect(sessionKey.count == 16)
