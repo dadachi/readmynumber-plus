@@ -542,7 +542,7 @@ extension RDCReader: NFCTagReaderSessionDelegate {
         let certificateData = Data(Array(0..<1200).map { UInt8($0 % 256) })
 
         // Create test verification result
-        let verificationDetails = ResidenceCardSignatureVerifier.VerificationDetails(
+        let verificationDetails = RDCVerificationDetails(
             checkCodeHash: "ABCDEF123456789",
             calculatedHash: "ABCDEF123456789",
             certificateSubject: "Test Certificate Subject",
@@ -551,7 +551,7 @@ extension RDCReader: NFCTagReaderSessionDelegate {
             certificateNotAfter: Date().addingTimeInterval(365 * 24 * 60 * 60)
         )
 
-        let verificationResult = ResidenceCardSignatureVerifier.VerificationResult(
+        let verificationResult = RDCVerificationResult(
             isValid: true,
             error: nil,
             details: verificationDetails
@@ -780,7 +780,7 @@ struct ResidenceCardData: Equatable {
     let certificate: Data    // Tag 0xDB - X.509 public key certificate
 
     // Signature verification status
-    var signatureVerificationResult: ResidenceCardSignatureVerifier.VerificationResult?
+    var signatureVerificationResult: RDCVerificationResult?
 
     struct AdditionalData: Equatable {
         let comprehensivePermission: Data

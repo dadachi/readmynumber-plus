@@ -4031,13 +4031,13 @@ struct SignatureVerificationTests {
         #expect(result.error != nil)
     }
 
-    @Test("VerificationResult can be valid")
-    func testVerificationResultCanBeValid() {
-        // Test that VerificationResult.isValid can be true
-        let validResult = ResidenceCardSignatureVerifier.VerificationResult(
+    @Test("RDCVerificationResult can be valid")
+    func testRDCVerificationResultCanBeValid() {
+        // Test that RDCVerificationResult.isValid can be true
+        let validResult = RDCVerificationResult(
             isValid: true,
             error: nil,
-            details: ResidenceCardSignatureVerifier.VerificationDetails(
+            details: RDCVerificationDetails(
                 checkCodeHash: "ABCDEF1234567890",
                 calculatedHash: "ABCDEF1234567890",
                 certificateSubject: "Test Certificate",
