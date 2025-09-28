@@ -3816,7 +3816,7 @@ struct SignatureVerificationTests {
 
     @Test("TLV parsing for signature data")
     func testTLVParsingForSignatureData() {
-        let verifier = ResidenceCardSignatureVerifier()
+        let verifier = RDCSignatureVerifierImpl()
 
         // Create test signature data with check code and certificate
         var signatureData = Data()
@@ -3845,7 +3845,7 @@ struct SignatureVerificationTests {
 
     @Test("Image value extraction from TLV")
     func testImageValueExtraction() {
-        let verifier = ResidenceCardSignatureVerifier()
+        let verifier = RDCSignatureVerifierImpl()
 
         // Create front image TLV data (tag 0xD0)
         var frontImageTLV = Data()
@@ -3871,7 +3871,7 @@ struct SignatureVerificationTests {
 
     @Test("Verification with mock data")
     func testVerificationWithMockData() {
-        let verifier = ResidenceCardSignatureVerifier()
+        let verifier = RDCSignatureVerifierImpl()
 
         // Create mock signature data (simplified)
         var mockSignature = Data()
@@ -3906,7 +3906,7 @@ struct SignatureVerificationTests {
 
     @Test("Error handling for missing data")
     func testErrorHandlingForMissingData() {
-        let verifier = ResidenceCardSignatureVerifier()
+        let verifier = RDCSignatureVerifierImpl()
 
         // Test with empty check code and certificate
         let emptyResult = verifier.verifySignature(
@@ -3989,7 +3989,7 @@ struct SignatureVerificationTests {
 
     @Test("Signature verification structure validation")
     func testSignatureVerificationStructureValidation() {
-        let verifier = ResidenceCardSignatureVerifier()
+        let verifier = RDCSignatureVerifierImpl()
 
         // Test with properly structured signature data (but without valid crypto)
         var signatureData = Data()
@@ -4055,17 +4055,17 @@ struct SignatureVerificationTests {
     }
 
     // Helper functions to access private methods for testing
-    private func extractCheckCodeForTest(verifier: ResidenceCardSignatureVerifier, data: Data) -> Data? {
+    private func extractCheckCodeForTest(verifier: RDCSignatureVerifier, data: Data) -> Data? {
         // This would normally require making the method internal or using @testable
         // For now, we simulate the TLV parsing logic
         return parseTLVForTest(data: data, tag: 0xDA)
     }
 
-    private func extractCertificateForTest(verifier: ResidenceCardSignatureVerifier, data: Data) -> Data? {
+    private func extractCertificateForTest(verifier: RDCSignatureVerifier, data: Data) -> Data? {
         return parseTLVForTest(data: data, tag: 0xDB)
     }
 
-    private func extractImageValueForTest(verifier: ResidenceCardSignatureVerifier, data: Data) -> Data? {
+    private func extractImageValueForTest(verifier: RDCSignatureVerifier, data: Data) -> Data? {
         if let value = parseTLVForTest(data: data, tag: 0xD0) {
             return value
         } else if let value = parseTLVForTest(data: data, tag: 0xD1) {

@@ -52,7 +52,7 @@ class RDCReader: NSObject, ObservableObject {
     override init() {
         self.sessionManager = RDCNFCSessionManagerImpl()
         self.threadDispatcher = SystemThreadDispatcher()
-        self.signatureVerifier = ResidenceCardSignatureVerifier()
+        self.signatureVerifier = RDCSignatureVerifierImpl()
         self.authenticationProvider = RDCAuthenticationProviderImpl()
         self.tdesCryptography = RDCTDESCryptography()
         self.cryptoProvider = RDCCryptoProviderImpl()

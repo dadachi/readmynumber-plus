@@ -167,7 +167,7 @@ class MockRDCSignatureVerifier: RDCSignatureVerifier {
 // 8. READ BINARY (00 B0 xx xx Le) - Read signature data in blocks
 //
 // The APDU responses contain the TLV-structured data that this verifier processes.
-public class ResidenceCardSignatureVerifier: RDCSignatureVerifier {
+public class RDCSignatureVerifierImpl: RDCSignatureVerifier {
 
     // MARK: - Constants
     // These constants are defined according to 在留カード等仕様書 specifications
