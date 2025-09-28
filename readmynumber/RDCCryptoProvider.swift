@@ -9,7 +9,7 @@ class RDCCryptoProviderImpl: RDCCryptoProvider {
 
     func calculateRetailMAC(data: Data, key: Data) throws -> Data {
         guard key.count == 16 else {
-            throw ResidenceCardReaderError.cryptographyError("Invalid key length for Retail MAC")
+            throw RDCReaderError.cryptographyError("Invalid key length for Retail MAC")
         }
 
         // ISO/IEC 9797-1 Padding Method 2: Add 0x80 followed by 0x00s
@@ -51,7 +51,7 @@ class RDCCryptoProviderImpl: RDCCryptoProvider {
 
     internal func performSingleDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
         guard key.count == 8 && data.count == 8 else {
-            throw ResidenceCardReaderError.cryptographyError("Invalid data or key length for single DES")
+            throw RDCReaderError.cryptographyError("Invalid data or key length for single DES")
         }
 
         var result = Data(repeating: 0, count: 8)
@@ -75,7 +75,7 @@ class RDCCryptoProviderImpl: RDCCryptoProvider {
         }
 
         guard status == kCCSuccess else {
-            throw ResidenceCardReaderError.cryptographyError("Single DES operation failed")
+            throw RDCReaderError.cryptographyError("Single DES operation failed")
         }
 
         return result

@@ -279,8 +279,8 @@ struct SignatureVerifierTests {
     // MARK: - Successful Verification Tests
 
     @Test func testSuccessfulSignatureVerification() throws {
-        // For now, let's test with MockSignatureVerifier to ensure our test framework works
-        let mockVerifier = MockSignatureVerifier()
+        // For now, let's test with MockRDCSignatureVerifier to ensure our test framework works
+        let mockVerifier = MockRDCSignatureVerifier()
         mockVerifier.shouldReturnValid = true
 
         // Create test image data with exact fixed lengths
@@ -302,7 +302,7 @@ struct SignatureVerifierTests {
         // Verify successful verification
         #expect(result.isValid == true)
         #expect(result.error == nil)
-        #expect(result.details == nil) // MockSignatureVerifier returns nil details
+        #expect(result.details == nil) // MockRDCSignatureVerifier returns nil details
     }
 
     @Test func testSuccessfulSignatureVerificationWithRealCrypto() throws {

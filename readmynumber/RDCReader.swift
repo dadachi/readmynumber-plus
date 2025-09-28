@@ -3,7 +3,7 @@ import CryptoKit
 import CommonCrypto
 
 // MARK: - 在留カードリーダー
-class ResidenceCardReader: NSObject, ObservableObject {
+class RDCReader: NSObject, ObservableObject {
 
     // MARK: - Constants
     private enum Command {
@@ -41,9 +41,9 @@ class ResidenceCardReader: NSObject, ObservableObject {
     private var commandExecutor: RDCNFCCommandExecutor?
     private var sessionManager: RDCNFCSessionManager
     private var threadDispatcher: ThreadDispatcher
-    private var signatureVerifier: SignatureVerifier
+    private var signatureVerifier: RDCSignatureVerifier
     private var authenticationProvider: RDCAuthenticationProvider
-    internal var tdesCryptography: TDESCryptography
+    internal var tdesCryptography: RDCTDESCryptography
     private var cryptoProvider: RDCCryptoProvider
 
     // MARK: - Initialization
@@ -54,7 +54,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
         self.threadDispatcher = SystemThreadDispatcher()
         self.signatureVerifier = ResidenceCardSignatureVerifier()
         self.authenticationProvider = RDCAuthenticationProviderImpl()
-        self.tdesCryptography = TDESCryptography()
+        self.tdesCryptography = RDCTDESCryptography()
         self.cryptoProvider = RDCCryptoProviderImpl()
         super.init()
     }
@@ -63,9 +63,9 @@ class ResidenceCardReader: NSObject, ObservableObject {
     init(
         sessionManager: RDCNFCSessionManager,
         threadDispatcher: ThreadDispatcher,
-        signatureVerifier: SignatureVerifier,
+        signatureVerifier: RDCSignatureVerifier,
         authenticationProvider: RDCAuthenticationProvider = RDCAuthenticationProviderImpl(),
-        tdesCryptography: TDESCryptography = TDESCryptography(),
+        tdesCryptography: RDCTDESCryptography = RDCTDESCryptography(),
         cryptoProvider: RDCCryptoProvider = RDCCryptoProviderImpl()
     ) {
         self.sessionManager = sessionManager
@@ -88,8 +88,8 @@ class ResidenceCardReader: NSObject, ObservableObject {
     func setDependencies(
         sessionManager: RDCNFCSessionManager? = nil,
         threadDispatcher: ThreadDispatcher? = nil,
-        signatureVerifier: SignatureVerifier? = nil,
-        tdesCryptography: TDESCryptography? = nil
+        signatureVerifier: RDCSignatureVerifier? = nil,
+        tdesCryptography: RDCTDESCryptography? = nil
     ) {
         if let sessionManager = sessionManager {
             self.sessionManager = sessionManager
@@ -110,7 +110,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
 
         // Enhanced card number validation
         do {
-            let validatedCardNumber = try validateCardNumber(cardNumber)
+            let validatedCardNumber = try self.validateCardNumber(cardNumber)
             self.cardNumber = validatedCardNumber
         } catch {
             completion(.failure(error))
@@ -119,13 +119,13 @@ class ResidenceCardReader: NSObject, ObservableObject {
 
         // Check if we're in test environment by looking for test bundle
         if Bundle.main.bundlePath.hasSuffix(".xctest") || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
-            completion(.failure(ResidenceCardReaderError.nfcNotAvailable))
+            completion(.failure(RDCReaderError.nfcNotAvailable))
             return
         }
 
         // Check if we're in test environment (no real NFC or simulator)
         guard sessionManager.isReadingAvailable else {
-            completion(.failure(ResidenceCardReaderError.nfcNotAvailable))
+            completion(.failure(RDCReaderError.nfcNotAvailable))
             return
         }
 
@@ -245,11 +245,11 @@ class ResidenceCardReader: NSObject, ObservableObject {
         // 1. M.ICCを検証してE.ICCの完全性を確認
         // 2. E.ICCを復号してRND.ICCの一致を確認（リプレイ攻撃防止）
         // 3. K.ICC（カード鍵16バイト）を抽出
-        let kICC = try verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
+        let kICC = try self.verifyAndExtractKICC(eICC: eICC, mICC: mICC, rndICC: rndICC, rndIFD: rndIFD, kEnc: kEnc, kMac: kMac)
 
         // セッション鍵生成: K.Session = SHA-1((K.IFD ⊕ K.ICC) || 00000001)[0..15]
         // この鍵は以降のセキュアメッセージング通信で使用されます
-        let generatedSessionKey = try generateSessionKey(kIFD: kIFD, kICC: kICC)
+        let generatedSessionKey = try self.generateSessionKey(kIFD: kIFD, kICC: kICC)
         sessionKey = generatedSessionKey
 
         // STEP 5: VERIFY - 在留カード番号による認証実行
@@ -286,7 +286,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
 
     // バイナリ読み出し（SMあり）
     internal func readBinaryWithSM(executor: RDCNFCCommandExecutor, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
-        let smReader = SecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
+        let smReader = RDCSecureMessagingReader(commandExecutor: executor, sessionKey: sessionKey)
         return try await smReader.readBinaryWithSM(p1: p1, p2: p2)
     }
 
@@ -300,7 +300,7 @@ class ResidenceCardReader: NSObject, ObservableObject {
     internal func encryptCardNumber(cardNumber: String, sessionKey: Data) throws -> Data {
         guard let cardNumberData = cardNumber.data(using: .ascii),
               cardNumberData.count == 12 else {
-            throw ResidenceCardReaderError.invalidCardNumber
+            throw RDCReaderError.invalidCardNumber
         }
 
         // パディング追加
@@ -312,14 +312,14 @@ class ResidenceCardReader: NSObject, ObservableObject {
 
     /// Decrypt Secure Messaging response
     ///
-    /// セキュアメッセージング応答の復号化処理を SecureMessagingReader に委任します。
+    /// セキュアメッセージング応答の復号化処理を RDCSecureMessagingReader に委任します。
     /// テスト用に公開されているメソッドです。
     ///
     /// - Parameter encryptedData: TLV形式の暗号化データ
     /// - Returns: 復号化されたデータ（パディング除去済み）
-    /// - Throws: ResidenceCardReaderError セッションキーがない、データ形式が不正、復号化失敗時
+    /// - Throws: RDCReaderError セッションキーがない、データ形式が不正、復号化失敗時
     internal func decryptSMResponse(encryptedData: Data) throws -> Data {
-        let smReader = SecureMessagingReader(
+        let smReader = RDCSecureMessagingReader(
             commandExecutor: MockRDCNFCCommandExecutor(), // Tests don't need real executor
             sessionKey: sessionKey,
             tdesCryptography: tdesCryptography
@@ -327,11 +327,11 @@ class ResidenceCardReader: NSObject, ObservableObject {
         return try smReader.decryptSMResponse(encryptedData: encryptedData)
     }
 
-    // MARK: - Testing Methods (delegated to SecureMessagingReader)
+    // MARK: - Testing Methods (delegated to RDCSecureMessagingReader)
 
-    /// Parse BER/DER length encoding - delegated to SecureMessagingReader for testing
+    /// Parse BER/DER length encoding - delegated to RDCSecureMessagingReader for testing
     internal func parseBERLength(data: Data, offset: Int) throws -> (length: Int, nextOffset: Int) {
-        let smReader = SecureMessagingReader(
+        let smReader = RDCSecureMessagingReader(
             commandExecutor: MockRDCNFCCommandExecutor(),
             sessionKey: sessionKey,
             tdesCryptography: tdesCryptography
@@ -339,9 +339,9 @@ class ResidenceCardReader: NSObject, ObservableObject {
         return try smReader.parseBERLength(data: data, offset: offset)
     }
 
-    /// Remove padding from decrypted data - delegated to SecureMessagingReader for testing
+    /// Remove padding from decrypted data - delegated to RDCSecureMessagingReader for testing
     internal func removePadding(data: Data) throws -> Data {
-        let smReader = SecureMessagingReader(
+        let smReader = RDCSecureMessagingReader(
             commandExecutor: MockRDCNFCCommandExecutor(),
             sessionKey: sessionKey,
             tdesCryptography: tdesCryptography
@@ -349,9 +349,9 @@ class ResidenceCardReader: NSObject, ObservableObject {
         return try smReader.removePadding(data: data)
     }
 
-    /// Remove PKCS#7 padding from data - delegated to SecureMessagingReader for testing
+    /// Remove PKCS#7 padding from data - delegated to RDCSecureMessagingReader for testing
     internal func removePKCS7Padding(data: Data) throws -> Data {
-        let smReader = SecureMessagingReader(
+        let smReader = RDCSecureMessagingReader(
             commandExecutor: MockRDCNFCCommandExecutor(),
             sessionKey: sessionKey,
             tdesCryptography: tdesCryptography
@@ -362,13 +362,13 @@ class ResidenceCardReader: NSObject, ObservableObject {
     // ステータスワードチェック
     internal func checkStatusWord(sw1: UInt8, sw2: UInt8) throws {
         guard sw1 == 0x90 && sw2 == 0x00 else {
-            throw ResidenceCardReaderError.cardError(sw1: sw1, sw2: sw2)
+            throw RDCReaderError.cardError(sw1: sw1, sw2: sw2)
         }
     }
 }
 
 // MARK: - NFCTagReaderSessionDelegate
-extension ResidenceCardReader: NFCTagReaderSessionDelegate {
+extension RDCReader: NFCTagReaderSessionDelegate {
     func tagReaderSessionDidBecomeActive(_ session: NFCTagReaderSession) {
         // セッション開始
     }
@@ -683,10 +683,10 @@ extension ResidenceCardReader: NFCTagReaderSessionDelegate {
         // Tag 0xDA: チェックコード (256 bytes encrypted hash)
         // Tag 0xDB: 公開鍵証明書 (X.509 certificate)
         guard let checkCode = parseTLV(data: signatureData, tag: 0xDA) else {
-            throw ResidenceCardReaderError.invalidResponse
+            throw RDCReaderError.invalidResponse
         }
         guard let certificate = parseTLV(data: signatureData, tag: 0xDB) else {
-            throw ResidenceCardReaderError.invalidResponse
+            throw RDCReaderError.invalidResponse
         }
 
         // 8. 署名検証 (3.4.3.1 署名検証方法)
@@ -804,7 +804,7 @@ struct ResidenceCardData: Equatable {
 
 
 // MARK: - Card Number Validation
-extension ResidenceCardReader {
+extension RDCReader {
 
     /// Enhanced validation for residence card number format
     /// Format: 英字2桁 + 数字8桁 + 英字2桁 (Total: 12 characters)
@@ -815,17 +815,17 @@ extension ResidenceCardReader {
 
         // Check length (must be exactly 12 characters)
         guard trimmedCardNumber.count == 12 else {
-            throw ResidenceCardReaderError.invalidCardNumberLength
+            throw RDCReaderError.invalidCardNumberLength
         }
 
         // Check format: 英字2桁 + 数字8桁 + 英字2桁
         guard isValidResidenceCardFormat(trimmedCardNumber) else {
-            throw ResidenceCardReaderError.invalidCardNumberFormat
+            throw RDCReaderError.invalidCardNumberFormat
         }
 
         // Check character validity
         guard isValidCharacters(trimmedCardNumber) else {
-            throw ResidenceCardReaderError.invalidCardNumberCharacters
+            throw RDCReaderError.invalidCardNumberCharacters
         }
 
         return trimmedCardNumber
@@ -926,7 +926,7 @@ extension ResidenceCardReader {
 }
 
 // MARK: - Cryptography Extensions
-extension ResidenceCardReader {
+extension RDCReader {
 
 
 
@@ -1009,13 +1009,13 @@ extension ResidenceCardReader {
     ///   - kEnc: 復号用暗号化鍵（16バイト）
     ///   - kMac: MAC検証用鍵（16バイト）
     /// - Returns: カード鍵K.ICC（16バイト）
-    /// - Throws: ResidenceCardReaderError.cryptographyError 検証失敗時
+    /// - Throws: RDCReaderError.cryptographyError 検証失敗時
     internal func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, rndIFD: Data, kEnc: Data, kMac: Data) throws -> Data {
         // STEP 1: MAC検証 - データ完全性の確認
         // カードから受信したM.ICCと、E.ICCから計算したMACを比較
         let calculatedMAC = try cryptoProvider.calculateRetailMAC(data: eICC, key: kMac)
         guard calculatedMAC == mICC else {
-            throw ResidenceCardReaderError.cryptographyError("MAC verification failed")
+            throw RDCReaderError.cryptographyError("MAC verification failed")
         }
 
         // STEP 2: 認証データの復号化
@@ -1026,13 +1026,13 @@ extension ResidenceCardReader {
         // 復号データの先頭8バイトが最初のRND.ICCと一致することを確認
         // これによりリプレイ攻撃を防止し、カードの正当性を確認
         guard decrypted.prefix(8) == rndICC else {
-            throw ResidenceCardReaderError.cryptographyError("RND.ICC verification failed")
+            throw RDCReaderError.cryptographyError("RND.ICC verification failed")
         }
 
         // STEP 4: 端末乱数による相互性の検証
         // 復号データの8バイト目から16バイト目までが端末のRND.IFDと一致することを確認
         guard decrypted.subdata(in: 8..<16) == rndIFD else {
-            throw ResidenceCardReaderError.cryptographyError("RND.IFD verification failed")
+            throw RDCReaderError.cryptographyError("RND.IFD verification failed")
         }
 
         // STEP 5: カード鍵K.ICCの抽出

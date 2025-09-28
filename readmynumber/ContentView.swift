@@ -289,7 +289,7 @@ class NFCManager: NSObject, ObservableObject, NFCTagReaderSessionDelegate {
 
     // 各証明書の読み取りクラスをインスタンス化
     private let authenticationReader = UserAuthenticationCertificateReader()
-    private let signatureReader = SignatureCertificateReader()
+    private let signatureReader = RDCSignatureCertificateReader()
 
     func startReading(pin: String, completion: @escaping (Bool, String) -> Void) {
         self.completionHandler = completion

@@ -8,10 +8,10 @@ protocol RDCAuthenticationProvider {
 }
 
 class RDCAuthenticationProviderImpl: RDCAuthenticationProvider {
-    private let tdesCryptography: TDESCryptography
+    private let tdesCryptography: RDCTDESCryptography
     private let cryptoProvider: RDCCryptoProvider
 
-    init(tdesCryptography: TDESCryptography = TDESCryptography(),
+    init(tdesCryptography: RDCTDESCryptography = RDCTDESCryptography(),
          cryptoProvider: RDCCryptoProvider = RDCCryptoProviderImpl()) {
         self.tdesCryptography = tdesCryptography
         self.cryptoProvider = cryptoProvider
@@ -19,7 +19,7 @@ class RDCAuthenticationProviderImpl: RDCAuthenticationProvider {
 
     func generateKeys(from cardNumber: String) throws -> (kEnc: Data, kMac: Data) {
         guard let cardNumberData = cardNumber.data(using: .ascii) else {
-            throw ResidenceCardReaderError.invalidCardNumber
+            throw RDCReaderError.invalidCardNumber
         }
 
         // SHA-1ハッシュ化（在留カード等仕様書 3.5.2.1 準拠）

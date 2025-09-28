@@ -207,8 +207,8 @@ class FrontImageBatchProcessor {
     }
 }
 
-// MARK: - Example 4: Integration with ResidenceCardDetailView
-extension ResidenceCardDetailView {
+// MARK: - Example 4: Integration with RDCDetailView
+extension RDCDetailView {
     
     /// Replace white background in front image with transparency
     func processFrontImageWithTransparency() -> UIImage? {

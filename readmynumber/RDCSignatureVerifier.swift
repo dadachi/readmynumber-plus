@@ -5,7 +5,7 @@ import Security
 // MARK: - Signature Verifier Protocol
 
 /// Protocol for residence card signature verification
-protocol SignatureVerifier {
+protocol RDCSignatureVerifier {
     /// Verify the digital signature of residence card data
     /// - Parameters:
     ///   - checkCode: The check code (tag 0xDA) - 256 bytes encrypted hash
@@ -24,7 +24,7 @@ protocol SignatureVerifier {
 // MARK: - Mock Signature Verifier
 
 /// Mock implementation for testing
-class MockSignatureVerifier: SignatureVerifier {
+class MockRDCSignatureVerifier: RDCSignatureVerifier {
     var shouldReturnValid = true
     var mockError: ResidenceCardSignatureVerifier.VerificationError?
     var verificationCalls: [(signatureData: Data, frontImageData: Data, faceImageData: Data)] = []
@@ -97,7 +97,7 @@ class MockSignatureVerifier: SignatureVerifier {
 // 8. READ BINARY (00 B0 xx xx Le) - Read signature data in blocks
 //
 // The APDU responses contain the TLV-structured data that this verifier processes.
-public class ResidenceCardSignatureVerifier: SignatureVerifier {
+public class ResidenceCardSignatureVerifier: RDCSignatureVerifier {
     
     // MARK: - Types
     public struct VerificationResult {

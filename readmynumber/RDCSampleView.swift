@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct ResidenceCardSampleView: View {
+struct RDCSampleView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
     @State private var selectedTab = 0
@@ -143,5 +143,5 @@ struct ResidenceCardSampleView: View {
 }
 
 #Preview {
-    ResidenceCardSampleView()
+    RDCSampleView()
 }

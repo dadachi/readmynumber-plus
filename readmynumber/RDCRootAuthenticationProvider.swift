@@ -1,5 +1,5 @@
 import Foundation
 
-protocol RootAuthenticationProvider {
+protocol RDCRootAuthenticationProvider {
     func performAuthentication(executor: RDCNFCCommandExecutor) async throws -> Data
 }

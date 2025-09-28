@@ -50,7 +50,7 @@ struct RDCPlainBinaryReaderTests {
         do {
             _ = try await reader.readBinaryPlain(p1: 0x8A, p2: 0x00)
             #expect(Bool(false), "Should have thrown an error")
-        } catch let error as ResidenceCardReaderError {
+        } catch let error as RDCReaderError {
             if case .cardError(let sw1, let sw2) = error {
                 #expect(sw1 == 0x6A)
                 #expect(sw2 == 0x82)
@@ -175,7 +175,7 @@ struct RDCPlainBinaryReaderTests {
             do {
                 _ = try await reader.readBinaryPlain(p1: 0x84, p2: 0x00)
                 #expect(Bool(false), "Should have thrown error for \(errorCase.description)")
-            } catch let error as ResidenceCardReaderError {
+            } catch let error as RDCReaderError {
                 if case .cardError(let sw1, let sw2) = error {
                     #expect(sw1 == errorCase.sw1, "SW1 mismatch for \(errorCase.description)")
                     #expect(sw2 == errorCase.sw2, "SW2 mismatch for \(errorCase.description)")

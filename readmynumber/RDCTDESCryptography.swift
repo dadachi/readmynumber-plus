@@ -5,7 +5,7 @@ import CommonCrypto
 /// 
 /// This class encapsulates Triple-DES cryptographic operations used in residence card reading.
 /// It follows the specifications defined in the residence card documentation for 2-key 3DES.
-class TDESCryptography {
+class RDCTDESCryptography {
   
   /// Triple-DES 暗号化・復号化処理
   /// 
@@ -33,10 +33,10 @@ class TDESCryptography {
   ///   - key: 16バイトの暗号化鍵（2-key 3DES用）
   ///   - encrypt: true=暗号化, false=復号化
   /// - Returns: 処理されたデータ
-  /// - Throws: ResidenceCardReaderError.cryptographyError 処理失敗時
+  /// - Throws: RDCReaderError.cryptographyError 処理失敗時
   func performTDES(data: Data, key: Data, encrypt: Bool) throws -> Data {
     guard key.count == 16 else {
-      throw ResidenceCardReaderError.cryptographyError("Invalid key length: \(key.count), expected 16")
+      throw RDCReaderError.cryptographyError("Invalid key length: \(key.count), expected 16")
     }
     
     // Convert 2-key (16 bytes) to 3-key (24 bytes) for CommonCrypto
@@ -92,7 +92,7 @@ class TDESCryptography {
       default:
         errorMessage = "TDES operation failed with status: \(status)"
       }
-      throw ResidenceCardReaderError.cryptographyError(errorMessage)
+      throw RDCReaderError.cryptographyError(errorMessage)
     }
     
     result.count = numBytesProcessed

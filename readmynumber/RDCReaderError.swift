@@ -1,5 +1,5 @@
 //
-//  ResidenceCardReaderError.swift
+//  RDCReaderError.swift
 //  readmynumber
 //
 //  Created on 2025/09/28.
@@ -8,7 +8,7 @@
 import Foundation
 
 /// Error types for residence card reader operations
-enum ResidenceCardReaderError: LocalizedError, Equatable {
+enum RDCReaderError: LocalizedError, Equatable {
     case nfcNotAvailable
     case invalidCardNumber
     case invalidCardNumberFormat

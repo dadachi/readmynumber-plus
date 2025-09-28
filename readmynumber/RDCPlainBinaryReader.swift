@@ -45,7 +45,7 @@ class RDCPlainBinaryReader {
     /// Check status words for errors
     private func checkStatusWord(sw1: UInt8, sw2: UInt8) throws {
         guard sw1 == 0x90 && sw2 == 0x00 else {
-            throw ResidenceCardReaderError.cardError(sw1: sw1, sw2: sw2)
+            throw RDCReaderError.cardError(sw1: sw1, sw2: sw2)
         }
     }
 }
