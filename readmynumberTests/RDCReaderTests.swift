@@ -832,19 +832,19 @@ struct RDCReaderTests {
         ])
         
         // Encrypt card number
-        let encryptedCardNumber = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let encryptedCardNumber = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         
         // Verify encryption properties
         #expect(encryptedCardNumber.count == 16) // Should be 16 bytes (padded to block boundary)
         #expect(encryptedCardNumber != Data(cardNumber.utf8)) // Should be different from plaintext
         
         // Test deterministic encryption
-        let encryptedCardNumber2 = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let encryptedCardNumber2 = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         #expect(encryptedCardNumber == encryptedCardNumber2) // Should be deterministic with same inputs
         
         // Test different session keys produce different results
         let differentSessionKey = Data(repeating: 0x42, count: 16)
-        let encryptedWithDifferentKey = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: differentSessionKey)
+        let encryptedWithDifferentKey = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: differentSessionKey)
         #expect(encryptedCardNumber != encryptedWithDifferentKey) // Different key should produce different result
         
         // Test decryption to verify round-trip
@@ -1003,14 +1003,14 @@ struct RDCReaderTests {
         let wrongSizeKey = Data(repeating: 0x42, count: 8) // 8 bytes instead of 16
         
         #expect(throws: RDCReaderError.self) {
-            _ = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: wrongSizeKey)
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: wrongSizeKey)
         }
         
         // Test with empty session key
         let emptyKey = Data()
         
         #expect(throws: RDCReaderError.self) {
-            _ = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: emptyKey)
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: emptyKey)
         }
     }
     
@@ -1021,27 +1021,27 @@ struct RDCReaderTests {
         
         // Test with card number that's too short
         #expect(throws: RDCReaderError.invalidCardNumber) {
-            _ = try reader.encryptCardNumber(cardNumber: "AB12345678C", sessionKey: validSessionKey)
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: "AB12345678C", sessionKey: validSessionKey)
         }
         
         // Test with card number that's too long
         #expect(throws: RDCReaderError.invalidCardNumber) {
-            _ = try reader.encryptCardNumber(cardNumber: "AB12345678CDE", sessionKey: validSessionKey)
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: "AB12345678CDE", sessionKey: validSessionKey)
         }
         
         // Test with card number containing non-ASCII characters
         #expect(throws: RDCReaderError.invalidCardNumber) {
-            _ = try reader.encryptCardNumber(cardNumber: "AB1234567あCD", sessionKey: validSessionKey)
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: "AB1234567あCD", sessionKey: validSessionKey)
         }
         
         // Test with empty card number
         #expect(throws: RDCReaderError.invalidCardNumber) {
-            _ = try reader.encryptCardNumber(cardNumber: "", sessionKey: validSessionKey)
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: "", sessionKey: validSessionKey)
         }
         
         // Test with card number containing extended ASCII characters
         #expect(throws: RDCReaderError.invalidCardNumber) {
-            _ = try reader.encryptCardNumber(cardNumber: "AB12345678C\u{00FF}", sessionKey: validSessionKey)
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: "AB12345678C\u{00FF}", sessionKey: validSessionKey)
         }
     }
     
@@ -1150,7 +1150,7 @@ struct RDCReaderTests {
         #expect(sessionKey.count == 16)
         
         // Step 5: Use session key for card number encryption
-        let encryptedCardNumber = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let encryptedCardNumber = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         #expect(encryptedCardNumber.count == 16)
         
         // Verify round-trip
@@ -4335,18 +4335,18 @@ struct PerformAuthenticationLinesTests {
         let sessionKey = Data([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
                               0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10])
         
-        let encryptedData = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let encryptedData = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         
         // Encrypted data should be 16 bytes (TDES block size)
         #expect(encryptedData.count == 16)
         
         // Should be deterministic
-        let encryptedData2 = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let encryptedData2 = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         #expect(encryptedData == encryptedData2)
         
         // Different card numbers should produce different encrypted data
         let differentCardNumber = "987654321098"
-        let encryptedData3 = try reader.encryptCardNumber(cardNumber: differentCardNumber, sessionKey: sessionKey)
+        let encryptedData3 = try reader.authenticationProvider.encryptCardNumber(cardNumber: differentCardNumber, sessionKey: sessionKey)
         #expect(encryptedData != encryptedData3)
     }
     
@@ -4360,11 +4360,11 @@ struct PerformAuthenticationLinesTests {
         let longNumber = "1234567890123"
         
         #expect(throws: RDCReaderError.self) {
-            _ = try reader.encryptCardNumber(cardNumber: shortNumber, sessionKey: sessionKey)
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: shortNumber, sessionKey: sessionKey)
         }
         
         #expect(throws: RDCReaderError.self) {
-            _ = try reader.encryptCardNumber(cardNumber: longNumber, sessionKey: sessionKey)
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: longNumber, sessionKey: sessionKey)
         }
     }
     
@@ -4376,7 +4376,7 @@ struct PerformAuthenticationLinesTests {
         let unicodeNumber = "１２３４５６７８９０１２"  // Full-width digits
         
         #expect(throws: RDCReaderError.self) {
-            _ = try reader.encryptCardNumber(cardNumber: unicodeNumber, sessionKey: sessionKey)
+            _ = try reader.authenticationProvider.encryptCardNumber(cardNumber: unicodeNumber, sessionKey: sessionKey)
         }
     }
     
@@ -4394,7 +4394,7 @@ struct PerformAuthenticationLinesTests {
         // Encrypt manually to compare
         let expectedEncrypted = try reader.tdesCryptography.performTDES(data: expectedPaddedData, key: sessionKey, encrypt: true)
         
-        let actualEncrypted = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
+        let actualEncrypted = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey)
         
         #expect(actualEncrypted == expectedEncrypted)
     }
@@ -4409,9 +4409,9 @@ struct PerformAuthenticationLinesTests {
         let key3 = Data([0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
                         0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10])
         
-        let encrypted1 = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: key1)
-        let encrypted2 = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: key2)
-        let encrypted3 = try reader.encryptCardNumber(cardNumber: cardNumber, sessionKey: key3)
+        let encrypted1 = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: key1)
+        let encrypted2 = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: key2)
+        let encrypted3 = try reader.authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: key3)
         
         // Different keys should produce different encrypted results
         #expect(encrypted1 != encrypted2)

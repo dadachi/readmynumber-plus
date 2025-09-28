@@ -7,6 +7,7 @@ protocol RDCAuthenticationProvider {
     func generateAuthenticationData(rndICC: Data, kEnc: Data, kMac: Data) throws -> (eIFD: Data, mIFD: Data, rndIFD: Data, kIFD: Data)
     func verifyAndExtractKICC(eICC: Data, mICC: Data, rndICC: Data, rndIFD: Data, kEnc: Data, kMac: Data) throws -> Data
     func generateSessionKey(kIFD: Data, kICC: Data) throws -> Data
+    func encryptCardNumber(cardNumber: String, sessionKey: Data) throws -> Data
 }
 
 class RDCAuthenticationProviderImpl: RDCAuthenticationProvider {
@@ -109,5 +110,18 @@ class RDCAuthenticationProviderImpl: RDCAuthenticationProvider {
         // STEP 4: 先頭16バイトをセッション鍵として採用
         // SHA-1出力（20バイト）の先頭16バイトが最終的なセッション鍵
         return Data(hash.prefix(16))
+    }
+
+    func encryptCardNumber(cardNumber: String, sessionKey: Data) throws -> Data {
+        guard let cardNumberData = cardNumber.data(using: .ascii),
+              cardNumberData.count == 12 else {
+            throw RDCReaderError.invalidCardNumber
+        }
+
+        // パディング追加
+        let paddedData = cardNumberData + Data([0x80, 0x00, 0x00, 0x00])
+
+        // TDES 2key CBC暗号化
+        return try tdesCryptography.performTDES(data: paddedData, key: sessionKey, encrypt: true)
     }
 }

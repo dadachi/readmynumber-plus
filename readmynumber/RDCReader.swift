@@ -258,7 +258,7 @@ class RDCReader: NSObject, ObservableObject {
 
         // 在留カード番号（12バイト）をセッション鍵で3DES暗号化
         // パディング: カード番号 + 0x80 + 0x00（16バイトブロック境界まで）
-        let encryptedCardNumber = try encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey!)
+        let encryptedCardNumber = try authenticationProvider.encryptCardNumber(cardNumber: cardNumber, sessionKey: sessionKey!)
 
         // セキュアメッセージング用TLVデータ構造:
         // 0x86: 暗号化されたデータオブジェクト
@@ -294,20 +294,6 @@ class RDCReader: NSObject, ObservableObject {
     internal func readBinaryPlain(executor: RDCNFCCommandExecutor, p1: UInt8, p2: UInt8 = 0x00) async throws -> Data {
         let plainReader = RDCPlainBinaryReader(commandExecutor: executor)
         return try await plainReader.readBinaryPlain(p1: p1, p2: p2)
-    }
-
-    // 暗号化・復号化処理
-    internal func encryptCardNumber(cardNumber: String, sessionKey: Data) throws -> Data {
-        guard let cardNumberData = cardNumber.data(using: .ascii),
-              cardNumberData.count == 12 else {
-            throw RDCReaderError.invalidCardNumber
-        }
-
-        // パディング追加
-        let paddedData = cardNumberData + Data([0x80, 0x00, 0x00, 0x00])
-
-        // TDES 2key CBC暗号化
-        return try tdesCryptography.performTDES(data: paddedData, key: sessionKey, encrypt: true)
     }
 
     /// Decrypt Secure Messaging response
